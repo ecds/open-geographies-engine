@@ -19,17 +19,21 @@ module OpenGeographies
     # the 20 files the fork used to modify) on boot and after every code reload, so
     # they survive Zeitwerk reloading in development.
     config.to_prepare do
+      # Fail with a clear message rather than a NameError deep in the decorators
+      # when the engine is mounted on a host that doesn't provide Core Data at all.
+      unless defined?(::CoreDataConnector::Project)
+        raise OpenGeographies::HostError,
+              'open_geographies must be mounted on a Core Data / FairData host: ' \
+              'CoreDataConnector::Project is not defined.'
+      end
+
       OpenGeographies::Decorators.apply!
     end
 
-    # Add Open Geographies' routes to the connector engine's route set so they are
-    # served under the same /core_data mount the host already provides — e.g.
+    # The routes Open Geographies adds under /core_data — e.g.
     # GET /core_data/public/v1/atlases/:slug and the admin sites/search_collections/
-    # place_imports endpoints. Registered before routes are finalized; the append
-    # block is evaluated in the connector engine's (isolated CoreDataConnector) route
-    # context, so controllers resolve to CoreDataConnector::*.
-    initializer 'open_geographies.append_routes', after: :add_routing_paths do
-      CoreDataConnector::Engine.routes.append do
+    # place_imports endpoints. Controllers resolve to CoreDataConnector::*.
+    ROUTES = proc do
         # --- Admin API (engine root → /core_data/...) ---
         resources :atlases, only: [:create]
 
@@ -68,7 +72,34 @@ module OpenGeographies
             resources :atlases, only: [:show], param: :slug
           end
         end
+    end
+
+    # Register the routes wherever the host serves Core Data from. Two host shapes
+    # exist:
+    #
+    # - The merged core-data-cloud / FairData app: the old connector engine is gone
+    #   and its routes live directly in the host's routes.rb as
+    #   `scope path: 'core_data', module: 'core_data_connector'`. Append ours to the
+    #   host under that same scope so the URLs are unchanged.
+    # - A legacy host still on the standalone gem: append to the connector engine's
+    #   own route set, exactly as before.
+    #
+    # Registered before routes are finalized (after :add_routing_paths).
+    initializer 'open_geographies.append_routes', after: :add_routing_paths do |app|
+      routes = OpenGeographies::Engine::ROUTES
+
+      if defined?(::CoreDataConnector::Engine)
+        ::CoreDataConnector::Engine.routes.append(&routes)
+      else
+        app.routes.append do
+          scope path: 'core_data', module: 'core_data_connector' do
+            instance_exec(&routes)
+          end
+        end
       end
     end
   end
+
+  # Raised when the engine is mounted on a host that does not provide Core Data.
+  class HostError < StandardError; end
 end

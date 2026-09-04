@@ -1,6 +1,14 @@
 # On-save indexing wraps the connector's Typesense client (lib/typesense, not
-# autoloaded). Require it so the decorators below can reference Typesense::Search.
-require 'typesense/search'
+# autoloaded). The merged core-data-cloud / FairData host no longer ships
+# lib/typesense/search.rb, so the require is optional: without it the Typesense
+# decorators below simply aren't applied. Typesense indexing is being retired
+# outright in favour of the v1 Elasticsearch index (see the v1 integration handoff);
+# this guard only keeps the engine bootable until that removal lands.
+begin
+  require 'typesense/search'
+rescue LoadError
+  nil
+end
 
 module OpenGeographies
   # Applies Open Geographies' in-place extensions to upstream Core Data classes —
@@ -99,6 +107,9 @@ module OpenGeographies
     # Typesense::Search → single-record upsert/remove (on-save indexing) + an
     # optional progress callback on full index runs.
     def self.wire_typesense_records!
+      # Absent on the merged FairData host (see the require guard at the top).
+      return unless defined?(::Typesense::Search)
+
       search = Typesense::Search
       search.include(OpenGeographies::TypesenseSearchRecords) unless search.include?(OpenGeographies::TypesenseSearchRecords)
       search.prepend(OpenGeographies::TypesenseSearchProgress) unless search.include?(OpenGeographies::TypesenseSearchProgress)

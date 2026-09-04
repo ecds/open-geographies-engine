@@ -1,4 +1,10 @@
-require 'typesense/search'
+# Optional on the merged FairData host, which no longer ships lib/typesense/search.rb;
+# Typesense collections are being retired with the move to the v1 Elasticsearch index.
+begin
+  require 'typesense/search'
+rescue LoadError
+  nil
+end
 
 module CoreDataConnector
   # A search collection maps a project's records (by project model) onto a

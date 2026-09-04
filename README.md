@@ -1,10 +1,12 @@
 # open_geographies
 
-A Rails engine that extends Performant Software's **Core Data**
-(`core_data_connector`) with the Open Geographies layer: a no-code, multi-tenant
-geospatial publishing platform (atlas provisioning, Sites, SearchCollections,
-authority bulk imports from GeoNames/Wikidata, automated Typesense indexing, and a
-by-slug public atlas API for the shared dynamic renderer).
+A Rails engine that extends Performant Software's **Core Data** (now **FairData**) with
+the Open Geographies layer: a no-code, multi-tenant geospatial publishing platform
+(atlas provisioning, Sites, authority bulk imports from GeoNames/Wikidata, and a
+by-slug public atlas API for the shared dynamic renderer). It is the upper layer of
+Open Geographies; the lower layer — the canonical schema, the v1 API and Elasticsearch
+indexing — is
+[`core-data-connector-open-geographies`](https://github.com/ecds/core-data-connector-open-geographies).
 
 ## Why an engine
 
@@ -29,10 +31,15 @@ It is **additive by construction**:
 ## Install (host app)
 
 ```ruby
-# Gemfile (host = core-data-cloud)
-gem 'core_data_connector'                       # stock upstream — no fork
-gem 'open_geographies', git: 'https://github.com/terminusfilms/open-geographies-engine.git'
+# Gemfile (host = core-data-cloud / FairData, which provides the CoreDataConnector
+# classes natively — the standalone core_data_connector gem no longer exists)
+gem 'open_geographies', git: 'https://github.com/ecds/open-geographies-engine.git'
 ```
+
+The engine declares no dependency on `core_data_connector`: it needs the
+`CoreDataConnector` classes to exist at boot, however the host provides them. On the
+merged app they are native code. Routes are appended under the host's existing
+`/core_data` scope (or to the connector engine's route set on a legacy gem-based host).
 
 ```sh
 bundle install
