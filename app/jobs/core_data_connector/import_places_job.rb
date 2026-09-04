@@ -6,9 +6,10 @@ module CoreDataConnector
   # whose identifier already exists in the project are skipped, so the same
   # import can be re-run later with an expanded area or new filters.
   #
-  # Follows ImportCsvJob's bulk pattern: incremental indexing is suspended
-  # for the duration and the affected search collections are fully
-  # reindexed afterwards. Progress lands on the Job row (extra.progress).
+  # Follows ImportCsvJob's bulk pattern: per-record indexing is suspended for
+  # the duration and the imported model's records are reindexed afterwards
+  # (scoped — the index is shared across atlases). Progress lands on the Job
+  # row (extra.progress).
   #
   # extra: { web_authority_id:, project_model_id:, source:, area: {...},
   #          filters: {...} }
@@ -43,7 +44,7 @@ module CoreDataConnector
         total = nil
         last_reported_at = nil
 
-        Search::AutoIndexable.disable do
+        ::OpenGeographies::Indexing.suspend do
           total = source.count
 
           source.each_record do |record|
@@ -129,23 +130,15 @@ module CoreDataConnector
       [:imported, place.id]
     end
 
-    # Full reindex of the collections covering the imported model, replacing
-    # the suspended incremental indexing (ImportCsvJob pattern).
+    # One reindex scoped to the imported model, replacing the suspended
+    # per-record indexing (ImportCsvJob pattern).
     def queue_reindexes(job, project_model)
-      SearchCollection
-        .covering_project_model(project_model.id)
-        .where(project_id: job.project_id, auto_index: true)
-        .find_each do |search_collection|
-        Job.create(
-          project_id: job.project_id,
-          user_id: job.user_id,
-          job_type: Job::JOB_TYPE_REINDEX,
-          extra: {
-            search_collection_id: search_collection.id,
-            search_collection_name: search_collection.name
-          }
-        )
-      end
+      Job.create(
+        project_id: job.project_id,
+        user_id: job.user_id,
+        job_type: Job::JOB_TYPE_REINDEX,
+        extra: { project_model_ids: [project_model.id] }
+      )
     end
 
     def duplicate_report(imported_place_ids)

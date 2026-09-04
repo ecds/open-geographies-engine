@@ -1,30 +1,32 @@
 module CoreDataConnector
-  # Provisions everything a wizard-created atlas needs beyond its database
-  # records (those are created synchronously by AtlasesController so validation
-  # errors return immediately): the Typesense collection and its search-only
-  # key.
+  # Provisions what a wizard-created atlas needs beyond its database records
+  # (those are created synchronously by AtlasesController so validation errors
+  # return immediately): the search index.
   #
-  # Once those exist the atlas is LIVE on the shared dynamic renderer
-  # (core-data-places) — the renderer resolves the site's config / branding /
-  # navigation from the console per request
-  # (GET /core_data/public/v1/atlases/:slug), so there is no content repository
-  # to scaffold and no static build/deploy step. Place data flows into the
-  # (initially empty) collection via import / on-save auto-indexing.
+  # There is no per-atlas index. Records are written to the shared v1
+  # Elasticsearch index by the lower-layer engine on every save, so the one
+  # thing provisioning must guarantee is that the index EXISTS WITH ITS MAPPING
+  # before the curator's first save: a single-record write into a missing index
+  # lets Elasticsearch auto-create it with dynamic mapping, which silently breaks
+  # keyword exact-match fields (slug, types, ...). Creation is mapping-aware and
+  # idempotent, so re-running is safe.
   #
-  # The current stage is recorded on the Job row (extra.stage) so the wizard can
-  # show progress; a failure records extra.failed_stage. Re-running is safe: the
-  # search index is recreated from scratch (empty at this point).
+  # Once that holds the atlas is LIVE on the shared dynamic renderer
+  # (core-data-places), which resolves the site's config / branding / navigation
+  # from the console per request (GET /core_data/public/v1/atlases/:slug) — no
+  # content repository, no build, no deploy. The current stage is recorded on
+  # the Job row (extra.stage) so the wizard can show progress; a failure records
+  # extra.failed_stage.
   class ProvisionAtlasJob < ApplicationJob
 
     def perform(job_id)
       job = Job.find(job_id)
-      search_collection = SearchCollection.find(job.extra['search_collection_id'])
 
       job.update(status: Job::JOB_STATUS_PROCESSING)
 
       begin
         stage job, 'search_index'
-        create_search_index search_collection
+        ensure_search_index job
 
         job.update(status: Job::JOB_STATUS_COMPLETED)
       rescue StandardError => error
@@ -42,23 +44,12 @@ module CoreDataConnector
 
     private
 
-    # Creates the (empty) Typesense collection and issues its search-only key —
-    # the same drop/create a reindex performs, with nothing to import yet. The
-    # key must exist before the atlas serves search: the emitted site config
-    # embeds it.
-    def create_search_index(search_collection)
-      search = search_collection.typesense_search
+    def ensure_search_index(job)
+      project_models = ProjectModel.where(project_id: job.project_id).to_a
 
-      begin
-        search.delete
-      rescue StandardError
-        # No existing collection.
-      end
+      ::OpenGeographies::Indexing.ensure_index!(project_models)
 
-      search.create
-
-      search_collection.issue_search_only_key!
-      search_collection.update(last_indexed_at: Time.current)
+      SearchCollection.where(project_id: job.project_id).update_all(last_indexed_at: Time.current)
     end
 
     def stage(job, name)

@@ -1,4 +1,5 @@
 require 'open_geographies/decorators'
+require 'open_geographies/indexing'
 
 module OpenGeographies
   class Engine < ::Rails::Engine
@@ -44,7 +45,6 @@ module OpenGeographies
 
         resources :search_collections do
           post :reindex, on: :member
-          post :issue_key, on: :member
         end
 
         resources :sites do

@@ -1,20 +1,16 @@
-# Optional on the merged FairData host, which no longer ships lib/typesense/search.rb;
-# Typesense collections are being retired with the move to the v1 Elasticsearch index.
-begin
-  require 'typesense/search'
-rescue LoadError
-  nil
-end
-
 module CoreDataConnector
-  # A search collection maps a project's records (by project model) onto a
-  # Typesense collection. It is the unit of configuration for automated
-  # indexing: a full reindex can be queued per collection, and saving a record
-  # belonging to one of its project models incrementally updates the index.
+  # A search collection groups a project's records (by project model) as a
+  # unit of search configuration for the console: which models an atlas
+  # searches over, whether polygons are indexed, and which user-defined fields
+  # are offered as facets. It also carries last_indexed_at for the console's
+  # index status.
   #
-  # Typesense connection settings come from the deployment environment
-  # (TYPESENSE_HOST / TYPESENSE_PORT / TYPESENSE_PROTOCOL / TYPESENSE_API_KEY),
-  # so per-collection records carry only publishing choices.
+  # It no longer owns an index. Records are written to the shared v1
+  # Elasticsearch index by the lower-layer engine regardless of collections;
+  # a collection's reindex action rebuilds just its project models' records
+  # there (ReindexAtlasJob). Whether the model survives at all, now that there
+  # is no per-atlas index to provision, is an open question with the lower
+  # engine — the search_only_key columns are already unused.
   class SearchCollection < ApplicationRecord
     # Relationships
     belongs_to :project
@@ -32,55 +28,6 @@ module CoreDataConnector
     # Returns the search collections covering the passed project model ID.
     def self.covering_project_model(project_model_id)
       where('project_model_ids @> ?', [project_model_id.to_i].to_json)
-    end
-
-    def typesense_search
-      ::Typesense::Search.new(**self.class.typesense_connection, collection_name: name)
-    end
-
-    # Creates a Typesense API key scoped to this collection only, so public
-    # sites never need the admin key: documents:search plus collections:get
-    # (the frontend's facet provider fetches the collection schema, which
-    # 401s under a search-only scope). Typesense returns the full key value
-    # only at creation time; we store it so the console can display it.
-    # Issuing again revokes any previously stored key.
-    def issue_search_only_key!
-      client = typesense_search.client
-
-      revoke_search_only_key!(client)
-
-      key = client.keys.create(
-        'description' => "Search-only key for collection #{name}",
-        'actions' => ['documents:search', 'collections:get'],
-        'collections' => [name]
-      )
-
-      update!(search_only_key: key['value'], search_only_key_id: key['id'])
-
-      key['value']
-    end
-
-    private
-
-    def revoke_search_only_key!(client)
-      return if search_only_key_id.nil?
-
-      begin
-        client.keys[search_only_key_id].delete
-      rescue StandardError
-        # Key already gone (e.g. Typesense reset); nothing to revoke.
-      end
-    end
-
-    public
-
-    def self.typesense_connection
-      {
-        host: ENV.fetch('TYPESENSE_HOST', 'localhost'),
-        port: ENV.fetch('TYPESENSE_PORT', 8108).to_i,
-        protocol: ENV.fetch('TYPESENSE_PROTOCOL', 'http'),
-        api_key: ENV.fetch('TYPESENSE_API_KEY', nil)
-      }
     end
 
     private

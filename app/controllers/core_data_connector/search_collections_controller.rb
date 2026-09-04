@@ -8,8 +8,9 @@ module CoreDataConnector
 
     # POST /core_data/search_collections/:id/reindex
     #
-    # Queues a full rebuild of the collection. The run is tracked as a Job
-    # (job_type "reindex") so its status is visible in the console.
+    # Queues a reindex of the collection's project models' records into the
+    # shared v1 index. Tracked as a Job (job_type "reindex") so its status is
+    # visible in the console.
     def reindex
       search_collection = SearchCollection.find(params[:id])
 
@@ -21,27 +22,12 @@ module CoreDataConnector
         job_type: Job::JOB_TYPE_REINDEX,
         extra: {
           search_collection_id: search_collection.id,
-          search_collection_name: search_collection.name
+          search_collection_name: search_collection.name,
+          project_model_ids: search_collection.project_model_ids
         }
       )
 
       render json: { job: { id: job.id, status: job.status } }, status: :ok
-    end
-
-    # POST /core_data/search_collections/:id/issue_key
-    #
-    # Issues (or re-issues, revoking the previous) a search-only Typesense
-    # API key scoped to this collection, for use by public sites.
-    def issue_key
-      search_collection = SearchCollection.find(params[:id])
-
-      authorize search_collection, :update?
-
-      key = search_collection.issue_search_only_key!
-
-      render json: { search_only_key: key }, status: :ok
-    rescue StandardError => error
-      render json: { errors: [{ base: error.message }] }, status: :unprocessable_entity
     end
 
     protected

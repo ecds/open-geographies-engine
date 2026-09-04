@@ -12,7 +12,7 @@ module CoreDataConnector
   # columns that hardcode a particular project's shape.
   #
   # Search entries reference SearchCollection records by id; the emitted
-  # config expands them into the Typesense connection block (public endpoint
+  # config expands them into the renderer's elasticsearch block (shared index
   # from the deployment environment + the collection's search-only key), so
   # site editors never handle search credentials.
   class Site < ApplicationRecord
@@ -93,18 +93,8 @@ module CoreDataConnector
       { 'items' => items }
     end
 
-    # The Typesense endpoint browsers reach (often differs from the internal
-    # endpoint Rails indexes against, e.g. behind a proxy with TLS).
-    def self.typesense_public_connection
-      {
-        'host' => ENV.fetch('TYPESENSE_PUBLIC_HOST') { ENV.fetch('TYPESENSE_HOST', 'localhost') },
-        'port' => ENV.fetch('TYPESENSE_PUBLIC_PORT') { ENV.fetch('TYPESENSE_PORT', 8108) }.to_i,
-        'protocol' => ENV.fetch('TYPESENSE_PUBLIC_PROTOCOL') { ENV.fetch('TYPESENSE_PROTOCOL', 'http') }
-      }
-    end
-
     # Emits the config.json document for this site: the stored config with
-    # the platform-derived sections (core_data connection, search/Typesense
+    # the platform-derived sections (core_data connection, search/elasticsearch
     # blocks) filled in.
     def to_site_config
       site_config = (config || {}).deep_dup.deep_stringify_keys
@@ -135,35 +125,28 @@ module CoreDataConnector
       ]
     end
 
-    # Expands a stored search entry: the search_collection_id reference
-    # becomes the full Typesense block (public connection + collection name +
-    # search-only key), with any stored typesense values kept as overrides.
-    # Facet include lists default to the entry's configured facets.
+    # Expands a stored search entry for the renderer: the search_collection_id
+    # reference becomes the `elasticsearch` block — the shared v1 index name plus
+    # facet attributes (the entry's configured facets, defaulting to the
+    # canonical `types`) — with any stored elasticsearch values kept as
+    # overrides. No credentials: this document is served to the browser; the
+    # renderer's server-side handler holds the connection and injects the
+    # tenant filter.
     def expand_search_entry(entry)
       expanded = entry.deep_dup
-      collection_id = expanded.delete('search_collection_id')
+      expanded.delete('search_collection_id')
+      expanded.delete('typesense')
 
-      collection = search_collections_by_id[collection_id.to_i] if collection_id.present?
-
-      typesense = expanded['typesense'] || {}
-
-      if collection.present?
-        typesense = self.class.typesense_public_connection
-                        .merge(
-                          'index_name' => collection.name,
-                          'api_key' => collection.search_only_key
-                        )
-                        .merge(typesense)
-                        .compact
-      end
+      elasticsearch = expanded['elasticsearch'] || {}
 
       facet_names = (expanded['facets'] || []).map { |facet| facet['name'] }.compact
+      facet_names = ['types'] if facet_names.empty?
 
-      if facet_names.present? && typesense.dig('facets', 'include').blank?
-        typesense['facets'] = (typesense['facets'] || {}).merge('include' => facet_names)
-      end
+      expanded['elasticsearch'] = {
+        'index_name' => ::OpenGeographies::Indexing.index_name,
+        'facet_attributes' => facet_names
+      }.merge(elasticsearch)
 
-      expanded['typesense'] = typesense if typesense.present?
       expanded
     end
 

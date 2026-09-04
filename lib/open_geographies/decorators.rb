@@ -1,15 +1,3 @@
-# On-save indexing wraps the connector's Typesense client (lib/typesense, not
-# autoloaded). The merged core-data-cloud / FairData host no longer ships
-# lib/typesense/search.rb, so the require is optional: without it the Typesense
-# decorators below simply aren't applied. Typesense indexing is being retired
-# outright in favour of the v1 Elasticsearch index (see the v1 integration handoff);
-# this guard only keeps the engine bootable until that removal lands.
-begin
-  require 'typesense/search'
-rescue LoadError
-  nil
-end
-
 module OpenGeographies
   # Applies Open Geographies' in-place extensions to upstream Core Data classes —
   # the OG-coupled subset of the changes the fork used to make directly to upstream
@@ -18,59 +6,19 @@ module OpenGeographies
   # re-apply after Zeitwerk reloads in development (each reload yields a fresh
   # upstream class, so includes/callbacks land exactly once).
   #
-  # The GENERAL, non-OG changes (the discoverable gate, GeometryCollection
-  # flattening, and search/base's orphaned-relationship guard + per-index facet
-  # opt-in) are NOT here — they carry on the connector mirror as thin, upstream-
-  # bound commits, because (a) they reference no OG model and (b) the gate's
-  # `base_query` edit can't be expressed as a clean prepend (it calls `super` into
-  # NestableController). See the connector `og/connector-base` overlay.
+  # Indexing is deliberately NOT decorated here. The lower-layer engine
+  # (core-data-connector-open-geographies) hooks the upstream classes with its
+  # own V1::Reindexable / ReindexesParent decorators, so every create, update
+  # and destroy — including nested names, geometries and relationships — is
+  # written to the shared v1 Elasticsearch index without this engine's help.
+  # This engine only suspends that around bulk writes and reindexes what it
+  # wrote afterwards (see OpenGeographies::Indexing).
   module Decorators
-    # Models that gain on-save Typesense indexing. Each `include Search::<Model>`,
-    # which pulls in Search::Base. Upstream Search::Base does NOT include
-    # AutoIndexable (that concern is OG-specific — it depends on SearchCollection),
-    # so the engine adds it to each searchable model here.
-    SEARCHABLE_MODELS = %w[
-      Event Instance Item MediaContent Organization Person Place Taxonomy Work
-    ].freeze
-
-    # Nested records whose changes must reindex their parent searchable record(s).
-    NESTED_AUTO_REINDEXERS = {
-      'CoreDataConnector::PlaceGeometry' => %i[place],
-      'CoreDataConnector::PlaceName' => %i[place],
-      'CoreDataConnector::Relationship' => %i[primary_record related_record]
-    }.freeze
-
     def self.apply!
-      wire_auto_indexing!
-      wire_nested_auto_indexing!
       wire_job_dispatch!
       wire_job_policy!
       wire_import_csv_job!
       wire_authority_bulk!
-      wire_typesense_records!
-    end
-
-    # Search::Base#included → (OG) include AutoIndexable, per searchable model.
-    def self.wire_auto_indexing!
-      auto_indexable = CoreDataConnector::Search::AutoIndexable
-
-      SEARCHABLE_MODELS.each do |name|
-        model = "CoreDataConnector::#{name}".constantize
-        model.include(auto_indexable) unless model.include?(auto_indexable)
-      end
-    end
-
-    # PlaceGeometry/PlaceName/Relationship → AutoIndexable::Nested + auto_reindexes.
-    def self.wire_nested_auto_indexing!
-      nested = CoreDataConnector::Search::AutoIndexable::Nested
-
-      NESTED_AUTO_REINDEXERS.each do |name, parents|
-        model = name.constantize
-        next if model.include?(nested)
-
-        model.include(nested)
-        model.auto_reindexes(*parents)
-      end
     end
 
     # Job → the OG job types + their after_create_commit dispatch.
@@ -88,8 +36,8 @@ module OpenGeographies
       scope.prepend(OpenGeographies::JobPolicyScopeDecorator) unless scope.include?(OpenGeographies::JobPolicyScopeDecorator)
     end
 
-    # ImportCsvJob → suspend on-save indexing during the bulk import, then queue a
-    # single full reindex per auto-indexed search collection.
+    # ImportCsvJob → suspend per-record indexing during the bulk import, then
+    # queue one reindex scoped to the project.
     def self.wire_import_csv_job!
       job = CoreDataConnector::ImportCsvJob
       job.prepend(OpenGeographies::ImportCsvJobDecorator) unless job.include?(OpenGeographies::ImportCsvJobDecorator)
@@ -102,17 +50,6 @@ module OpenGeographies
 
       wikidata = CoreDataConnector::Authority::Wikidata
       wikidata.include(OpenGeographies::WikidataBulk) unless wikidata.include?(OpenGeographies::WikidataBulk)
-    end
-
-    # Typesense::Search → single-record upsert/remove (on-save indexing) + an
-    # optional progress callback on full index runs.
-    def self.wire_typesense_records!
-      # Absent on the merged FairData host (see the require guard at the top).
-      return unless defined?(::Typesense::Search)
-
-      search = Typesense::Search
-      search.include(OpenGeographies::TypesenseSearchRecords) unless search.include?(OpenGeographies::TypesenseSearchRecords)
-      search.prepend(OpenGeographies::TypesenseSearchProgress) unless search.include?(OpenGeographies::TypesenseSearchProgress)
     end
   end
 
@@ -152,7 +89,7 @@ module OpenGeographies
     private
 
     def queue_reindex_job
-      CoreDataConnector::ReindexSearchCollectionJob.perform_later(id)
+      CoreDataConnector::ReindexAtlasJob.perform_later(id)
     end
 
     def queue_build_tiles_job
@@ -203,33 +140,26 @@ module OpenGeographies
   # --- Import CSV job (prepend override) ------------------------------------
 
   module ImportCsvJobDecorator
-    # Suspend on-save incremental indexing for the bulk import (per-record
-    # IndexRecordJobs would flood the queue and re-serialize relationship graphs
-    # thousands of times), then queue a single full reindex per affected search
-    # collection.
+    # Suspend per-record indexing for the bulk import (one Elasticsearch
+    # round-trip per row would flood the cluster and re-serialize relationship
+    # graphs thousands of times), then queue a single reindex scoped to the
+    # project's records.
     def perform(id)
-      CoreDataConnector::Search::AutoIndexable.disable { super }
+      OpenGeographies::Indexing.suspend { super }
 
       job = CoreDataConnector::Job.find_by(id:)
-      queue_reindexes(job) if job&.status == CoreDataConnector::Job::JOB_STATUS_COMPLETED
+      queue_reindex(job) if job&.status == CoreDataConnector::Job::JOB_STATUS_COMPLETED
     end
 
     private
 
-    def queue_reindexes(job)
-      CoreDataConnector::SearchCollection
-        .where(project_id: job.project_id, auto_index: true)
-        .find_each do |search_collection|
-          CoreDataConnector::Job.create(
-            project_id: job.project_id,
-            user_id: job.user_id,
-            job_type: CoreDataConnector::Job::JOB_TYPE_REINDEX,
-            extra: {
-              search_collection_id: search_collection.id,
-              search_collection_name: search_collection.name
-            }
-          )
-        end
+    def queue_reindex(job)
+      CoreDataConnector::Job.create(
+        project_id: job.project_id,
+        user_id: job.user_id,
+        job_type: CoreDataConnector::Job::JOB_TYPE_REINDEX,
+        extra: {}
+      )
     end
   end
 
@@ -308,86 +238,6 @@ module OpenGeographies
       send_request(SPARQL_URL, method: :get, params:, headers:) do |body|
         JSON.parse(body)
       end
-    end
-  end
-
-  # --- Typesense client (reopen + prepend) ----------------------------------
-
-  module TypesenseSearchRecords
-    # Serializes a single record and upserts it into the collection. Used by
-    # incremental (on-save) indexing; the next full reindex re-imports the record
-    # with a fresh import_id.
-    def index_record(record, options = {})
-      collection = client.collections[collection_name]
-
-      document = record.to_search_json(options.merge(include_relationships: true))
-      collection.documents.import([document], action: 'emplace')
-    end
-
-    # Removes a single record's document from the collection. Document ids are
-    # record uuids (see Search::Base search_attribute :id).
-    def remove_record(uuid)
-      collection = client.collections[collection_name]
-
-      begin
-        collection.documents[uuid].delete
-      rescue ::Typesense::Error::ObjectNotFound
-        nil
-      end
-    end
-  end
-
-  module TypesenseSearchProgress
-    # Full index run with an optional progress callback (done, total), so the
-    # reindex job can report progress on the Job record. Overrides the upstream
-    # `index` (which takes no block).
-    def index(options, &on_progress)
-      collection = client.collections[collection_name]
-
-      project_model_ids = options.delete(:project_model_ids)
-      options[:include_relationships] = true
-
-      # Query project_models and build a hash of class names to arrays of project_model IDs
-      model_classes = CoreDataConnector::ProjectModel
-                        .where(id: project_model_ids)
-                        .pluck(:id, :model_class)
-                        .inject({}) do |hash, record|
-                          id, model_class = record
-
-                          hash[model_class] ||= []
-                          hash[model_class] << id
-
-                          hash
-                        end
-
-      # Total record count across all models, so callers can report progress.
-      total = model_classes.keys.sum do |model_class|
-        model_class.constantize.all_records_by_project_model(model_classes[model_class]).count
-      end
-
-      completed = 0
-      on_progress&.call(completed, total)
-
-      # Append a unique import_id to all of the documents indexed in this batch
-      import_id = DateTime.now.to_i
-      import_attributes = { import_id: import_id }
-
-      # Iterate over the keys and query the records belonging to each project model
-      model_classes.keys.each do |model_class|
-        klass = model_class.constantize
-        ids = model_classes[model_class]
-
-        klass.for_search(ids) do |records|
-          documents = records.map { |r| r.to_search_json(options).merge(import_attributes) }
-          collection.documents.import(documents, action: 'emplace')
-
-          completed += records.size
-          on_progress&.call(completed, total)
-        end
-      end
-
-      # Delete any records from the index not included in this batch
-      collection.documents.delete(filter_by: "import_id:!=#{import_id}")
     end
   end
 end

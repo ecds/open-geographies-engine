@@ -9,8 +9,8 @@ module CoreDataConnector
     # GET /core_data/sites/:id/config
     #
     # Emits the config.json document for the site: the stored config with the
-    # platform-derived sections (Core Data connection, Typesense blocks from
-    # the referenced search collections) filled in.
+    # platform-derived sections (Core Data connection, the shared search index)
+    # filled in.
     #
     # The shared dynamic renderer resolves a site by slug through the public
     # endpoint (GET /core_data/public/v1/atlases/:slug); this authenticated,

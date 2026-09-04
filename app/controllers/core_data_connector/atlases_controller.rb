@@ -5,8 +5,8 @@ module CoreDataConnector
   # database records for a new atlas synchronously — project (discoverable,
   # owned by the caller), starter models from the template, search
   # collection, site — so name/slug validation errors return immediately,
-  # then queues a ProvisionAtlasJob for the slow/external bit (the Typesense
-  # collection + its search-only key). The atlas is then live on the shared
+  # then queues a ProvisionAtlasJob for the external bit (making sure the shared
+  # search index exists with its mapping). The atlas is then live on the shared
   # dynamic renderer — no content repository, build, or deploy.
   #
   # Params (atlas):
@@ -116,7 +116,7 @@ module CoreDataConnector
 
     # The stored config for a fresh atlas: an OSM base layer and one places
     # search wired to the new collection. The platform-derived sections
-    # (core_data connection, Typesense block from search_collection_id) are
+    # (core_data connection, elasticsearch index name) are
     # filled in by Site#to_site_config at publish time.
     def default_config(search_collection, locale)
       {
@@ -139,8 +139,8 @@ module CoreDataConnector
               'max_zoom' => 16,
               'cluster_radius' => 8
             },
-            'typesense' => {
-              'query_by' => 'name,names'
+            'elasticsearch' => {
+              'facet_attributes' => ['types']
             },
             'result_card' => {
               'title' => 'name'
