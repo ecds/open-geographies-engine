@@ -126,15 +126,17 @@ module CoreDataConnector
     end
 
     # Expands a stored search entry for the renderer: the search_collection_id
-    # reference becomes the `elasticsearch` block — the shared v1 index name plus
-    # facet attributes (the entry's configured facets, defaulting to the
-    # canonical `types`) — with any stored elasticsearch values kept as
-    # overrides. No credentials: this document is served to the browser; the
-    # renderer's server-side handler holds the connection and injects the
-    # tenant filter.
+    # reference becomes the `elasticsearch` block — the shared v1 index name,
+    # the collection's project model ids (the index holds every model of every
+    # atlas, so a search must say which models it is over; the renderer
+    # applies these as a server-side filter alongside project_id), and facet
+    # attributes (the entry's configured facets, defaulting to the canonical
+    # `types`) — with any stored elasticsearch values kept as overrides. No
+    # credentials: this document is served to the browser; the renderer's
+    # server-side handler holds the connection and injects the tenant filter.
     def expand_search_entry(entry)
       expanded = entry.deep_dup
-      expanded.delete('search_collection_id')
+      search_collection = search_collections_by_id[expanded.delete('search_collection_id')&.to_i]
       expanded.delete('typesense')
 
       elasticsearch = expanded['elasticsearch'] || {}
@@ -144,8 +146,9 @@ module CoreDataConnector
 
       expanded['elasticsearch'] = {
         'index_name' => ::OpenGeographies::Indexing.index_name,
+        'model_ids' => search_collection&.project_model_ids&.map(&:to_s),
         'facet_attributes' => facet_names
-      }.merge(elasticsearch)
+      }.compact.merge(elasticsearch)
 
       expanded
     end

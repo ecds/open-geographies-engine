@@ -79,8 +79,11 @@ module OpenGeographies
     #
     # - The merged core-data-cloud / FairData app: the old connector engine is gone
     #   and its routes live directly in the host's routes.rb as
-    #   `scope path: 'core_data', module: 'core_data_connector'`. Append ours to the
-    #   host under that same scope so the URLs are unchanged.
+    #   `scope path: 'core_data', module: 'core_data_connector'`. Add ours to the
+    #   host under that same scope so the URLs are unchanged. They must be
+    #   *prepended*: the host's routes.rb ends in a `get '*path'` catch-all that
+    #   serves the SPA's index.html, so anything appended after it is unreachable
+    #   for GET (the public atlas-by-slug endpoint the renderer resolves against).
     # - A legacy host still on the standalone gem: append to the connector engine's
     #   own route set, exactly as before.
     #
@@ -91,7 +94,7 @@ module OpenGeographies
       if defined?(::CoreDataConnector::Engine)
         ::CoreDataConnector::Engine.routes.append(&routes)
       else
-        app.routes.append do
+        app.routes.prepend do
           scope path: 'core_data', module: 'core_data_connector' do
             instance_exec(&routes)
           end
