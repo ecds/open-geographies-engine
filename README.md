@@ -28,6 +28,28 @@ It is **additive by construction**:
   is just the decorator list.
 - **Routes:** appended into the connector engine's `/core_data` route set.
 
+## Local development against the real host
+
+Develop against what actually deploys: ECDS's `core-data-cloud` fork on branch `ecds`
+(the merged Core Data / FairData app, with the lower-layer engine already in its
+Gemfile), with this engine mounted from a local path.
+
+```sh
+git clone --branch ecds https://github.com/ecds/core-data-cloud.git ecds-core-data-cloud
+cd ecds-core-data-cloud
+# Gemfile: gem 'open_geographies', path: '../open-geographies-engine'
+cp .env.example .env   # DATABASE_*, SECRET_KEY_BASE, ELASTICSEARCH_HOST/API_KEY, REDIS_URL
+bundle install
+bin/rails db:create
+bin/rails open_geographies:install:migrations
+bin/rails db:migrate   # host schema, then the lower engine's migrations, then ours
+bin/rails runner 'Rails.application.eager_load!; puts "ok"'
+```
+
+Verified 2026-09-04 on `ecds` @ `d5ddd03` with Ruby 4.0.5: bundle resolves both
+engines, all migrations apply, eager load is clean, and every route this engine adds
+appears under `/core_data` alongside the lower engine's mount at `/open_geographies`.
+
 ## Install (host app)
 
 ```ruby

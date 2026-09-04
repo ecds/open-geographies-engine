@@ -10,15 +10,17 @@ module CoreDataConnector
       # renderer resolves an atlas per request with one call instead of reading
       # a baked config file.
       #
-      # Only atlases whose project is discoverable are served (the same
-      # visibility rule the rest of the public API enforces); an unknown or
-      # non-discoverable slug returns 404. Unlike the admin
+      # Only atlases whose project is discoverable are served; an unknown or
+      # non-discoverable slug returns 404. The gate is the explicit
+      # `discoverable?` check below rather than a shared concern: the host no
+      # longer ships the old connector-patch DiscoverableProjectScope, and the
+      # v1 engine enforces discoverability on its own endpoints via a Project
+      # scope, so this endpoint carries its own check. Unlike the admin
       # GET /core_data/sites/:id/config endpoint (authenticated, addressed by
-      # id, used by the build pipeline), this is unauthenticated and addressed
-      # by the slug the renderer already has from the request.
+      # id), this is unauthenticated and addressed by the slug the renderer
+      # already has from the request.
       class AtlasesController < ApplicationController
         include UnauthenticateableController
-        include DiscoverableProjectScope
 
         def show
           site = Site.find_by(slug: params[:slug])
