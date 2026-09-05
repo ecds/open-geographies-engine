@@ -7,6 +7,7 @@ import {
   fetchSite,
   fetchSiteConfig,
   fetchSiteFacets,
+  fetchSiteFields,
   reindexSearchCollection,
   updateSite
 } from '../api';
@@ -19,6 +20,7 @@ const TABS = [
   { key: 'navigation', label: 'Navigation' },
   { key: 'layers', label: 'Map layers' },
   { key: 'search', label: 'Search' },
+  { key: 'detail', label: 'Detail pages' },
   { key: 'advanced', label: 'Advanced' },
   { key: 'preview', label: 'Config preview' }
 ];
@@ -57,6 +59,7 @@ const AtlasEditor = ({ id, navigate }) => {
   const [site, setSite] = useState(null);
   const [collections, setCollections] = useState([]);
   const [facets, setFacets] = useState([]);
+  const [fieldModels, setFieldModels] = useState([]);
   const [tab, setTab] = useState('general');
   const [advancedText, setAdvancedText] = useState('');
   const [advancedError, setAdvancedError] = useState(false);
@@ -74,7 +77,8 @@ const AtlasEditor = ({ id, navigate }) => {
 
         return Promise.all([
           fetchSearchCollections(data.site.project_id).then((d) => setCollections(d.search_collections || [])),
-          fetchSiteFacets(id).then((d) => setFacets(d.facets || []))
+          fetchSiteFacets(id).then((d) => setFacets(d.facets || [])),
+          fetchSiteFields(id).then((d) => setFieldModels(d.models || []))
         ]);
       })
       .catch((error) => setErrors(errorMessages(error)));
@@ -100,6 +104,19 @@ const AtlasEditor = ({ id, navigate }) => {
     const search = [...(config.search || [])];
     search[index] = { ...search[index], ...changes };
     updateConfig({ search });
+  };
+
+  /**
+   * Hidden fields live under detail_pages.models.<model>.exclude. detail_pages
+   * is otherwise advanced JSON, so the advanced text is refreshed to match.
+   */
+  const updateExclude = (model, exclude) => {
+    const models = { ...(config.detail_pages?.models || {}) };
+    models[model] = { ...(models[model] || {}), exclude };
+
+    const next = { ...config, detail_pages: { ...(config.detail_pages || {}), models } };
+    update({ config: next });
+    setAdvancedText(JSON.stringify(_.omit(next, MANAGED_KEYS), null, 2));
   };
 
   /**
@@ -340,9 +357,28 @@ const AtlasEditor = ({ id, navigate }) => {
     </>
   );
 
+  const renderDetail = () => (
+    <>
+      <p className='muted'>Fields hidden on each record's detail page and search panel — internal bookkeeping such as legacy ids, CMS links or slugs. Searches only ever return declared fields; this governs the record pages.</p>
+      { _.isEmpty(fieldModels) && <p className='muted'>No models with a detail page in this project.</p> }
+      { _.map(fieldModels, (entry) => (
+        <div className='card' key={entry.model}>
+          <Field label={`${entry.name} (${entry.model})`} hint='Type a field name or uuid to hide one not listed.'>
+            <MultiSelect
+              allowAdditions
+              onChange={(exclude) => updateExclude(entry.model, exclude)}
+              options={_.map(entry.fields, (f) => ({ value: f.key, text: f.kind === 'user_defined' ? `${f.label} (${f.key})` : f.label }))}
+              value={config.detail_pages?.models?.[entry.model]?.exclude || []}
+            />
+          </Field>
+        </div>
+      ))}
+    </>
+  );
+
   const renderAdvanced = () => (
     <>
-      <p className='muted'>Free-form JSON for config sections without a dedicated editor (detail_pages, result_filtering, content, i18n, core_data.url). Merged into the site config when you click away.</p>
+      <p className='muted'>Free-form JSON for config sections without a dedicated editor (the rest of detail_pages, result_filtering, content, i18n, core_data.url). Merged into the site config when you click away.</p>
       { advancedError && <Message tone='negative'>Invalid JSON — fix the syntax to apply changes.</Message> }
       <textarea className='input code' onBlur={onAdvancedBlur} onChange={(e) => setAdvancedText(e.target.value)} rows={24} spellCheck={false} value={advancedText} />
     </>
@@ -362,6 +398,7 @@ const AtlasEditor = ({ id, navigate }) => {
     navigation: renderNavigation,
     layers: renderLayers,
     search: renderSearch,
+    detail: renderDetail,
     advanced: renderAdvanced,
     preview: renderPreview
   };

@@ -20,6 +20,7 @@ require 'open_geographies/version'
 require 'open_geographies/engine'
 require 'open_geographies/tenancy_probe'
 require 'open_geographies/facet_catalog'
+require 'open_geographies/field_catalog'
 require 'open_geographies/public_project_import'
 
 module OpenGeographies

@@ -50,6 +50,7 @@ module OpenGeographies
         resources :sites do
           get :config, action: :site_config, on: :member
           get :facets, on: :member
+          get :fields, on: :member
           post :build_tiles, on: :member
         end
 

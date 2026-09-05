@@ -120,6 +120,8 @@ export const fetchSiteConfig = (id) => request('GET', `/core_data/sites/${id}/co
 
 export const fetchSiteFacets = (id) => request('GET', `/core_data/sites/${id}/facets`);
 
+export const fetchSiteFields = (id) => request('GET', `/core_data/sites/${id}/fields`);
+
 export const buildTiles = (id) => request('POST', `/core_data/sites/${id}/build_tiles`, { body: {} });
 
 export const fetchSearchCollections = (projectId) => request('GET', '/core_data/search_collections', {

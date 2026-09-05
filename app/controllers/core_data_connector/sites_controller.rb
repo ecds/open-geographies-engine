@@ -20,6 +20,20 @@ module CoreDataConnector
       render json: { facets: ::OpenGeographies::FacetCatalog.for_models(models).map(&:to_h) }, status: :ok
     end
 
+    # GET /core_data/sites/:id/fields
+    #
+    # The fields each detail page / search panel can hide, per renderer model
+    # (see OpenGeographies::FieldCatalog). The console's "Hidden fields"
+    # pick-list, stored as detail_pages.models.<model>.exclude.
+    def fields
+      site = Site.find(params[:id])
+      authorize site, :show?
+
+      models = ProjectModel.where(project_id: site.project_id).order(:order)
+
+      render json: { models: ::OpenGeographies::FieldCatalog.for_models(models) }, status: :ok
+    end
+
     # GET /core_data/sites/:id/config
     #
     # Emits the config.json document for the site: the stored config with the
