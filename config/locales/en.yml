@@ -1,0 +1,14 @@
+en:
+  authorization:
+    core_data_connector/site_policy:
+      create?: 'You do not have permission to create a site for this project.'
+      show?: 'You do not have permission to view this site.'
+      update?: 'You do not have permission to update this site.'
+      destroy?: 'You do not have permission to delete this site.'
+    core_data_connector/search_collection_policy:
+      create?: 'You do not have permission to create a search collection for this project.'
+      show?: 'You do not have permission to view this search collection.'
+      update?: 'You do not have permission to update this search collection.'
+      destroy?: 'You do not have permission to delete this search collection.'
+    core_data_connector/job_policy:
+      show?: 'You do not have permission to view this job.'

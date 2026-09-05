@@ -15,6 +15,10 @@ module CoreDataConnector
     # Relationships
     belongs_to :project
 
+    # Same reasoning as Site: the policy check precedes the update, so the
+    # project must not be changeable after creation.
+    attr_readonly :project_id
+
     # Validations
     validates :name, presence: true, uniqueness: true,
                      format: { with: /\A[a-z0-9_]+\z/, message: 'only lowercase letters, numbers, and underscores' }

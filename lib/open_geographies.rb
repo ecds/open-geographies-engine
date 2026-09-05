@@ -18,6 +18,7 @@ rescue LoadError
 end
 require 'open_geographies/version'
 require 'open_geographies/engine'
+require 'open_geographies/tenancy_probe'
 
 module OpenGeographies
 end

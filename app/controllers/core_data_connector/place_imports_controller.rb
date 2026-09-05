@@ -26,6 +26,9 @@ module CoreDataConnector
       limit = (params[:limit] || 500).to_i.clamp(1, 1000)
 
       render json: source.preview(limit:), status: :ok
+    rescue Pundit::NotAuthorizedError
+      # Let the resource controller's rescue answer, as for every other action.
+      raise
     rescue StandardError => error
       log_error error
 

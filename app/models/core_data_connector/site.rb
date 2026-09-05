@@ -56,6 +56,12 @@ module CoreDataConnector
     # Relationships
     belongs_to :project
 
+    # A site is born on a project and stays there. Authorization runs against
+    # the project a site belongs to *before* an update is applied, so allowing
+    # project_id to change would let an owner of A re-parent a site onto B —
+    # and the public by-slug endpoint would then publish it under B's data.
+    attr_readonly :project_id
+
     # Validations
     validates :name, presence: true
     validates :slug, presence: true, uniqueness: true,

@@ -39,5 +39,17 @@ module CoreDataConnector
 
       query
     end
+
+    private
+
+    # A search collection's project is fixed at creation (attr_readonly on the model):
+    # authorization runs against the current project before an update, so a
+    # project_id in an update body is dropped rather than raising.
+    def prepare_params(item = nil)
+      prepared = super
+
+      item&.persisted? ? prepared.except('project_id', :project_id) : prepared
+    end
+
   end
 end
