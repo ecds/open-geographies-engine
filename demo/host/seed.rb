@@ -26,7 +26,16 @@ password = ENV.fetch('DEMO_ADMIN_PASSWORD', 'Changeme1!!')
 user = CoreDataConnector::User.find_by(email:)
 
 if user
-  log.call("admin #{email} exists")
+  # On a fresh database db:prepare has already run the host's own seeds,
+  # which create this account — and its after-create hook then replaces the
+  # password with a random one it emails. Until someone has signed in, the
+  # demo password wins.
+  if user.last_sign_in_at.nil? && !user.authenticate(password)
+    user.update!(password:, password_confirmation: password, require_password_change: false)
+    log.call("reset the password of never-used admin #{email}")
+  else
+    log.call("admin #{email} exists")
+  end
 else
   # skip_invitation: the host's after-create hook otherwise replaces the
   # password with a random one and emails it (an invitation nobody receives).
