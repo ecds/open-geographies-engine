@@ -134,3 +134,40 @@ textarea.input { resize: vertical; }
 .stage-running .stage-icon { border-color: var(--og-primary); border-right-color: transparent; animation: spin 0.8s linear infinite; }
 .stage-failed .stage-icon { background: var(--og-negative); border-color: var(--og-negative); }
 .stage-pending { color: var(--og-muted); }
+
+/* Shell */
+.shell { display: flex; align-items: center; gap: 24px; padding: 0 24px; height: 52px; background: var(--og-primary); color: #fff; }
+.shell-brand { font-weight: 700; }
+.shell-nav { display: flex; gap: 4px; flex: 1; }
+.shell-link { color: rgba(255, 255, 255, 0.85); text-decoration: none; padding: 6px 10px; border-radius: 6px; }
+.shell-link:hover, .shell-link[aria-current='page'] { background: rgba(255, 255, 255, 0.14); color: #fff; }
+.shell-console { font-size: 13px; }
+
+/* Pages */
+.page-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.page-head h1 { margin: 0; }
+.crumbs { color: var(--og-muted); margin: 0 0 4px; }
+.crumbs a { color: inherit; }
+.atlas-head .tabs { margin-bottom: 20px; }
+.atlas-head .tab { text-decoration: none; }
+.row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.row .field { margin: 0; }
+.card.row { justify-content: space-between; }
+.card.row p { margin: 2px 0 0; }
+
+/* Table */
+.table { width: 100%; border-collapse: collapse; background: var(--og-surface); border: 1px solid var(--og-border); border-radius: 8px; overflow: hidden; }
+.table th, .table td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--og-border); vertical-align: top; }
+.table th { background: var(--og-ground); font-size: 13px; text-transform: uppercase; letter-spacing: 0.02em; color: var(--og-muted); }
+.table tr:last-child td { border-bottom: 0; }
+.table-actions { white-space: nowrap; }
+.table-actions a { margin-left: 12px; }
+
+/* Editor bits */
+.color-field { display: flex; gap: 8px; align-items: center; }
+.color-field input[type='color'] { width: 40px; height: 36px; padding: 0; border: 1px solid var(--og-border); border-radius: 6px; background: none; }
+.code, .code-block { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+.code-block { background: var(--og-ground); border: 1px solid var(--og-border); border-radius: 6px; padding: 12px; overflow: auto; max-height: 520px; }
+.details { margin-top: 16px; }
+.details summary { cursor: pointer; color: var(--og-muted); }
+.details ul { margin: 8px 0 0; padding-left: 20px; color: var(--og-muted); }

@@ -6,6 +6,20 @@ module CoreDataConnector
     # Preloads
     preloads :project
 
+    # GET /core_data/sites/:id/facets
+    #
+    # The facet attributes this site's searches can declare, derived from the
+    # v1 index's mapping and promotion rules for the project's models (see
+    # OpenGeographies::FacetCatalog). The console's facet pick-list.
+    def facets
+      site = Site.find(params[:id])
+      authorize site, :show?
+
+      models = ProjectModel.where(project_id: site.project_id).order(:order)
+
+      render json: { facets: ::OpenGeographies::FacetCatalog.for_models(models).map(&:to_h) }, status: :ok
+    end
+
     # GET /core_data/sites/:id/config
     #
     # Emits the config.json document for the site: the stored config with the

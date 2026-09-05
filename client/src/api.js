@@ -107,3 +107,29 @@ export const createPlaceImport = (projectId, placeImport) => request(
   `/core_data/projects/${projectId}/place_imports`,
   { body: { place_import: placeImport } }
 );
+
+// --- Atlas editor -----------------------------------------------------------
+
+export const fetchSites = () => request('GET', '/core_data/sites', { params: { per_page: 0, sort_by: 'name' } });
+
+export const fetchSite = (id) => request('GET', `/core_data/sites/${id}`);
+
+export const updateSite = (id, site) => request('PATCH', `/core_data/sites/${id}`, { body: { site } });
+
+export const fetchSiteConfig = (id) => request('GET', `/core_data/sites/${id}/config`);
+
+export const fetchSiteFacets = (id) => request('GET', `/core_data/sites/${id}/facets`);
+
+export const buildTiles = (id) => request('POST', `/core_data/sites/${id}/build_tiles`, { body: {} });
+
+export const fetchSearchCollections = (projectId) => request('GET', '/core_data/search_collections', {
+  params: { per_page: 0, project_id: projectId }
+});
+
+export const reindexSearchCollection = (id) => request('POST', `/core_data/search_collections/${id}/reindex`, { body: {} });
+
+export const fetchJobs = (projectId) => request('GET', '/core_data/jobs', {
+  params: { per_page: 0, project_id: projectId, sort_by: 'created_at', sort_direction: 'descending' }
+});
+
+export const fetchDescriptors = (projectId) => request('GET', `/core_data/projects/${projectId}/descriptors`);

@@ -141,11 +141,12 @@ module CoreDataConnector
               'max_zoom' => 16,
               'cluster_radius' => 8
             },
-            'elasticsearch' => {
-              'facet_attributes' => ['types']
-            },
+            'facets' => [
+              { 'name' => 'types', 'type' => 'list' }
+            ],
             'result_card' => {
-              'title' => 'name'
+              'title' => 'name',
+              'attributes' => [{ 'name' => 'types' }]
             }
           }
         ],

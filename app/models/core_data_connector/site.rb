@@ -147,14 +147,16 @@ module CoreDataConnector
 
       elasticsearch = expanded['elasticsearch'] || {}
 
+      # The entry's `facets` (what the console edits) is the source of the
+      # facet attributes; a stored elasticsearch.facet_attributes is only a
+      # fallback for entries with no facets declared.
       facet_names = (expanded['facets'] || []).map { |facet| facet['name'] }.compact
-      facet_names = ['types'] if facet_names.empty?
+      facet_names = Array(elasticsearch['facet_attributes']).presence || ['types'] if facet_names.empty?
 
       expanded['elasticsearch'] = {
         'index_name' => ::OpenGeographies::Indexing.index_name,
-        'model_ids' => search_collection&.project_model_ids&.map(&:to_s),
-        'facet_attributes' => facet_names
-      }.compact.merge(elasticsearch)
+        'model_ids' => search_collection&.project_model_ids&.map(&:to_s)
+      }.compact.merge(elasticsearch).merge('facet_attributes' => facet_names)
 
       expanded
     end

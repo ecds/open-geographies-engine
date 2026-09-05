@@ -1,0 +1,243 @@
+{
+  "$comment": "Open Geographies canonical Elasticsearch mapping — the index-layer half of the schema (v0.2.1-draft). One mapping serves every atlas: fixed envelope + promoted fields are explicit properties; per-atlas relationships land under their relationship UUID (handled by the related_records dynamic template); per-atlas scalar UDFs land under their field UUID with *_facet companions (handled by facets_as_keyword). Every query is filtered server-side on project_id + visibility — documents from internal-intent fields are never written to this index at all.",
+
+  "settings": {
+    "analysis": {
+      "analyzer": {
+        "og_text": {
+          "type": "custom",
+          "tokenizer": "standard",
+          "filter": ["lowercase", "asciifolding"]
+        }
+      }
+    }
+  },
+
+  "mappings": {
+    "dynamic_templates": [
+      {
+        "facets_as_keyword": {
+          "match": "*_facet",
+          "mapping": { "type": "keyword", "ignore_above": 256 }
+        }
+      },
+      {
+        "related_records": {
+          "match_mapping_type": "object",
+          "match": "????????-????-????-????-????????????",
+          "mapping": {
+            "type": "object",
+            "properties": {
+              "uuid": { "type": "keyword" },
+              "record_id": { "type": "keyword" },
+              "name": { "type": "text", "analyzer": "og_text", "fields": { "keyword": { "type": "keyword", "ignore_above": 256 } } },
+              "name_facet": { "type": "keyword", "ignore_above": 256 },
+              "inverse": { "type": "boolean" }
+            }
+          }
+        }
+      },
+      {
+        "strings_as_text": {
+          "match_mapping_type": "string",
+          "mapping": { "type": "text", "analyzer": "og_text" }
+        }
+      }
+    ],
+
+    "properties": {
+      "uuid": { "type": "keyword" },
+      "slug": { "type": "keyword" },
+      "project_id": { "type": "keyword" },
+      "model_type": { "type": "keyword" },
+      "model_id": { "type": "keyword" },
+      "model_name": { "type": "keyword" },
+
+      "name": {
+        "type": "text",
+        "analyzer": "og_text",
+        "fields": { "keyword": { "type": "keyword", "ignore_above": 256 } }
+      },
+      "names": { "type": "text", "analyzer": "og_text" },
+      "description": { "type": "text", "analyzer": "og_text" },
+      "short_description": { "type": "text", "analyzer": "og_text" },
+
+      "visibility": { "type": "keyword" },
+      "date_modified": { "type": "date" },
+      "identifiers": {
+        "properties": {
+          "authority": { "type": "keyword" },
+          "identifier": { "type": "keyword" }
+        }
+      },
+
+      "geo": {
+        "properties": {
+          "point": { "type": "geo_point" },
+          "shape": { "type": "geo_shape" }
+        }
+      },
+      "geojson": { "type": "object", "enabled": false },
+      "bbox": { "type": "double" },
+
+      "types": { "type": "keyword" },
+      "contained_in_place": {
+        "properties": {
+          "uuid": { "type": "keyword" },
+          "name": { "type": "keyword" },
+          "slug": { "type": "keyword" }
+        }
+      },
+      "address": { "type": "text", "analyzer": "og_text" },
+      "temporal_coverage": { "type": "date_range" },
+
+      "media_type": { "type": "keyword" },
+      "content_url": { "type": "keyword", "index": false },
+      "embed_url": { "type": "keyword", "index": false },
+      "thumbnail": { "type": "keyword", "index": false },
+      "preview": { "type": "keyword", "index": false },
+      "manifest_url": { "type": "keyword", "index": false },
+      "encoding_format": { "type": "keyword" },
+      "duration": { "type": "integer" },
+      "caption": { "type": "text", "analyzer": "og_text" },
+      "alt_text": { "type": "text", "analyzer": "og_text" },
+      "content_warning": { "type": "text", "analyzer": "og_text" },
+      "upload_date": { "type": "date" },
+      "featured": { "type": "boolean" },
+
+      "url": { "type": "keyword", "index": false },
+      "authors": { "type": "text", "analyzer": "og_text", "fields": { "keyword": { "type": "keyword", "ignore_above": 256 } } },
+      "date_published": { "type": "date" },
+      "isbn": { "type": "keyword" },
+      "work_type": { "type": "keyword" },
+
+      "job_title": { "type": "keyword" },
+      "affiliation": { "type": "keyword" },
+      "birth_date": { "type": "date" },
+      "death_date": { "type": "date" },
+
+      "date": { "type": "date" },
+      "bearing": { "type": "double" },
+      "source": {
+        "properties": {
+          "type": { "type": "keyword" },
+          "urls": { "type": "keyword", "index": false }
+        }
+      },
+
+      "creator": {
+        "properties": {
+          "uuid": { "type": "keyword" },
+          "slug": { "type": "keyword" },
+          "name": { "type": "text", "analyzer": "og_text", "fields": { "keyword": { "type": "keyword", "ignore_above": 256 } } }
+        }
+      },
+      "publisher": {
+        "properties": {
+          "uuid": { "type": "keyword" },
+          "slug": { "type": "keyword" },
+          "name": { "type": "text", "analyzer": "og_text", "fields": { "keyword": { "type": "keyword", "ignore_above": 256 } } }
+        }
+      },
+      "preview_media": {
+        "properties": {
+          "uuid": { "type": "keyword" },
+          "slug": { "type": "keyword" },
+          "thumbnail": { "type": "keyword", "index": false }
+        }
+      },
+      "administrative_area": {
+        "properties": {
+          "level": { "type": "keyword" },
+          "name": { "type": "keyword" },
+          "geonames_id": { "type": "keyword" },
+          "geonames_url": { "type": "keyword", "index": false }
+        }
+      },
+
+      "vocabulary": { "type": "keyword" },
+      "parent": {
+        "properties": {
+          "uuid": { "type": "keyword" },
+          "name": { "type": "keyword" },
+          "slug": { "type": "keyword" }
+        }
+      },
+
+      "featured_media": {
+        "properties": {
+          "uuid": { "type": "keyword" },
+          "slug": { "type": "keyword" },
+          "name": { "type": "text", "analyzer": "og_text" },
+          "media_type": { "type": "keyword" },
+          "thumbnail": { "type": "keyword", "index": false },
+          "content_url": { "type": "keyword", "index": false },
+          "embed_url": { "type": "keyword", "index": false }
+        }
+      },
+      "media": {
+        "properties": {
+          "uuid": { "type": "keyword" },
+          "slug": { "type": "keyword" },
+          "name": { "type": "text", "analyzer": "og_text" },
+          "media_type": { "type": "keyword" },
+          "thumbnail": { "type": "keyword", "index": false },
+          "content_url": { "type": "keyword", "index": false },
+          "embed_url": { "type": "keyword", "index": false },
+          "featured": { "type": "boolean" }
+        }
+      },
+      "works": {
+        "properties": {
+          "uuid": { "type": "keyword" },
+          "slug": { "type": "keyword" },
+          "name": { "type": "text", "analyzer": "og_text" },
+          "url": { "type": "keyword", "index": false },
+          "work_type": { "type": "keyword" }
+        }
+      },
+      "people": {
+        "properties": {
+          "uuid": { "type": "keyword" },
+          "slug": { "type": "keyword" },
+          "name": { "type": "text", "analyzer": "og_text", "fields": { "keyword": { "type": "keyword", "ignore_above": 256 } } }
+        }
+      },
+      "places": {
+        "properties": {
+          "uuid": { "type": "keyword" },
+          "slug": { "type": "keyword" },
+          "name": { "type": "text", "analyzer": "og_text", "fields": { "keyword": { "type": "keyword", "ignore_above": 256 } } },
+          "type": { "type": "keyword" },
+          "location": { "type": "geo_point" },
+          "thumbnail": { "type": "keyword", "index": false }
+        }
+      },
+      "map_layers": {
+        "properties": {
+          "uuid": { "type": "keyword" },
+          "slug": { "type": "keyword" },
+          "name": { "type": "text", "analyzer": "og_text" },
+          "date": { "type": "date" },
+          "bbox": { "type": "double" },
+          "source": {
+            "properties": {
+              "type": { "type": "keyword" },
+              "urls": { "type": "keyword", "index": false }
+            }
+          },
+          "thumbnail": { "type": "keyword", "index": false }
+        }
+      },
+      "stops": {
+        "properties": {
+          "position": { "type": "integer" },
+          "uuid": { "type": "keyword" },
+          "slug": { "type": "keyword" },
+          "name": { "type": "text", "analyzer": "og_text" },
+          "location": { "type": "geo_point" }
+        }
+      }
+    }
+  }
+}

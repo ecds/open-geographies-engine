@@ -19,6 +19,7 @@ end
 require 'open_geographies/version'
 require 'open_geographies/engine'
 require 'open_geographies/tenancy_probe'
+require 'open_geographies/facet_catalog'
 
 module OpenGeographies
 end

@@ -5,9 +5,15 @@ import config from './config';
 import { JobStatuses } from './jobs';
 import useJobPolling from './hooks/useJobPolling';
 import { isSignedIn } from './session';
+import { paths, useRoute } from './router';
 import AtlasAreaForm from './components/AtlasAreaForm';
 import PlaceImportPanel from './components/PlaceImportPanel';
+import Shell from './components/Shell';
 import { Button, Field, Message } from './components/ui';
+import AtlasEditor from './pages/AtlasEditor';
+import AtlasImports from './pages/AtlasImports';
+import AtlasJobs from './pages/AtlasJobs';
+import AtlasList from './pages/AtlasList';
 
 const Steps = {
   basics: 'basics',
@@ -62,7 +68,7 @@ const MODULES = [
  * The atlas is live on the shared dynamic renderer as soon as it is
  * provisioned — there is no build or deploy.
  */
-const App = () => {
+const Wizard = ({ navigate }) => {
   const [step, setStep] = useState(Steps.basics);
   const [atlas, setAtlas] = useState({
     name: '',
@@ -122,19 +128,6 @@ const App = () => {
   };
 
   const projectUrl = provisioned && `${config.consoleUrl}/projects/${provisioned.project_id}`;
-
-  if (!isSignedIn()) {
-    return (
-      <main className='wizard'>
-        <h1>Create your atlas</h1>
-        <Message tone='warning'>
-          Sign in to the console first, then come back to this page.
-          {' '}
-          <a href={`${config.consoleUrl}/login`}>Sign in</a>
-        </Message>
-      </main>
-    );
-  }
 
   return (
     <main className='wizard'>
@@ -281,11 +274,48 @@ const App = () => {
           <p>Add your own places from the project’s data entry pages — they appear in your atlas immediately.</p>
           <p>Need more data later? Re-run authority imports any time from the project’s “Place imports” page.</p>
           <div className='actions actions-centered'>
-            <a className='button button-primary' href={projectUrl}>Go to your project</a>
+            <Button onClick={() => navigate(paths.atlas(provisioned.site_id))} primary>Open atlas settings</Button>
+            <a className='button' href={projectUrl}>Go to the project's data</a>
           </div>
         </section>
       )}
     </main>
+  );
+};
+
+/**
+ * The engine's console: the wizard plus the atlas pages, chosen by path.
+ */
+const App = () => {
+  const { route, navigate } = useRoute();
+
+  if (!isSignedIn()) {
+    return (
+      <Shell active={route.name} navigate={navigate}>
+        <main className='wizard'>
+          <h1>Open Geographies</h1>
+          <Message tone='warning'>
+            Sign in to the console first, then come back to this page.
+            {' '}
+            <a href={`${config.consoleUrl}/login`}>Sign in</a>
+          </Message>
+        </main>
+      </Shell>
+    );
+  }
+
+  const page = {
+    wizard: () => <Wizard navigate={navigate} />,
+    atlases: () => <AtlasList navigate={navigate} />,
+    atlas: () => <AtlasEditor id={route.id} key={route.id} navigate={navigate} />,
+    imports: () => <AtlasImports id={route.id} key={route.id} navigate={navigate} />,
+    jobs: () => <AtlasJobs id={route.id} key={route.id} navigate={navigate} />
+  }[route.name];
+
+  return (
+    <Shell active={route.name === 'wizard' ? 'wizard' : 'atlases'} navigate={navigate}>
+      { page() }
+    </Shell>
   );
 };
 

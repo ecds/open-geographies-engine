@@ -89,6 +89,7 @@ module CoreDataConnector
               )
 
               create_fields!(model, definition[:user_defined_fields], table_name: definition[:model_class])
+              assign_role!(model, definition)
 
               models[definition[:name]] = model
             end
@@ -106,7 +107,27 @@ module CoreDataConnector
           models.values
         end
 
+        # The roles the template's Place-classed models play, in the lower
+        # engine's terms. CoreDataConnector::Place backs both "Places" and
+        # "Map Layers" (layers need PlaceGeometry), so the indexer tells them
+        # apart by a ProjectModelRole row (PromotedRelationships
+        # .template_model_name_for) — without it a Map Layers model indexes as
+        # places. Written only when the lower engine is loaded.
+        ROLES = {
+          'primary_place_model' => 'primary_place',
+          'Map Layers' => 'map_layer'
+        }.freeze
+
         private
+
+        def assign_role!(model, definition)
+          return unless defined?(::CoreDataConnector::OpenGeographies::ProjectModelRole)
+
+          role = ROLES[definition.dig(:og, :role).to_s] || ROLES[definition[:name].to_s]
+          return unless role
+
+          ::CoreDataConnector::OpenGeographies::ProjectModelRole.find_or_create_by!(project_model_id: model.id, role:)
+        end
 
         def create_fields!(defineable, fields, table_name:)
           (fields || []).each do |field|

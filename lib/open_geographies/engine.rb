@@ -49,6 +49,7 @@ module OpenGeographies
 
         resources :sites do
           get :config, action: :site_config, on: :member
+          get :facets, on: :member
           post :build_tiles, on: :member
         end
 
@@ -99,10 +100,12 @@ module OpenGeographies
             instance_exec(&routes)
           end
 
-          # The "Create your atlas" wizard page (see WizardController). At the
-          # root, not under /core_data, because it is a page rather than an API
-          # endpoint; ahead of the host's catch-all for the same reason as above.
+          # The engine's console pages (see WizardController): the "Create your
+          # atlas" wizard and the atlas editor. At the root, not under
+          # /core_data, because they are pages rather than API endpoints; ahead
+          # of the host's catch-all for the same reason as above.
           get 'wizard', to: 'core_data_connector/wizard#show'
+          get 'atlases(/*path)', to: 'core_data_connector/wizard#show', format: false
         end
       end
     end

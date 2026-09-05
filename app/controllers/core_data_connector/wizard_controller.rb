@@ -1,7 +1,8 @@
 module CoreDataConnector
-  # GET /wizard
+  # GET /wizard, GET /atlases(/*path)
   #
-  # The "Create your atlas" wizard page. The wizard is a small self-contained
+  # The engine's console pages: the "Create your atlas" wizard and the atlas
+  # editor (sites, search apps, imports, jobs). One small self-contained
   # React app that lives in this engine (client/, built to public/wizard/) and
   # talks to the engine's own admin API (POST /core_data/atlases, jobs,
   # place_imports) with the session the FairData console already holds in

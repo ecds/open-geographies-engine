@@ -83,11 +83,19 @@ compliant by construction: "Types" on Places indexes as `types`, "Short Descript
 `short_description`, and so on. Two starters: `places` (Places + Types) and `atlas` (every
 non-optional model), plus optional modules by name (Map Layers, Work Types, Tours).
 
-## The "Create your atlas" wizard (`/wizard`)
+## The console pages (`/wizard`, `/atlases`)
 
-The wizard is a small React app that lives in this engine (`client/`) and is served by
-it at `GET /wizard` — FairData only needs a navigation link to that path; everything
-past the link (page, assets, provisioning flow, authority seeding) is the engine's.
+The engine serves its own console pages — the "Create your atlas" wizard at `/wizard`
+and the atlas pages at `/atlases` (list; per atlas: settings, place imports, jobs) — from
+one small React app that lives in this engine (`client/`). FairData only needs a
+navigation link to `/wizard` or `/atlases`; everything past the link is the engine's.
+
+The atlas settings editor covers name/slug, branding, navigation, map layers, search apps
+(collection, facets, result card), an Advanced JSON tab for the rest of the config, the
+emitted config.json, plus Reindex and Build map tiles. Facet choices come from
+`GET /core_data/sites/:id/facets` (`OpenGeographies::FacetCatalog`), which derives what is
+actually facetable from the v1 mapping and the template's promotion rules — so the
+pick-list never offers an attribute the index can't aggregate.
 
 - It calls the engine's own admin API (`POST /core_data/atlases`, `GET /core_data/jobs/:id`,
   the `place_imports` endpoints) with the session the console already holds
