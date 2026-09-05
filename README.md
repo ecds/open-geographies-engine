@@ -72,6 +72,17 @@ bin/rails db:migrate
 The host already mounts `CoreDataConnector::Engine` at `/core_data`; this engine adds
 its routes there automatically. Nothing else to wire.
 
+## Provisioning is the canonical template
+
+`Atlases::Template` creates a wizard-born atlas's models, user-defined fields and
+relationships from `canonical_template.json` — the lower engine's own copy when that engine
+is loaded, else `lib/open_geographies/canonical_template.json` (a vendored snapshot; never
+edit it here — the template's home is the lower engine's repo). Because the lower engine's
+`PromotedRelationships` matches names against the same document, a wizard-born atlas is
+compliant by construction: "Types" on Places indexes as `types`, "Short Description" as
+`short_description`, and so on. Two starters: `places` (Places + Types) and `atlas` (every
+non-optional model), plus optional modules by name (Map Layers, Work Types, Tours).
+
 ## The "Create your atlas" wizard (`/wizard`)
 
 The wizard is a small React app that lives in this engine (`client/`) and is served by

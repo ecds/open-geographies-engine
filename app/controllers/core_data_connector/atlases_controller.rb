@@ -15,6 +15,8 @@ module CoreDataConnector
   #   description - optional project description
   #   locale      - optional default locale (default 'en')
   #   template    - 'places' (default) or 'atlas' (see Atlases::Template)
+  #   modules     - optional module names to add to the 'atlas' template
+  #                 (Atlases::Template.optional_models: Map Layers, Work Types, Tours)
   #   area        - optional geographic area document, stored on the site:
   #                 { geometry_json: <GeoJSON>, admin_units: [...] }
   class AtlasesController < ApplicationController
@@ -52,7 +54,7 @@ module CoreDataConnector
           role: UserProject::ROLE_OWNER
         )
 
-        models = Atlases::Template.create_models!(project, template)
+        models = Atlases::Template.create_models!(project, template, include: atlas_params[:modules] || [])
         places_model = models.find { |model| model.model_class == 'CoreDataConnector::Place' }
 
         search_collection = SearchCollection.create!(
@@ -102,7 +104,7 @@ module CoreDataConnector
     private
 
     def atlas_params
-      params.require(:atlas).permit(:name, :slug, :description, :locale, :template, area: {})
+      params.require(:atlas).permit(:name, :slug, :description, :locale, :template, area: {}, modules: [])
     end
 
     # The atlas's public URL on the shared dynamic renderer, when a URL template

@@ -1,0 +1,176 @@
+{
+  "name": "Open Geographies — canonical atlas template",
+  "version": "0.2.1-draft",
+  "changelog": "0.2.1: post-review fixes — duplicate `preview` mapping key resolved (relationship-promoted object renamed preview_media; scalar preview = the extras URL field); administrative_area added to the mapping (Jay's v1 field); mapping version comment corrected. 0.2.0: media fields renamed to match MediaContent#extras reality (thumbnail_url/iiif_url → thumbnail/preview in the mapping); address flattened to a single display-text field promoted from a new Places 'Address' UDF (structured geo faceting is served by administrative_area instead).",
+  "$comment": "The authoring layer of the OG canonical schema: the project_models the wizard creates. Format matches a Core Data project export (name / project_models / user_defined_fields / project_model_relationships) so it can be diffed against 'Georgia Coast Atlas schema.json' directly. OG extensions live under 'og' keys: og.promote maps a UDF or relationship onto a well-known envelope field the renderer depends on by name; og.intent marks field visibility (internal fields are never publicly indexed or rendered); og.optional marks modules an atlas may skip. Numeric ids are omitted — they are assigned at creation; relationships reference models by 'related_model' name.",
+
+  "project_models": [
+    {
+      "name": "Places",
+      "model_class": "CoreDataConnector::Place",
+      "og": { "role": "primary_place_model" },
+      "user_defined_fields": [
+        { "column_name": "Short Description", "data_type": "Text", "required": false, "searchable": true, "allow_multiple": false, "order": 0,
+          "og": { "intent": "displayable", "promote": "short_description" } },
+        { "column_name": "Description", "data_type": "RichText", "required": false, "searchable": true, "allow_multiple": false, "order": 1,
+          "og": { "intent": "displayable", "promote": "description" } },
+        { "column_name": "Address", "data_type": "String", "required": false, "searchable": true, "allow_multiple": false, "order": 2,
+          "og": { "intent": "displayable", "promote": "address", "$comment": "Display text only (closes the unreachable-address gap; HRCGA already has this field). Structured locality/region/country faceting is administrative_area's job, derived server-side from the centroid — not curator-entered." } }
+      ],
+      "project_model_relationships": [
+        { "name": "Types", "related_model": "Types", "multiple": true, "allow_inverse": true, "inverse_name": "Places",
+          "og": { "promote": "types" } },
+        { "name": "Contained In", "related_model": "Places", "multiple": false, "allow_inverse": true, "inverse_name": "Contains",
+          "og": { "promote": "contained_in_place", "$comment": "Replaces GCA's bespoke County relationship; generalizes to county/state/region/parish." } },
+        { "name": "Media", "related_model": "Media", "multiple": true, "allow_inverse": true, "inverse_name": "Places",
+          "og": { "promote": "media" },
+          "user_defined_fields": [
+            { "column_name": "featured", "data_type": "Boolean", "required": false, "order": 0,
+              "og": { "intent": "displayable", "$comment": "Presentation hint on the relationship, as GCA does today." } }
+          ] },
+        { "name": "Works", "related_model": "Works", "multiple": true, "allow_inverse": true, "inverse_name": "Places",
+          "og": { "promote": "works" } },
+        { "name": "People", "related_model": "People", "multiple": true, "allow_inverse": true, "inverse_name": "Places",
+          "og": { "promote": "people" } },
+        { "name": "Related Places", "related_model": "Places", "multiple": true, "allow_inverse": false,
+          "og": { "promote": "places" } },
+        { "name": "Map Layers", "related_model": "Map Layers", "multiple": true, "allow_inverse": true, "inverse_name": "Places",
+          "og": { "promote": "map_layers", "optional": true } }
+      ]
+    },
+
+    {
+      "name": "Media",
+      "model_class": "CoreDataConnector::MediaContent",
+      "og": { "$comment": "ONE media model for image/video/audio/pano/3d — the correction to GCA's split (Photographs=MediaContent, Videos/Panos=Item). Uploaded media fills content urls natively (ActiveStorage/IIIF/Mux); externally-hosted media fills Embed URL. Exactly one of the two must be present." },
+      "user_defined_fields": [
+        { "column_name": "Media Type", "data_type": "Select", "required": true, "searchable": true, "allow_multiple": false, "order": 0,
+          "options": ["image", "video", "audio", "pano", "model3d"],
+          "og": { "intent": "displayable", "promote": "media_type" } },
+        { "column_name": "Embed URL", "data_type": "String", "required": false, "searchable": false, "allow_multiple": false, "order": 1,
+          "og": { "intent": "displayable", "promote": "embed_url", "$comment": "Vimeo / YouTube / Matterport. Promoted from GCA's per-atlas convention to a structural field." } },
+        { "column_name": "Caption", "data_type": "RichText", "required": false, "searchable": true, "allow_multiple": false, "order": 2,
+          "og": { "intent": "displayable", "promote": "caption" } },
+        { "column_name": "Alt Text", "data_type": "Text", "required": false, "searchable": false, "allow_multiple": false, "order": 3,
+          "og": { "intent": "displayable", "promote": "alt_text" } },
+        { "column_name": "Duration", "data_type": "Number", "required": false, "searchable": false, "allow_multiple": false, "order": 4,
+          "og": { "intent": "displayable", "promote": "duration", "$comment": "Seconds; audio/video only." } }
+      ],
+      "project_model_relationships": [
+        { "name": "Creator", "related_model": "People", "multiple": false, "allow_inverse": true, "inverse_name": "Media",
+          "og": { "promote": "creator", "$comment": "HRCGA's Photographer, generalized." } },
+        { "name": "Publisher", "related_model": "Organizations", "multiple": false, "allow_inverse": true, "inverse_name": "Media",
+          "og": { "promote": "publisher" } }
+      ]
+    },
+
+    {
+      "name": "Works",
+      "model_class": "CoreDataConnector::Work",
+      "og": { "$comment": "References & bibliography (GCA's Works, HRCGA's Resources) — things that point at content rather than being media. schema.org CreativeWork." },
+      "user_defined_fields": [
+        { "column_name": "Link", "data_type": "String", "required": false, "searchable": false, "allow_multiple": false, "order": 0,
+          "og": { "intent": "displayable", "promote": "url" } },
+        { "column_name": "Authors", "data_type": "String", "required": false, "searchable": true, "allow_multiple": true, "order": 1,
+          "og": { "intent": "displayable", "promote": "authors" } },
+        { "column_name": "Publisher", "data_type": "String", "required": false, "searchable": true, "allow_multiple": false, "order": 2,
+          "og": { "intent": "displayable", "promote": "publisher" } },
+        { "column_name": "Date Published", "data_type": "FuzzyDate", "required": false, "searchable": false, "allow_multiple": false, "order": 3,
+          "og": { "intent": "displayable", "promote": "date_published" } },
+        { "column_name": "Pages", "data_type": "String", "required": false, "searchable": false, "allow_multiple": false, "order": 4,
+          "og": { "intent": "displayable" } },
+        { "column_name": "Volume", "data_type": "String", "required": false, "searchable": false, "allow_multiple": false, "order": 5,
+          "og": { "intent": "displayable" } },
+        { "column_name": "Issue", "data_type": "String", "required": false, "searchable": false, "allow_multiple": false, "order": 6,
+          "og": { "intent": "displayable" } },
+        { "column_name": "ISBN", "data_type": "String", "required": false, "searchable": false, "allow_multiple": false, "order": 7,
+          "og": { "intent": "displayable", "promote": "isbn" } }
+      ],
+      "project_model_relationships": [
+        { "name": "Type", "related_model": "Work Types", "multiple": false, "allow_inverse": true, "inverse_name": "Works",
+          "og": { "promote": "work_type", "$comment": "HRCGA's Resource Types (which carried the Embeddable presentation hint — that stays a taxonomy-term UDF, not structure)." } }
+      ]
+    },
+
+    {
+      "name": "People",
+      "model_class": "CoreDataConnector::Person",
+      "user_defined_fields": [
+        { "column_name": "Biography", "data_type": "RichText", "required": false, "searchable": true, "allow_multiple": false, "order": 0,
+          "og": { "intent": "displayable", "promote": "description" } },
+        { "column_name": "Job Title", "data_type": "String", "required": false, "searchable": false, "allow_multiple": false, "order": 1,
+          "og": { "intent": "displayable", "promote": "job_title" } },
+        { "column_name": "Affiliation", "data_type": "String", "required": false, "searchable": false, "allow_multiple": false, "order": 2,
+          "og": { "intent": "displayable", "promote": "affiliation" } }
+      ]
+    },
+
+    {
+      "name": "Organizations",
+      "model_class": "CoreDataConnector::Organization",
+      "user_defined_fields": [
+        { "column_name": "URL", "data_type": "String", "required": false, "searchable": false, "allow_multiple": false, "order": 0,
+          "og": { "intent": "displayable", "promote": "url" } }
+      ]
+    },
+
+    {
+      "name": "Map Layers",
+      "model_class": "CoreDataConnector::Place",
+      "og": { "optional": true, "$comment": "First-class georeferenced overlay (kept from GCA — the time-slider). Place-based because it carries spatial extent, as GCA already does. Topo Quads fold in here as dated layers." },
+      "user_defined_fields": [
+        { "column_name": "Date", "data_type": "FuzzyDate", "required": false, "searchable": true, "allow_multiple": false, "order": 0,
+          "og": { "intent": "displayable", "promote": "date", "$comment": "Drives the time-slider." } },
+        { "column_name": "Bearing", "data_type": "Number", "required": false, "searchable": false, "allow_multiple": false, "order": 1,
+          "og": { "intent": "displayable", "promote": "bearing" } },
+        { "column_name": "Source Type", "data_type": "Select", "required": true, "searchable": false, "allow_multiple": false, "order": 2,
+          "options": ["wms", "iiif", "xyz", "pmtiles", "annotation"],
+          "og": { "intent": "displayable", "promote": "source.type" } },
+        { "column_name": "Source URLs", "data_type": "String", "required": true, "searchable": false, "allow_multiple": true, "order": 3,
+          "og": { "intent": "displayable", "promote": "source.urls", "$comment": "Generalizes GCA's wms_resources + IIIF annotation pages into one typed source." } },
+        { "column_name": "Description", "data_type": "RichText", "required": false, "searchable": true, "allow_multiple": false, "order": 4,
+          "og": { "intent": "displayable", "promote": "description" } }
+      ],
+      "project_model_relationships": [
+        { "name": "Preview", "related_model": "Media", "multiple": false, "allow_inverse": false,
+          "og": { "promote": "preview_media", "$comment": "GCA's separate Map Preview model folds into Media. Named preview_media to avoid colliding with the scalar `preview` URL field emitted by MediaContent#extras." } },
+        { "name": "Publisher", "related_model": "Organizations", "multiple": false, "allow_inverse": true, "inverse_name": "Map Layers",
+          "og": { "promote": "publisher" } }
+      ]
+    },
+
+    {
+      "name": "Types",
+      "model_class": "CoreDataConnector::Taxonomy",
+      "og": { "$comment": "The place-type vocabulary — the one taxonomy every atlas gets, because the promoted 'types' facet and map styling depend on it. Its TERMS are per-atlas data ('Barrier Island', 'Church'); the model is structural. All other vocabularies (Topics, Denominations, Counties, Map Categories…) are added per-atlas by the curator and surface via config — the mechanism is this same model class." }
+    },
+
+    {
+      "name": "Work Types",
+      "model_class": "CoreDataConnector::Taxonomy",
+      "og": { "optional": true },
+      "user_defined_fields": [
+        { "column_name": "Embeddable", "data_type": "Boolean", "required": false, "searchable": false, "allow_multiple": false, "order": 0,
+          "og": { "intent": "displayable", "$comment": "HRCGA's presentation hint, kept as a term-level UDF — optional, not structural." } }
+      ]
+    },
+
+    {
+      "name": "Tours",
+      "model_class": "CoreDataConnector::Instance",
+      "og": { "optional": true, "$comment": "Optional module (schema.org ItemList / TouristTrip). Consumed by the renderer and by Open Tour as an API client. Ordered stops via the relationship's order." },
+      "user_defined_fields": [
+        { "column_name": "Description", "data_type": "Text", "required": false, "searchable": true, "allow_multiple": false, "order": 0,
+          "og": { "intent": "displayable", "promote": "description" } },
+        { "column_name": "Link", "data_type": "String", "required": false, "searchable": false, "allow_multiple": false, "order": 1,
+          "og": { "intent": "displayable", "promote": "url" } }
+      ],
+      "project_model_relationships": [
+        { "name": "Stops", "related_model": "Places", "multiple": true, "allow_inverse": true, "inverse_name": "Tours",
+          "og": { "promote": "stops" } },
+        { "name": "Thumbnail", "related_model": "Media", "multiple": false, "allow_inverse": false,
+          "og": { "promote": "preview_media" } }
+      ]
+    }
+  ]
+}

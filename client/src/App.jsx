@@ -39,8 +39,19 @@ const LOCALES = [
 ];
 
 const TEMPLATES = [
-  { value: 'places', title: 'Places', description: 'Just places — the lightest start' },
-  { value: 'atlas', title: 'Atlas', description: 'Places, people, media, and topics' }
+  { value: 'places', title: 'Places', description: 'Places and a place-type vocabulary — the lightest start' },
+  { value: 'atlas', title: 'Atlas', description: 'Places, media, works, people, and organizations' }
+];
+
+/**
+ * The canonical template's optional modules (og.optional), offered with the
+ * Atlas template. Names must match the template exactly — the engine creates
+ * them from the same document the indexer promotes from.
+ */
+const MODULES = [
+  { value: 'Map Layers', title: 'Map layers', description: 'Georeferenced historical overlays with a time slider' },
+  { value: 'Work Types', title: 'Work types', description: 'A vocabulary for classifying works' },
+  { value: 'Tours', title: 'Tours', description: 'Ordered stops through places' }
 ];
 
 /**
@@ -58,6 +69,7 @@ const App = () => {
     description: '',
     locale: 'en',
     template: 'places',
+    modules: [],
     area: {}
   });
   const [errors, setErrors] = useState([]);
@@ -182,6 +194,25 @@ const App = () => {
               </label>
             ))}
           </fieldset>
+          { atlas.template === 'atlas' && (
+            <fieldset className='field'>
+              <legend className='field-label'>Optional modules</legend>
+              { _.map(MODULES, (module) => (
+                <label className='check' key={module.value}>
+                  <input
+                    checked={_.contains(atlas.modules, module.value)}
+                    onChange={(e) => update({
+                      modules: e.target.checked
+                        ? [...atlas.modules, module.value]
+                        : _.without(atlas.modules, module.value)
+                    })}
+                    type='checkbox'
+                  />
+                  <strong>{ module.title }</strong> — { module.description }
+                </label>
+              ))}
+            </fieldset>
+          )}
           <h3>Geographic area</h3>
           <AtlasAreaForm onChange={(area) => update({ area })} value={atlas.area} />
           <div className='actions'>
