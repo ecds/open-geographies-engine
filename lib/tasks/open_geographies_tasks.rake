@@ -38,3 +38,16 @@ namespace :open_geographies do
     puts "\nAll #{probe.checks} checks passed."
   end
 end
+
+namespace :open_geographies do
+  desc 'Clone a discoverable project from another instance\'s public API (SOURCE=, PROJECT_ID=, NAME=, [SLUG=])'
+  task import_public_project: :environment do
+    source = ENV.fetch('SOURCE')
+    project_id = ENV.fetch('PROJECT_ID')
+    name = ENV.fetch('NAME')
+
+    project = OpenGeographies::PublicProjectImport.new(source:, project_id:, name:, slug: ENV['SLUG']).run!
+
+    puts "\nImported project #{project.id} (#{project.name})."
+  end
+end
