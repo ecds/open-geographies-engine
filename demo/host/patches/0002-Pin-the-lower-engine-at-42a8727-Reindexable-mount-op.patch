@@ -1,0 +1,46 @@
+From ca14903c39bba88caba0e9759dc98f0eeb8516c6 Mon Sep 17 00:00:00 2001
+From: terminusfilms <steve@terminusfilms.com>
+Date: Fri, 4 Sep 2026 17:38:28 -0400
+Subject: [PATCH 2/2] Pin the lower engine at 42a8727 (Reindexable); mount
+ open_geographies from local path
+
+---
+ Gemfile      | 2 +-
+ Gemfile.lock | 5 +++--
+ 2 files changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/Gemfile b/Gemfile
+index 970cdca..5527fac 100644
+--- a/Gemfile
++++ b/Gemfile
+@@ -84,7 +84,7 @@ end
+ 
+ # ECDS STUFF
+ # gem 'core_data_connector_open_geographies', path: '/Users/jay/data/core-data-connector-open-geographies'
+-gem 'core_data_connector_open_geographies', git: 'https://github.com/ecds/core-data-connector-open-geographies.git', ref: '7dc6690'
++gem 'core_data_connector_open_geographies', git: 'https://github.com/ecds/core-data-connector-open-geographies.git', ref: '42a8727'
+ 
+ # Open Geographies platform engine (upper layer: wizard/provisioning, Sites, imports,
+ # by-slug atlas API). Local path for development; pin by git ref for deploys.
+diff --git a/Gemfile.lock b/Gemfile.lock
+index 326af4d..8e5f17a 100644
+--- a/Gemfile.lock
++++ b/Gemfile.lock
+@@ -1,11 +1,12 @@
+ GIT
+   remote: https://github.com/ecds/core-data-connector-open-geographies.git
+-  revision: 7dc669082ae77659946d169184f70ee55efc0c7b
+-  ref: 7dc6690
++  revision: 42a87273e98462b4e1cd8a5a13aed54904d026c1
++  ref: 42a8727
+   specs:
+     core_data_connector_open_geographies (0.1.0)
+       elasticsearch (~> 8)
+       rails (>= 8.0.2)
++      rgeo-geojson (~> 2.2)
+       searchkick (~> 5.4.0)
+ 
+ GIT
+-- 
+2.49.0
+

@@ -1,0 +1,126 @@
+# Open Geographies demo stack — the whole platform on one machine:
+#
+#   db            PostGIS                          :54334
+#   elasticsearch the shared v1 index              :9200
+#   host          FairData + this engine           http://localhost:3001
+#                 console at /, engine pages at /wizard and /atlases
+#   renderer      the shared dynamic renderer       http://<slug>.localhost:4321
+#
+# First run: copy .env.example to .env, fill the two keys, then
+#
+#   docker compose up --build
+#
+# The host seeds itself: an admin account (see .env) and the Historic Rural
+# Churches of Georgia atlas, cloned from coredata.ecds.io's public API and
+# reindexed — a few minutes, watch `docker compose logs -f host`. Then:
+#
+#   http://hrcga.localhost:4321/en/search/places   the atlas
+#   http://localhost:3001/atlases                  its settings
+#   http://localhost:3001/wizard                   create another
+name: og-demo
+
+services:
+  db:
+    image: postgis/postgis:16-3.4-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: core_data
+      POSTGRES_PASSWORD: core_data_local
+      POSTGRES_DB: core_data_development
+    ports:
+      - "54334:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U core_data"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  host:
+    build:
+      context: ..
+      dockerfile: demo/host/Dockerfile
+      args:
+        BUILD_CONSOLE: ${BUILD_CONSOLE:-1}
+        VITE_MAP_TILER_KEY: ${VITE_MAP_TILER_KEY:-}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      DATABASE_HOST: db
+      DATABASE_PORT: "5432"
+      DATABASE_USERNAME: core_data
+      DATABASE_PASSWORD: core_data_local
+      DATABASE_NAME: core_data_development
+      DATABASE_POOL: "20"
+      ELASTICSEARCH_HOST: http://elasticsearch:9200
+      # Security is off on the demo node; the host's client requires the key to be set.
+      ELASTICSEARCH_API_KEY: ""
+      HOSTNAME: http://localhost:3001
+      # PRIMARY_DOMAIN stays unset: the host's canonical-domain redirect would
+      # bounce the renderer's in-network calls (Host: host:3000).
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE:-og-demo-not-a-secret-0123456789abcdef0123456789abcdef}
+      # What the browser (and the renderer's config.json) uses to reach this host.
+      CORE_DATA_PUBLIC_URL: http://localhost:3001
+      OG_ATLAS_URL_TEMPLATE: http://{slug}.localhost:${RENDERER_PORT:-4321}
+      VITE_MAP_TILER_KEY: ${VITE_MAP_TILER_KEY:-}
+      GEONAMES_USERNAME: ${GEONAMES_USERNAME:-}
+      IIIF_CLOUD_URL: ${IIIF_CLOUD_URL:-https://iiif-cloud.ecds.io}
+      DEMO_ADMIN_EMAIL: ${DEMO_ADMIN_EMAIL:-admin@example.com}
+      DEMO_ADMIN_PASSWORD: ${DEMO_ADMIN_PASSWORD:-Changeme1!!}
+      DEMO_SKIP_HRCGA: ${DEMO_SKIP_HRCGA:-0}
+      DEMO_HRCGA_SOURCE: ${DEMO_HRCGA_SOURCE:-https://coredata.ecds.io}
+      DEMO_ALLOWED_HOSTS: host
+    ports:
+      - "3001:3000"
+    volumes:
+      # The fetched HRCGA snapshot, so a rebuilt container doesn't refetch it.
+      # A named volume, not a bind mount: a host path the Docker VM can't
+      # share (macOS keeps Docker out of ~/Documents unless granted) hangs the
+      # container start with no error.
+      - og_import:/app/tmp/og_import
+
+  renderer:
+    build:
+      context: renderer
+      args:
+        RENDERER_REF: ${RENDERER_REF:-main}
+    restart: unless-stopped
+    depends_on:
+      - host
+      - elasticsearch
+    environment:
+      # Server-side addresses (inside the compose network).
+      OG_CONSOLE_URL: http://host:3000
+      OG_CORE_DATA_INTERNAL_URL: http://host:3000
+      OG_ELASTICSEARCH_URL: http://elasticsearch:9200
+      # The atlas plain localhost:4321 shows; any other is <slug>.localhost:4321.
+      OG_SITE_SLUG: ${OG_SITE_SLUG:-hrcga}
+    ports:
+      - "${RENDERER_PORT:-4321}:4321"
+
+volumes:
+  pgdata:
+  esdata:
+  og_import:

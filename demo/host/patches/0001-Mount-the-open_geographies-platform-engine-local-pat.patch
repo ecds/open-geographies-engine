@@ -1,0 +1,126 @@
+From 829b63f246f3e588e3d42164fa62489a3f5a715e Mon Sep 17 00:00:00 2001
+From: terminusfilms <steve@terminusfilms.com>
+Date: Fri, 4 Sep 2026 17:27:54 -0400
+Subject: [PATCH 1/2] Mount the open_geographies platform engine (local path) +
+ its two additive migrations
+
+---
+ Gemfile                                       |  4 ++++
+ Gemfile.lock                                  |  8 +++++++
+ ...tor_search_collections.open_geographies.rb | 24 +++++++++++++++++++
+ ...e_data_connector_sites.open_geographies.rb | 24 +++++++++++++++++++
+ 4 files changed, 60 insertions(+)
+ create mode 100644 db/migrate/20260904212559_create_core_data_connector_search_collections.open_geographies.rb
+ create mode 100644 db/migrate/20260904212560_create_core_data_connector_sites.open_geographies.rb
+
+diff --git a/Gemfile b/Gemfile
+index 6204b6e..970cdca 100644
+--- a/Gemfile
++++ b/Gemfile
+@@ -85,6 +85,10 @@ end
+ # ECDS STUFF
+ # gem 'core_data_connector_open_geographies', path: '/Users/jay/data/core-data-connector-open-geographies'
+ gem 'core_data_connector_open_geographies', git: 'https://github.com/ecds/core-data-connector-open-geographies.git', ref: '7dc6690'
++
++# Open Geographies platform engine (upper layer: wizard/provisioning, Sites, imports,
++# by-slug atlas API). Local path for development; pin by git ref for deploys.
++gem 'open_geographies', path: '../open-geographies-engine'
+ # Elasticserch
+ gem 'elasticsearch', '~> 8.0'
+ gem 'faraday-typhoeus', '~> 1.0' # Needed to use Elasticsearch in rake tasks.
+diff --git a/Gemfile.lock b/Gemfile.lock
+index d2883c4..326af4d 100644
+--- a/Gemfile.lock
++++ b/Gemfile.lock
+@@ -54,6 +54,12 @@ GIT
+       rails (>= 6.0.3.2, < 9)
+       resource_api
+ 
++PATH
++  remote: ../open-geographies-engine
++  specs:
++    open_geographies (0.1.0)
++      rails (>= 8.1, < 9)
++
+ GEM
+   remote: https://rubygems.org/
+   specs:
+@@ -2152,6 +2158,7 @@ DEPENDENCIES
+   mail_safe (~> 0.3.4)
+   namae
+   nameable
++  open_geographies!
+   paper_trail (>= 16.0)
+   pg (~> 1.6.3)
+   postmark-rails (~> 0.22.1)
+@@ -2692,6 +2699,7 @@ CHECKSUMS
+   nokogiri (1.19.4-x86_64-darwin) sha256=7fd17057d3e1f00e9954a74b3cd76595d3d4a5ef233b7ed9599047c204f70551
+   nokogiri (1.19.4-x86_64-linux-gnu) sha256=379fae440b28915e3f19d752ce2dcf8465ed2b2fbefd2a7ca0dd497bc981a06a
+   nokogiri (1.19.4-x86_64-linux-musl) sha256=17dfb7c1fa194ae02fbf7c51a7afc8d278045ab3fdacfd86f91d02d7b274470b
++  open_geographies (0.1.0)
+   ostruct (0.6.3) sha256=95a2ed4a4bd1d190784e666b47b2d3f078e4a9efda2fccf18f84ddc6538ed912
+   pagy (5.10.1) sha256=352c3f9a2bbb12dfc34e0e3b613b191328bf0559fd7bf8d45530aa3cfc2629c6
+   paper_trail (17.0.0) sha256=1c2842061d3874ca7015908e821e2aa14f9b982af2acb2a7974713bf79021c85
+diff --git a/db/migrate/20260904212559_create_core_data_connector_search_collections.open_geographies.rb b/db/migrate/20260904212559_create_core_data_connector_search_collections.open_geographies.rb
+new file mode 100644
+index 0000000..8775535
+--- /dev/null
++++ b/db/migrate/20260904212559_create_core_data_connector_search_collections.open_geographies.rb
+@@ -0,0 +1,24 @@
++# This migration comes from open_geographies (originally 20260612000001)
++# Open Geographies engine migration (additive — creates a NEW table only).
++#
++# Squashed from the fork's original pair (create + add_search_only_key) into the
++# final shape. Installs onto a clean upstream Core Data via
++# `rails open_geographies:install:migrations`.
++class CreateCoreDataConnectorSearchCollections < ActiveRecord::Migration[8.1]
++  def change
++    create_table :core_data_connector_search_collections do |t|
++      t.references :project, null: false
++      t.string :name, null: false
++      t.jsonb :project_model_ids, default: []
++      t.boolean :polygons, default: true
++      t.jsonb :facet_field_uuids, default: []
++      t.boolean :auto_index, default: true
++      t.datetime :last_indexed_at
++      t.string :search_only_key
++      t.integer :search_only_key_id
++      t.timestamps
++    end
++
++    add_index :core_data_connector_search_collections, :name, unique: true
++  end
++end
+diff --git a/db/migrate/20260904212560_create_core_data_connector_sites.open_geographies.rb b/db/migrate/20260904212560_create_core_data_connector_sites.open_geographies.rb
+new file mode 100644
+index 0000000..6c16957
+--- /dev/null
++++ b/db/migrate/20260904212560_create_core_data_connector_sites.open_geographies.rb
+@@ -0,0 +1,24 @@
++# This migration comes from open_geographies (originally 20260612000002)
++# Open Geographies engine migration (additive — creates a NEW table only).
++#
++# Squashed from the fork's original 7 sites migrations into the FINAL shape — the
++# retired deploy-pipeline columns (deploy_adapter, deploy_config, netlify_token,
++# content_repo_*, deploy_key_*, webhook_secret, auto_rebuild) were added then dropped
++# on the fork; the engine never creates them. Installs onto a clean upstream Core
++# Data via `rails open_geographies:install:migrations`.
++class CreateCoreDataConnectorSites < ActiveRecord::Migration[8.1]
++  def change
++    create_table :core_data_connector_sites do |t|
++      t.references :project, null: false
++      t.string :name, null: false
++      t.string :slug, null: false
++      t.jsonb :config, default: {}
++      t.jsonb :area
++      t.jsonb :branding, default: {}
++      t.jsonb :navigation, default: {}
++      t.timestamps
++    end
++
++    add_index :core_data_connector_sites, :slug, unique: true
++  end
++end
+-- 
+2.49.0
+

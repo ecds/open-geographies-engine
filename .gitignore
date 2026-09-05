@@ -11,3 +11,5 @@
 *.swp
 .DS_Store
 Gemfile.lock
+!demo/data/.gitkeep
+demo/.env

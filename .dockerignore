@@ -1,0 +1,6 @@
+# Build context for demo/host/Dockerfile is this repo; keep it to the engine.
+client/node_modules
+tmp
+log
+.git
+*.gem
