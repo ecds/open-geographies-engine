@@ -98,8 +98,23 @@ module OpenGeographies
           scope path: 'core_data', module: 'core_data_connector' do
             instance_exec(&routes)
           end
+
+          # The "Create your atlas" wizard page (see WizardController). At the
+          # root, not under /core_data, because it is a page rather than an API
+          # endpoint; ahead of the host's catch-all for the same reason as above.
+          get 'wizard', to: 'core_data_connector/wizard#show'
         end
       end
+    end
+
+    # Serve the wizard's built assets (public/wizard/) from the engine itself.
+    # The host serves only its own public/ directory (and in production often
+    # none at all, leaving that to a CDN or proxy); without this the page could
+    # not load its script. Appended to the middleware stack, so it runs after
+    # the host's own static server but still ahead of the router, and it only
+    # answers for files that exist under the engine's public/.
+    initializer 'open_geographies.static_assets' do |app|
+      app.middleware.use ::ActionDispatch::Static, root.join('public').to_s
     end
   end
 

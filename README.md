@@ -72,6 +72,25 @@ bin/rails db:migrate
 The host already mounts `CoreDataConnector::Engine` at `/core_data`; this engine adds
 its routes there automatically. Nothing else to wire.
 
+## The "Create your atlas" wizard (`/wizard`)
+
+The wizard is a small React app that lives in this engine (`client/`) and is served by
+it at `GET /wizard` — FairData only needs a navigation link to that path; everything
+past the link (page, assets, provisioning flow, authority seeding) is the engine's.
+
+- It calls the engine's own admin API (`POST /core_data/atlases`, `GET /core_data/jobs/:id`,
+  the `place_imports` endpoints) with the session the console already holds
+  (`localStorage['core_data_cloud_user']`, sent as `Authorization`), so it needs no login
+  of its own. In Clerk mode the `__session` cookie authenticates the same way.
+- Runtime settings come from the host's environment: `VITE_MAP_TILER_KEY` (the draw and
+  preview maps; without it MapLibre's demo tiles are used), `GEONAMES_USERNAME` (the
+  administrative-unit picker and GeoNames imports), `OG_ATLAS_URL_TEMPLATE` (the "view
+  your atlas" link).
+- The build is committed (`public/wizard/`) so the host needs no Node step. To change the
+  wizard: `cd client && npm install && npm run build`, then commit `public/wizard/` with
+  the source. `npm run dev` serves it at http://localhost:5175 proxying `/core_data` to a
+  host on :3001.
+
 ## Upstream-PR posture
 
 A few decorators carry changes that are **general improvements** to Core Data, not
