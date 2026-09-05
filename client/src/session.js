@@ -17,3 +17,11 @@ export const getSession = () => {
 export const getToken = () => getSession().token;
 
 export const isSignedIn = () => !!getToken();
+
+/**
+ * Stores a session as the console would (the /auth/login response: token,
+ * exp, user), so the two clients share one sign-in.
+ */
+export const setSession = (session) => {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+};

@@ -62,6 +62,13 @@ const request = async (method, path, { body, params } = {}) => {
 /**
  * Flattens an ApiError (or any error) into display strings.
  */
+/**
+ * Signs in against the host's own endpoint (the same one the FairData console
+ * uses) — the engine pages then work before FairData's nav link exists, and
+ * on a host whose console bundle isn't built (the demo stack).
+ */
+export const signIn = (email, password) => request('POST', '/auth/login', { body: { email, password } });
+
 export const errorMessages = (error) => {
   const errors = error?.errors;
 

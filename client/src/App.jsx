@@ -1,10 +1,10 @@
 import { useCallback, useMemo, useState } from 'react';
 import _ from 'underscore';
-import { createAtlas, errorMessages } from './api';
+import { createAtlas, errorMessages, signIn } from './api';
 import config from './config';
 import { JobStatuses } from './jobs';
 import useJobPolling from './hooks/useJobPolling';
-import { isSignedIn } from './session';
+import { isSignedIn, setSession } from './session';
 import { paths, useRoute } from './router';
 import AtlasAreaForm from './components/AtlasAreaForm';
 import PlaceImportPanel from './components/PlaceImportPanel';
@@ -284,22 +284,57 @@ const Wizard = ({ navigate }) => {
 };
 
 /**
+ * Signed-out state: a sign-in form against the host's /auth/login, storing
+ * the session where the FairData console keeps its own.
+ */
+const SignIn = ({ onSignedIn }) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [errors, setErrors] = useState([]);
+  const [saving, setSaving] = useState(false);
+
+  const onSubmit = (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setErrors([]);
+
+    signIn(email, password)
+      .then((session) => { setSession(session); onSignedIn(); })
+      .catch((error) => setErrors(error?.status === 401 ? ['Email or password not recognized.'] : errorMessages(error)))
+      .finally(() => setSaving(false));
+  };
+
+  return (
+    <main className='wizard'>
+      <h1>Open Geographies</h1>
+      <form className='panel' onSubmit={onSubmit}>
+        <p className='muted'>Sign in with your FairData account.</p>
+        { !_.isEmpty(errors) && <Message list={errors} tone='negative' /> }
+        <Field label='Email' required>
+          <input autoFocus className='input' onChange={(e) => setEmail(e.target.value)} type='email' value={email} />
+        </Field>
+        <Field label='Password' required>
+          <input className='input' onChange={(e) => setPassword(e.target.value)} type='password' value={password} />
+        </Field>
+        <div className='actions'>
+          <Button disabled={!email || !password || saving} loading={saving} primary type='submit'>Sign in</Button>
+        </div>
+      </form>
+    </main>
+  );
+};
+
+/**
  * The engine's console: the wizard plus the atlas pages, chosen by path.
  */
 const App = () => {
   const { route, navigate } = useRoute();
+  const [, setSignedInAt] = useState(0);
 
   if (!isSignedIn()) {
     return (
       <Shell active={route.name} navigate={navigate}>
-        <main className='wizard'>
-          <h1>Open Geographies</h1>
-          <Message tone='warning'>
-            Sign in to the console first, then come back to this page.
-            {' '}
-            <a href={`${config.consoleUrl}/login`}>Sign in</a>
-          </Message>
-        </main>
+        <SignIn onSignedIn={() => setSignedInAt(Date.now())} />
       </Shell>
     );
   }
