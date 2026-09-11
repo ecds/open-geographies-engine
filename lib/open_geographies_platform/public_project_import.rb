@@ -133,7 +133,9 @@ module OpenGeographiesPlatform
 
     # --- Fetching ----------------------------------------------------------
 
-    def get(path, params = {}, project_id: @source_project_id)
+    # project_id is positional: the callers pass their query as bare keywords
+    # (per_page:, page:), which Ruby would otherwise route into a keyword here.
+    def get(path, params = {}, project_id = @source_project_id)
       uri = URI("#{@source}#{path}")
       query = params.merge('project_ids[]' => project_id)
       uri.query = URI.encode_www_form(query)
@@ -346,7 +348,7 @@ module OpenGeographiesPlatform
         if path.exist?
           JSON.parse(File.read(path))
         else
-          descriptors = get("/core_data/public/v1/projects/#{project_id}/descriptors", {}, project_id:)['descriptors'] || []
+          descriptors = get("/core_data/public/v1/projects/#{project_id}/descriptors", {}, project_id)['descriptors'] || []
           File.write(path, JSON.generate(descriptors))
           descriptors
         end
