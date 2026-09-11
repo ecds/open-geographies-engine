@@ -24,8 +24,8 @@ namespace :open_geographies do
     host = ENV.fetch('HOST', 'http://localhost:3001')
     password = 'Tenancy-Probe-2026!'
 
-    fixtures = OpenGeographies::TenancyProbe::Fixtures.build!(password:)
-    probe = OpenGeographies::TenancyProbe.new(host:, fixtures:, password:)
+    fixtures = OpenGeographiesPlatform::TenancyProbe::Fixtures.build!(password:)
+    probe = OpenGeographiesPlatform::TenancyProbe.new(host:, fixtures:, password:)
 
     begin
       probe.run!
@@ -40,13 +40,20 @@ namespace :open_geographies do
 end
 
 namespace :open_geographies do
-  desc 'Clone a discoverable project from another instance\'s public API (SOURCE=, PROJECT_ID=, NAME=, [SLUG=])'
+  desc 'Clone a discoverable project from another instance\'s public API ' \
+       '(SOURCE=, PROJECT_ID=, NAME=, [SLUG=], [RELATED_PROJECTS="Contained In=7,…"])'
   task import_public_project: :environment do
     source = ENV.fetch('SOURCE')
     project_id = ENV.fetch('PROJECT_ID')
     name = ENV.fetch('NAME')
+    # Which project a relationship's targets live in, for sources whose
+    # descriptors don't carry related_project_id yet.
+    related_projects = ENV.fetch('RELATED_PROJECTS', '').split(',').filter_map do |pair|
+      label, id = pair.split('=', 2)
+      [label.strip, id.strip] if label.present? && id.present?
+    end.to_h
 
-    project = OpenGeographies::PublicProjectImport.new(source:, project_id:, name:, slug: ENV['SLUG']).run!
+    project = OpenGeographiesPlatform::PublicProjectImport.new(source:, project_id:, name:, slug: ENV['SLUG'], related_projects:).run!
 
     puts "\nImported project #{project.id} (#{project.name})."
   end

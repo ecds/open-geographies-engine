@@ -3,6 +3,8 @@
 require 'net/http'
 require 'json'
 require 'uri'
+require 'fileutils'
+require 'securerandom'
 
 module OpenGeographiesPlatform
   # Clones a discoverable Core Data project — its structure and public
@@ -81,7 +83,12 @@ module OpenGeographiesPlatform
 
     attr_reader :log
 
-    def initialize(source:, project_id:, name:, slug: nil, log: $stdout)
+    # related_projects: { "Contained In" => 7 } — the project a relationship's
+    # targets live in, for a source whose descriptors don't yet carry
+    # `related_project_id` (added to FairData's descriptors 2026-09-11; not on
+    # every instance yet). A descriptor's own related_project_id wins.
+    def initialize(source:, project_id:, name:, slug: nil, related_projects: {}, log: $stdout)
+      @related_projects = related_projects
       @source = source.sub(%r{/+$}, '')
       @source_project_id = project_id
       @name = name
@@ -126,9 +133,9 @@ module OpenGeographiesPlatform
 
     # --- Fetching ----------------------------------------------------------
 
-    def get(path, params = {})
+    def get(path, params = {}, project_id: @source_project_id)
       uri = URI("#{@source}#{path}")
-      query = params.merge('project_ids[]' => @source_project_id)
+      query = params.merge('project_ids[]' => project_id)
       uri.query = URI.encode_www_form(query)
 
       response = Net::HTTP.get_response(uri)
@@ -268,6 +275,7 @@ module OpenGeographiesPlatform
         records[related_uuid] ||= { index: 'taxonomies', class: 'CoreDataConnector::Taxonomy', data: item }
       end
 
+      adopt_foreign_targets!(records, edges)
       assign_models!(records, edges)
 
       ::ActiveRecord::Base.transaction do
@@ -281,6 +289,70 @@ module OpenGeographiesPlatform
         link_records!(created, edges)
 
         project
+      end
+    end
+
+    # Relationship targets that live in another project — HRCGA's churches
+    # are "Contained In" counties held by a separate Administrative Areas
+    # project. The nested walk already returned them (a relationship belongs
+    # to the primary record's project, so `project_ids[]=<source>` keeps the
+    # edge), but they were never among the project's own records, so the
+    # edge was dropped at link time and no church indexed a contained_in_place.
+    # Adopt them: each becomes a record of a model named after the foreign
+    # project's model when that project is known (the descriptor's
+    # related_project_id, or the caller's override), else after the
+    # relationship, so the promoted key still resolves by relationship name.
+    def adopt_foreign_targets!(records, edges)
+      foreign = edges.reject { |_p, _r, related_uuid, nested, _i, _o| nested == 'taxonomies' || records.key?(related_uuid) }
+      return if foreign.empty?
+
+      foreign.group_by { |_p, rel_uuid, *| rel_uuid }.each do |rel_uuid, rel_edges|
+        descriptor = @relationships[rel_uuid] || {}
+        label = descriptor['label'].to_s
+        project_id = descriptor['related_project_id'] || @related_projects[label]
+        foreign_descriptors = project_id ? foreign_descriptors_for(project_id) : []
+        foreign_fields = foreign_descriptors.select { |d| d['context'] && !d.key?('inverse_label') }
+        foreign_models = foreign_descriptors.select { |d| d['context'].nil? }
+
+        rel_edges.uniq { |_p, _r, related_uuid, *| related_uuid }.each do |_p, _r, related_uuid, nested, item, _o|
+          klass = INDEXES.fetch(nested)
+          field_uuids = (item['user_defined'] || {}).keys
+          model_label = foreign_fields.find { |d| field_uuids.include?(d['identifier']) }&.dig('context')
+          model_label ||= foreign_models.first&.dig('label') if foreign_models.size == 1
+          model_label ||= "#{label} targets"
+          model_uuid = foreign_models.find { |d| d['label'] == model_label }&.dig('identifier')
+
+          @models[model_label] ||= { uuid: model_uuid || SecureRandom.uuid, fields: {}, foreign_project_id: project_id }
+          @models[model_label][:class] ||= klass
+          foreign_fields.each { |d| @fields[d['identifier']] ||= d.merge('context' => model_label) }
+
+          records[related_uuid] = { index: nested, class: klass, data: item, model: model_label }
+        end
+
+        @log.puts "#{label}: adopted #{rel_edges.map { |e| e[2] }.uniq.size} targets from " \
+                  "#{project_id ? "project #{project_id}" : 'an unknown project'} into #{records.values.count { |r| r[:model] && rel_edges.any? { |e| e[2] == r[:data]['uuid'] } }} records of #{@models.keys.last}"
+      end
+    end
+
+    # A foreign project's descriptors (models, fields, relationships), cached
+    # with the snapshot.
+    def foreign_descriptors_for(project_id)
+      @foreign_descriptors ||= {}
+      @foreign_descriptors[project_id] ||= begin
+        dir = ::Rails.root.join('tmp', 'og_import')
+        FileUtils.mkdir_p(dir)
+        path = dir.join("#{URI(@source).host}-#{project_id}-descriptors.json")
+
+        if path.exist?
+          JSON.parse(File.read(path))
+        else
+          descriptors = get("/core_data/public/v1/projects/#{project_id}/descriptors", {}, project_id:)['descriptors'] || []
+          File.write(path, JSON.generate(descriptors))
+          descriptors
+        end
+      rescue StandardError => e
+        @log.puts "  ! descriptors for project #{project_id}: #{e.message}"
+        []
       end
     end
 
