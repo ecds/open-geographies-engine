@@ -70,8 +70,12 @@ project = CoreDataConnector::Project.find_by(name: NAME)
 
 unless project
   log.call("importing #{NAME} from #{SOURCE} (project #{SOURCE_PROJECT_ID}) — a few minutes on first run")
+  # HRCGA's churches are "Contained In" counties held by coredata.ecds.io's
+  # Administrative Areas project (7); until that instance's descriptors carry
+  # related_project_id, say so explicitly so the counties are imported too.
   project = OpenGeographiesPlatform::PublicProjectImport.new(
-    source: SOURCE, project_id: SOURCE_PROJECT_ID, name: NAME, slug: SLUG, log: $stdout
+    source: SOURCE, project_id: SOURCE_PROJECT_ID, name: NAME, slug: SLUG,
+    related_projects: { 'Contained In' => 7 }, log: $stdout
   ).run!
 end
 
