@@ -1,0 +1,90 @@
+From 151d8e7bc5a1586b89e2fc393a3381c167282e38 Mon Sep 17 00:00:00 2001
+From: terminusfilms <steve@terminusfilms.com>
+Date: Fri, 11 Sep 2026 18:11:22 -0400
+Subject: [PATCH 3/3] Copy the lower engine's two create-table migrations ahead
+ of its rename (fresh-DB db:prepare)
+
+---
+ ...es_project_model_roles.open_geographies.rb | 43 +++++++++++++++++++
+ ...s_geonames_hierarchies.open_geographies.rb | 19 ++++++++
+ 2 files changed, 62 insertions(+)
+ create mode 100644 db/migrate/20260911214026_create_core_data_connector_open_geographies_project_model_roles.open_geographies.rb
+ create mode 100644 db/migrate/20260911214027_create_core_data_connector_open_geographies_geonames_hierarchies.open_geographies.rb
+
+diff --git a/db/migrate/20260911214026_create_core_data_connector_open_geographies_project_model_roles.open_geographies.rb b/db/migrate/20260911214026_create_core_data_connector_open_geographies_project_model_roles.open_geographies.rb
+new file mode 100644
+index 0000000..6dcc3d0
+--- /dev/null
++++ b/db/migrate/20260911214026_create_core_data_connector_open_geographies_project_model_roles.open_geographies.rb
+@@ -0,0 +1,43 @@
++# This migration comes from open_geographies (the lower engine)
++# frozen_string_literal: true
++
++# Lives entirely in this engine's own schema - references
++# core_data_connector_project_models (and, denormalized, core_data_connector_
++# projects) by plain id, not something added to core-data-connector's own
++# tables/migrations. That's deliberate: this engine is a fork of a repo we
++# don't own, and adding columns there would be permanent divergence with no
++# way back. This table is how v1 answers "which role does this project_model
++# play" (the primary Place model when an atlas has several; which Place-class
++# models are actually Map Layers) without touching anything upstream.
++class CreateCoreDataConnectorOpenGeographiesProjectModelRoles < ActiveRecord::Migration[7.1]
++  def change
++    create_table :core_data_connector_open_geographies_project_model_roles do |t|
++      t.bigint :project_model_id, null: false
++      # Denormalized from project_model.project_id, set by the model - needed
++      # because the invariant that actually matters ("only one primary place
++      # model per project") spans project_models, and a DB-level partial
++      # unique index can't reach across a join to enforce that; it can only
++      # constrain columns that live on this table.
++      t.bigint :project_id, null: false
++      t.string :role, null: false
++
++      t.timestamps
++    end
++
++    add_index :core_data_connector_open_geographies_project_model_roles,
++      :project_model_id, name: 'index_og_project_model_roles_on_project_model_id'
++
++    add_index :core_data_connector_open_geographies_project_model_roles,
++      :project_id,
++      unique: true,
++      where: "role = 'primary_place'",
++      name: 'index_og_project_model_roles_on_unique_primary_place'
++
++    # "map_layer" is intentionally not made unique; an atlas can tag more than
++    # one Place-class project_model as a map layer source (GCA's separate Map
++    # Layers + Topo Quads, both folding into the same model_type at index time).
++    add_index :core_data_connector_open_geographies_project_model_roles,
++      [:project_model_id, :role], unique: true,
++      name: 'index_og_project_model_roles_on_project_model_id_and_role'
++  end
++end
+diff --git a/db/migrate/20260911214027_create_core_data_connector_open_geographies_geonames_hierarchies.open_geographies.rb b/db/migrate/20260911214027_create_core_data_connector_open_geographies_geonames_hierarchies.open_geographies.rb
+new file mode 100644
+index 0000000..10f8a3c
+--- /dev/null
++++ b/db/migrate/20260911214027_create_core_data_connector_open_geographies_geonames_hierarchies.open_geographies.rb
+@@ -0,0 +1,19 @@
++# This migration comes from open_geographies (the lower engine)
++# frozen_string_literal: true
++
++class CreateCoreDataConnectorOpenGeographiesGeonamesHierarchies < ActiveRecord::Migration[7.1]
++  def change
++    create_table :core_data_connector_open_geographies_geonames_hierarchies do |t|
++      t.bigint :place_id, null: false
++      t.decimal :lat, precision: 10, scale: 6, null: false
++      t.decimal :lng, precision: 10, scale: 6, null: false
++      t.jsonb :hierarchy, null: false, default: []
++      t.datetime :fetched_at, null: false
++
++      t.timestamps
++    end
++
++    add_index :core_data_connector_open_geographies_geonames_hierarchies, :place_id,
++      unique: true, name: 'index_og_geonames_hierarchies_on_place_id'
++  end
++end
+-- 
+2.49.0
+
