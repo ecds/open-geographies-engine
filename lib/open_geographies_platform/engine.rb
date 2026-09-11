@@ -1,12 +1,12 @@
-require 'open_geographies/decorators'
-require 'open_geographies/indexing'
+require 'open_geographies_platform/decorators'
+require 'open_geographies_platform/indexing'
 
-module OpenGeographies
+module OpenGeographiesPlatform
   class Engine < ::Rails::Engine
     # Without isolate_namespace the engine name would default to
     # "open_geographies_engine"; set it explicitly so the install task and the
     # copied migration suffix are the clean `open_geographies` (see README).
-    engine_name 'open_geographies'
+    engine_name 'open_geographies_platform'
 
     # Deliberately NOT isolated. Open Geographies extends Core Data *in place*: its
     # models/controllers/serializers/policies/jobs live in the CoreDataConnector
@@ -23,12 +23,12 @@ module OpenGeographies
       # Fail with a clear message rather than a NameError deep in the decorators
       # when the engine is mounted on a host that doesn't provide Core Data at all.
       unless defined?(::CoreDataConnector::Project)
-        raise OpenGeographies::HostError,
+        raise OpenGeographiesPlatform::HostError,
               'open_geographies must be mounted on a Core Data / FairData host: ' \
               'CoreDataConnector::Project is not defined.'
       end
 
-      OpenGeographies::Decorators.apply!
+      OpenGeographiesPlatform::Decorators.apply!
     end
 
     # The routes Open Geographies adds under /core_data — e.g.
@@ -91,7 +91,7 @@ module OpenGeographies
     #
     # Registered before routes are finalized (after :add_routing_paths).
     initializer 'open_geographies.append_routes', after: :add_routing_paths do |app|
-      routes = OpenGeographies::Engine::ROUTES
+      routes = OpenGeographiesPlatform::Engine::ROUTES
 
       if defined?(::CoreDataConnector::Engine)
         ::CoreDataConnector::Engine.routes.append(&routes)

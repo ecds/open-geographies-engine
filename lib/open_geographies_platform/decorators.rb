@@ -1,4 +1,4 @@
-module OpenGeographies
+module OpenGeographiesPlatform
   # Applies Open Geographies' in-place extensions to upstream Core Data classes —
   # the OG-coupled subset of the changes the fork used to make directly to upstream
   # files. Each is a reopen (additive include / new methods) or a prepend
@@ -12,7 +12,7 @@ module OpenGeographies
   # and destroy — including nested names, geometries and relationships — is
   # written to the shared v1 Elasticsearch index without this engine's help.
   # This engine only suspends that around bulk writes and reindexes what it
-  # wrote afterwards (see OpenGeographies::Indexing).
+  # wrote afterwards (see OpenGeographiesPlatform::Indexing).
   module Decorators
     def self.apply!
       wire_job_dispatch!
@@ -24,32 +24,32 @@ module OpenGeographies
     # Job → the OG job types + their after_create_commit dispatch.
     def self.wire_job_dispatch!
       job = CoreDataConnector::Job
-      job.include(OpenGeographies::JobDispatch) unless job.include?(OpenGeographies::JobDispatch)
+      job.include(OpenGeographiesPlatform::JobDispatch) unless job.include?(OpenGeographiesPlatform::JobDispatch)
     end
 
     # JobPolicy → project members can view their own jobs (wizard polling).
     def self.wire_job_policy!
       policy = CoreDataConnector::JobPolicy
-      policy.prepend(OpenGeographies::JobPolicyDecorator) unless policy.include?(OpenGeographies::JobPolicyDecorator)
+      policy.prepend(OpenGeographiesPlatform::JobPolicyDecorator) unless policy.include?(OpenGeographiesPlatform::JobPolicyDecorator)
 
       scope = CoreDataConnector::JobPolicy::Scope
-      scope.prepend(OpenGeographies::JobPolicyScopeDecorator) unless scope.include?(OpenGeographies::JobPolicyScopeDecorator)
+      scope.prepend(OpenGeographiesPlatform::JobPolicyScopeDecorator) unless scope.include?(OpenGeographiesPlatform::JobPolicyScopeDecorator)
     end
 
     # ImportCsvJob → suspend per-record indexing during the bulk import, then
     # queue one reindex scoped to the project.
     def self.wire_import_csv_job!
       job = CoreDataConnector::ImportCsvJob
-      job.prepend(OpenGeographies::ImportCsvJobDecorator) unless job.include?(OpenGeographies::ImportCsvJobDecorator)
+      job.prepend(OpenGeographiesPlatform::ImportCsvJobDecorator) unless job.include?(OpenGeographiesPlatform::ImportCsvJobDecorator)
     end
 
     # GeoNames/Wikidata → area-scoped bulk-import methods.
     def self.wire_authority_bulk!
       geonames = CoreDataConnector::Authority::Geonames
-      geonames.include(OpenGeographies::GeonamesBulk) unless geonames.include?(OpenGeographies::GeonamesBulk)
+      geonames.include(OpenGeographiesPlatform::GeonamesBulk) unless geonames.include?(OpenGeographiesPlatform::GeonamesBulk)
 
       wikidata = CoreDataConnector::Authority::Wikidata
-      wikidata.include(OpenGeographies::WikidataBulk) unless wikidata.include?(OpenGeographies::WikidataBulk)
+      wikidata.include(OpenGeographiesPlatform::WikidataBulk) unless wikidata.include?(OpenGeographiesPlatform::WikidataBulk)
     end
   end
 
@@ -145,7 +145,7 @@ module OpenGeographies
     # graphs thousands of times), then queue a single reindex scoped to the
     # project's records.
     def perform(id)
-      OpenGeographies::Indexing.suspend { super }
+      OpenGeographiesPlatform::Indexing.suspend { super }
 
       job = CoreDataConnector::Job.find_by(id:)
       queue_reindex(job) if job&.status == CoreDataConnector::Job::JOB_STATUS_COMPLETED

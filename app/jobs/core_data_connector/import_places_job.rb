@@ -44,7 +44,7 @@ module CoreDataConnector
         total = nil
         last_reported_at = nil
 
-        ::OpenGeographies::Indexing.suspend do
+        ::OpenGeographiesPlatform::Indexing.suspend do
           total = source.count
 
           source.each_record do |record|

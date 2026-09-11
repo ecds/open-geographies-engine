@@ -20,7 +20,7 @@ RUN apt-get update -qq \
 
 ARG CORE_DATA_CLOUD_REPO=https://github.com/ecds/core-data-cloud.git
 # The `ecds` branch commit the mount patches apply to.
-ARG CORE_DATA_CLOUD_REF=d5ddd0393a5e359516a8db312d5c06ec674b2976
+ARG CORE_DATA_CLOUD_REF=ff020c5
 
 RUN git clone --filter=blob:none "$CORE_DATA_CLOUD_REPO" /app \
   && git -C /app checkout --detach "$CORE_DATA_CLOUD_REF"

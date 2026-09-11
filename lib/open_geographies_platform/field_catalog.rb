@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module OpenGeographies
+module OpenGeographiesPlatform
   # The fields a site's detail pages and search panels can hide, per renderer
   # model, for the console's "Hidden fields" pick-list.
   #

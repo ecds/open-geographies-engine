@@ -1,8 +1,8 @@
-require_relative 'lib/open_geographies/version'
+require_relative 'lib/open_geographies_platform/version'
 
 Gem::Specification.new do |spec|
-  spec.name        = 'open_geographies'
-  spec.version     = OpenGeographies::VERSION
+  spec.name        = 'open_geographies_platform'
+  spec.version     = OpenGeographiesPlatform::VERSION
   spec.authors     = ['Terminus Films']
   spec.email       = ['steve@terminusfilms.com']
   spec.homepage    = 'https://github.com/ecds/open-geographies-engine'

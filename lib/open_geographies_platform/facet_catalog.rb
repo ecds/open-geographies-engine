@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module OpenGeographies
+module OpenGeographiesPlatform
   # The facet attributes a site's search can offer, derived from what the v1
   # index actually makes facetable for the project's models.
   #
@@ -68,9 +68,19 @@ module OpenGeographies
           return Entry.new(attribute:, label:, facetable: true)
         end
 
+        # A bespoke (non-canonical) relationship to a non-taxonomy model lands
+        # under its parameterized name as summary objects. Since mapping
+        # 0.3.0 the `relationship_name` dynamic template matches every string
+        # `name` in the tree and gives it a keyword sub-field, so the summary's
+        # name is facetable; an older mapping (UUID-keyed related_records
+        # template) left it analyzed text.
         unless promoted_key
+          if dynamic_keyword_subfield?('name')
+            return Entry.new(attribute: "#{key}.name.keyword", label:, facetable: true)
+          end
+
           return Entry.new(attribute: "#{key}.name", label:, facetable: false,
-                           reason: 'Only canonically named relationships index with a facetable name.')
+                           reason: 'The mapping does not index a non-canonical relationship\'s name as a keyword.')
         end
 
         name_field = keyword_path("#{promoted_key}.name")
@@ -106,6 +116,16 @@ module OpenGeographies
         nil
       end
 
+      # Whether a dynamic template gives string fields named `field` a keyword
+      # sub-field wherever they occur (the mapping's relationship_* templates).
+      def dynamic_keyword_subfield?(field)
+        Array(mapping.dig(:mappings, :dynamic_templates)).any? do |template|
+          template.values.any? do |rule|
+            rule[:match] == field && rule.dig(:mapping, :fields, :keyword, :type) == 'keyword'
+          end
+        end
+      end
+
       def mapping_property(path)
         path.split('.').reduce(mapping.dig(:mappings, :properties)) do |properties, segment|
           return nil unless properties.is_a?(Hash)
@@ -120,10 +140,10 @@ module OpenGeographies
       end
 
       def mapping
-        @mapping ||= if defined?(::CoreDataConnector::OpenGeographies::Searchable::MAPPING)
-                       ::CoreDataConnector::OpenGeographies::Searchable::MAPPING
+        @mapping ||= if defined?(::OpenGeographies::V1::Searchable::MAPPING)
+                       ::OpenGeographies::V1::Searchable::MAPPING
                      else
-                       JSON.parse(File.read(Engine.root.join('lib', 'open_geographies', 'es_mapping.json')), symbolize_names: true).freeze
+                       JSON.parse(File.read(Engine.root.join('lib', 'open_geographies_platform', 'es_mapping.json')), symbolize_names: true).freeze
                      end
       end
 
@@ -155,8 +175,8 @@ module OpenGeographies
       # engine's ProjectModelRole, as its PromotedRelationships does.
       def template_model_name_for(model)
         if model.model_class == 'CoreDataConnector::Place'
-          role = if defined?(::CoreDataConnector::OpenGeographies::ProjectModelRole)
-                   ::CoreDataConnector::OpenGeographies::ProjectModelRole.find_by(project_model_id: model.id)&.role
+          role = if defined?(::OpenGeographies::ProjectModelRole)
+                   ::OpenGeographies::ProjectModelRole.find_by(project_model_id: model.id)&.role
                  end
 
           return role == 'map_layer' ? 'Map Layers' : 'Places'

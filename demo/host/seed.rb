@@ -14,7 +14,7 @@
 # rebuild doesn't walk the source again. DEMO_SKIP_HRCGA=1 seeds only the
 # account.
 
-require 'open_geographies/public_project_import'
+require 'open_geographies_platform/public_project_import'
 
 log = ->(message) { $stdout.puts("[demo seed] #{message}"); $stdout.flush }
 
@@ -70,7 +70,7 @@ project = CoreDataConnector::Project.find_by(name: NAME)
 
 unless project
   log.call("importing #{NAME} from #{SOURCE} (project #{SOURCE_PROJECT_ID}) — a few minutes on first run")
-  project = OpenGeographies::PublicProjectImport.new(
+  project = OpenGeographiesPlatform::PublicProjectImport.new(
     source: SOURCE, project_id: SOURCE_PROJECT_ID, name: NAME, slug: SLUG, log: $stdout
   ).run!
 end
@@ -80,8 +80,8 @@ churches = models.find_by!(name: 'Churches')
 
 # The indexer tells the atlas's primary places apart from other Place-classed
 # models (States, map layers) by this role.
-if defined?(CoreDataConnector::OpenGeographies::ProjectModelRole)
-  CoreDataConnector::OpenGeographies::ProjectModelRole.find_or_create_by!(project_model_id: churches.id, role: 'primary_place')
+if defined?(OpenGeographies::ProjectModelRole)
+  OpenGeographies::ProjectModelRole.find_or_create_by!(project_model_id: churches.id, role: 'primary_place')
 end
 
 collection = CoreDataConnector::SearchCollection.find_or_create_by!(project_id: project.id, name: 'hrcga_churches') do |c|
@@ -128,8 +128,8 @@ log.call("created site #{SLUG} (id #{site.id}) on project #{project.id}")
 # Only the churches: the media/works/people documents aren't needed to
 # render the atlas, and reindexing all 6,000+ takes a quarter hour.
 log.call("reindexing #{churches.name}…")
-count = OpenGeographies::Indexing.reindex_project_models([churches]) do |completed, total|
+count = OpenGeographiesPlatform::Indexing.reindex_project_models([churches]) do |completed, total|
   log.call("  #{completed}/#{total}") if completed.positive? && (completed % 500).zero?
 end
-log.call("reindexed #{count} records into #{OpenGeographies::Indexing.index_name}")
+log.call("reindexed #{count} records into #{OpenGeographiesPlatform::Indexing.index_name}")
 log.call("HRCGA is live: http://#{SLUG}.localhost:4321/en/search/places")

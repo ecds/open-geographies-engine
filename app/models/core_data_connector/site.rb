@@ -154,7 +154,7 @@ module CoreDataConnector
       facet_names = Array(elasticsearch['facet_attributes']).presence || ['types'] if facet_names.empty?
 
       expanded['elasticsearch'] = {
-        'index_name' => ::OpenGeographies::Indexing.index_name,
+        'index_name' => ::OpenGeographiesPlatform::Indexing.index_name,
         'model_ids' => search_collection&.project_model_ids&.map(&:to_s)
       }.compact.merge(elasticsearch).merge('facet_attributes' => facet_names)
 

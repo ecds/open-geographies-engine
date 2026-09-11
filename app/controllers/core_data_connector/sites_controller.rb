@@ -10,20 +10,20 @@ module CoreDataConnector
     #
     # The facet attributes this site's searches can declare, derived from the
     # v1 index's mapping and promotion rules for the project's models (see
-    # OpenGeographies::FacetCatalog). The console's facet pick-list.
+    # OpenGeographiesPlatform::FacetCatalog). The console's facet pick-list.
     def facets
       site = Site.find(params[:id])
       authorize site, :show?
 
       models = ProjectModel.where(project_id: site.project_id).order(:order)
 
-      render json: { facets: ::OpenGeographies::FacetCatalog.for_models(models).map(&:to_h) }, status: :ok
+      render json: { facets: ::OpenGeographiesPlatform::FacetCatalog.for_models(models).map(&:to_h) }, status: :ok
     end
 
     # GET /core_data/sites/:id/fields
     #
     # The fields each detail page / search panel can hide, per renderer model
-    # (see OpenGeographies::FieldCatalog). The console's "Hidden fields"
+    # (see OpenGeographiesPlatform::FieldCatalog). The console's "Hidden fields"
     # pick-list, stored as detail_pages.models.<model>.exclude.
     def fields
       site = Site.find(params[:id])
@@ -31,7 +31,7 @@ module CoreDataConnector
 
       models = ProjectModel.where(project_id: site.project_id).order(:order)
 
-      render json: { models: ::OpenGeographies::FieldCatalog.for_models(models) }, status: :ok
+      render json: { models: ::OpenGeographiesPlatform::FieldCatalog.for_models(models) }, status: :ok
     end
 
     # GET /core_data/sites/:id/config

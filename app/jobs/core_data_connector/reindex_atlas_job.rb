@@ -19,7 +19,7 @@ module CoreDataConnector
         project_models = project_models_for(job)
         last_reported_at = nil
 
-        reindexed = ::OpenGeographies::Indexing.reindex_project_models(project_models) do |completed, total|
+        reindexed = ::OpenGeographiesPlatform::Indexing.reindex_project_models(project_models) do |completed, total|
           now = Time.current
 
           if last_reported_at.nil? || now - last_reported_at >= PROGRESS_INTERVAL || completed >= total

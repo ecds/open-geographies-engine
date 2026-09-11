@@ -40,15 +40,15 @@ module CoreDataConnector
         # The template document (symbol keys), from the lower engine when
         # present, else this engine's vendored copy.
         def document
-          @document ||= if defined?(::CoreDataConnector::OpenGeographies::V1::PromotedRelationships::TEMPLATE)
-                          ::CoreDataConnector::OpenGeographies::V1::PromotedRelationships::TEMPLATE
+          @document ||= if defined?(::OpenGeographies::V1::PromotedRelationships::TEMPLATE)
+                          ::OpenGeographies::V1::PromotedRelationships::TEMPLATE
                         else
                           JSON.parse(File.read(vendored_path), symbolize_names: true).freeze
                         end
         end
 
         def vendored_path
-          ::OpenGeographies::Engine.root.join('lib', 'open_geographies', 'canonical_template.json')
+          ::OpenGeographiesPlatform::Engine.root.join('lib', 'open_geographies_platform', 'canonical_template.json')
         end
 
         # Names of the optional modules a caller may enable (Map Layers, Work
@@ -121,12 +121,12 @@ module CoreDataConnector
         private
 
         def assign_role!(model, definition)
-          return unless defined?(::CoreDataConnector::OpenGeographies::ProjectModelRole)
+          return unless defined?(::OpenGeographies::ProjectModelRole)
 
           role = ROLES[definition.dig(:og, :role).to_s] || ROLES[definition[:name].to_s]
           return unless role
 
-          ::CoreDataConnector::OpenGeographies::ProjectModelRole.find_or_create_by!(project_model_id: model.id, role:)
+          ::OpenGeographies::ProjectModelRole.find_or_create_by!(project_model_id: model.id, role:)
         end
 
         def create_fields!(defineable, fields, table_name:)

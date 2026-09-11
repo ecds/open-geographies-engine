@@ -1,4 +1,4 @@
-# open_geographies
+# open_geographies_platform
 
 A Rails engine that extends Performant Software's **Core Data** (now **FairData**) with
 the Open Geographies layer: a no-code, multi-tenant geospatial publishing platform
@@ -6,7 +6,14 @@ the Open Geographies layer: a no-code, multi-tenant geospatial publishing platfo
 by-slug public atlas API for the shared dynamic renderer). It is the upper layer of
 Open Geographies; the lower layer — the canonical schema, the v1 API and Elasticsearch
 indexing — is
-[`core-data-connector-open-geographies`](https://github.com/ecds/core-data-connector-open-geographies).
+[`open-geographies-fairdata`](https://github.com/ecds/open-geographies-fairdata) (gem
+`open_geographies_fairdata`, module `OpenGeographies`; renamed from
+`core-data-connector-open-geographies` on 2026-09-11).
+
+Because the lower engine took the bare `OpenGeographies` module, this engine's Ruby
+namespace is **`OpenGeographiesPlatform`** (gem `open_geographies_platform`). Its
+domain classes still live in `CoreDataConnector::`; references into the lower engine
+are written `::OpenGeographies::V1::…` / `::OpenGeographies::ProjectModelRole`.
 
 ## Why an engine
 
@@ -23,7 +30,7 @@ It is **additive by construction**:
   with no reconciliation.
 - **Code:** the ~28 new classes live in the `CoreDataConnector` namespace (they are
   Core Data domain objects). The ~20 places the fork used to *modify* upstream files
-  are applied at boot as **decorators** (`lib/open_geographies/decorators.rb`), never
+  are applied at boot as **decorators** (`lib/open_geographies_platform/decorators.rb`), never
   as forked copies — so there are no file collisions and the upstream surface we track
   is just the decorator list.
 - **Routes:** appended into the connector engine's `/core_data` route set.
@@ -37,25 +44,28 @@ Gemfile), with this engine mounted from a local path.
 ```sh
 git clone --branch ecds https://github.com/ecds/core-data-cloud.git ecds-core-data-cloud
 cd ecds-core-data-cloud
-# Gemfile: gem 'open_geographies', path: '../open-geographies-engine'
+# Gemfile: gem 'open_geographies_platform', path: '../open-geographies-engine'
 cp .env.example .env   # DATABASE_*, SECRET_KEY_BASE, ELASTICSEARCH_HOST/API_KEY, REDIS_URL
 bundle install
 bin/rails db:create
-bin/rails open_geographies:install:migrations
-bin/rails db:migrate   # host schema, then the lower engine's migrations, then ours
+bin/rails railties:install:migrations FROM=open_geographies            # the lower engine's
+bin/rails railties:install:migrations FROM=open_geographies_platform   # ours
+bin/rails db:migrate
 bin/rails runner 'Rails.application.eager_load!; puts "ok"'
 ```
 
-Verified 2026-09-04 on `ecds` @ `d5ddd03` with Ruby 4.0.5: bundle resolves both
-engines, all migrations apply, eager load is clean, and every route this engine adds
-appears under `/core_data` alongside the lower engine's mount at `/open_geographies`.
+Verified 2026-09-11 on `ecds` @ `ff020c5` (lower engine `67d0728`) with Ruby 4.0.5:
+bundle resolves both engines, both `Engine` classes load with their own roots, all
+migrations apply (including the lower engine's table rename), eager load is clean,
+every route this engine adds appears under `/core_data` alongside the lower engine's
+mount at `/open_geographies`, and the tenancy probe passes 37/37.
 
 ## Install (host app)
 
 ```ruby
 # Gemfile (host = core-data-cloud / FairData, which provides the CoreDataConnector
 # classes natively — the standalone core_data_connector gem no longer exists)
-gem 'open_geographies', git: 'https://github.com/ecds/open-geographies-engine.git'
+gem 'open_geographies_platform', git: 'https://github.com/ecds/open-geographies-engine.git'
 ```
 
 The engine declares no dependency on `core_data_connector`: it needs the
@@ -76,7 +86,7 @@ its routes there automatically. Nothing else to wire.
 
 `Atlases::Template` creates a wizard-born atlas's models, user-defined fields and
 relationships from `canonical_template.json` — the lower engine's own copy when that engine
-is loaded, else `lib/open_geographies/canonical_template.json` (a vendored snapshot; never
+is loaded, else `lib/open_geographies_platform/canonical_template.json` (a vendored snapshot of the lower engine's 0.3.0; never
 edit it here — the template's home is the lower engine's repo). Because the lower engine's
 `PromotedRelationships` matches names against the same document, a wizard-born atlas is
 compliant by construction: "Types" on Places indexes as `types`, "Short Description" as

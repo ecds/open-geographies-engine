@@ -47,7 +47,7 @@ module CoreDataConnector
     def ensure_search_index(job)
       project_models = ProjectModel.where(project_id: job.project_id).to_a
 
-      ::OpenGeographies::Indexing.ensure_index!(project_models)
+      ::OpenGeographiesPlatform::Indexing.ensure_index!(project_models)
 
       SearchCollection.where(project_id: job.project_id).update_all(last_indexed_at: Time.current)
     end

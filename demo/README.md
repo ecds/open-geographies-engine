@@ -40,9 +40,10 @@ with no hosts-file change; an atlas created in the wizard with slug `foo` is at
 | `renderer` | `renderer/Dockerfile` | `ecds/core-data-places` `main` (pin with `RENDERER_REF`), Astro's standalone Node adapter |
 
 `host/patches/` is the future integration PR against the host, as patches:
-the `open_geographies` gem mount (`path: '../open-geographies-engine'`), the
-two additive migrations, and the lower-engine pin bump to `42a8727`
-(`Reindexable`). Nothing in the host repo needs to change for the demo to run.
+the `open_geographies_platform` gem mount (`path: '../open-geographies-engine'`)
+and the two additive migrations, on top of `ecds` @ `ff020c5` (which already pins
+the lower engine, `open_geographies_fairdata`, at `67d0728`). Nothing in the host
+repo needs to change for the demo to run.
 
 The host seeds itself on start (`host/seed.rb`, idempotent): the admin
 account, then the HRCGA project cloned through `coredata.ecds.io`'s public

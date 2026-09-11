@@ -1,4 +1,4 @@
-module OpenGeographies
+module OpenGeographiesPlatform
   # The platform's one touchpoint with the search index.
   #
   # Indexing itself belongs to the lower-layer engine
@@ -20,7 +20,7 @@ module OpenGeographies
   # Everything here degrades to a no-op when the lower engine isn't loaded, so
   # this engine still boots on a host that hasn't mounted it yet.
   module Indexing
-    V1 = 'CoreDataConnector::OpenGeographies::V1'.freeze
+    V1 = 'OpenGeographies::V1'.freeze
 
     # Used only when the lower engine is absent (e.g. a host that hasn't mounted
     # it); with it present the real name is read from its Searchkick config.

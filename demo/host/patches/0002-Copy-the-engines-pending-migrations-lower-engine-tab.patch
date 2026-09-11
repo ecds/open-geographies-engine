@@ -1,0 +1,64 @@
+From a8da8c541f3b9b7fdb3613223c2f64884308e219 Mon Sep 17 00:00:00 2001
+From: terminusfilms <steve@terminusfilms.com>
+Date: Fri, 11 Sep 2026 17:44:30 -0400
+Subject: [PATCH 2/2] Copy the engines' pending migrations: lower engine table
+ rename, drop search_only_key
+
+---
+ ...pen_geographies_tables.open_geographies.rb | 25 +++++++++++++++++++
+ ...h_collections.open_geographies_platform.rb | 11 ++++++++
+ 2 files changed, 36 insertions(+)
+ create mode 100644 db/migrate/20260911214028_rename_core_data_connector_open_geographies_tables.open_geographies.rb
+ create mode 100644 db/migrate/20260911214404_drop_search_only_key_from_search_collections.open_geographies_platform.rb
+
+diff --git a/db/migrate/20260911214028_rename_core_data_connector_open_geographies_tables.open_geographies.rb b/db/migrate/20260911214028_rename_core_data_connector_open_geographies_tables.open_geographies.rb
+new file mode 100644
+index 0000000..2f9a1cf
+--- /dev/null
++++ b/db/migrate/20260911214028_rename_core_data_connector_open_geographies_tables.open_geographies.rb
+@@ -0,0 +1,25 @@
++# frozen_string_literal: true
++
++# This migration comes from open_geographies (originally 20260911184143)
++# Drops the leftover "core_data_connector_" prefix from this engine's own two
++# tables, matching the Ruby namespace rename (CoreDataConnector::OpenGeographies
++# -> OpenGeographies) - these tables were never core-data-connector's own (see
++# the original CreateCoreDataConnectorOpenGeographiesProjectModelRoles/
++# ...GeonamesHierarchies migrations' own comments), so the prefix was always
++# just an artifact of the old module nesting, not a real ownership marker.
++#
++# rename_table, not drop+recreate: core_data_connector_open_geographies_geonames_hierarchies
++# holds 842 real cached rows in production (checked directly) - an instant,
++# lossless Postgres metadata operation preserves them, where a drop+recreate
++# would just force every one of those places to re-hit the live GeoNames API
++# on the next reindex for no reason. project_model_roles is empty in
++# production today, but there's no reason to treat it differently.
++class RenameCoreDataConnectorOpenGeographiesTables < ActiveRecord::Migration[8.1]
++  def change
++    rename_table :core_data_connector_open_geographies_project_model_roles,
++      :open_geographies_project_model_roles
++
++    rename_table :core_data_connector_open_geographies_geonames_hierarchies,
++      :open_geographies_geonames_hierarchies
++  end
++end
+diff --git a/db/migrate/20260911214404_drop_search_only_key_from_search_collections.open_geographies_platform.rb b/db/migrate/20260911214404_drop_search_only_key_from_search_collections.open_geographies_platform.rb
+new file mode 100644
+index 0000000..08bc5c2
+--- /dev/null
++++ b/db/migrate/20260911214404_drop_search_only_key_from_search_collections.open_geographies_platform.rb
+@@ -0,0 +1,11 @@
++# This migration comes from open_geographies_platform (originally 20260911220000)
++# The per-atlas search-only API key was a Typesense-era artifact: every atlas
++# now searches one shared Elasticsearch index through the renderer's
++# server-side handler, so nothing issues or reads these columns. Dropped
++# (Jay's read of the model, 2026-09-11: keep SearchCollection, lose the key).
++class DropSearchOnlyKeyFromSearchCollections < ActiveRecord::Migration[8.1]
++  def change
++    remove_column :core_data_connector_search_collections, :search_only_key, :string
++    remove_column :core_data_connector_search_collections, :search_only_key_id, :integer
++  end
++end
+-- 
+2.49.0
+

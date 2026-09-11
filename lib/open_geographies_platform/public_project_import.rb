@@ -4,7 +4,7 @@ require 'net/http'
 require 'json'
 require 'uri'
 
-module OpenGeographies
+module OpenGeographiesPlatform
   # Clones a discoverable Core Data project — its structure and public
   # records — from another instance's public v1 API into a project on this
   # one, preserving every uuid.
@@ -101,7 +101,7 @@ module OpenGeographies
 
       # Per-record indexing is suspended for the bulk write (ImportCsvJob's
       # pattern); the caller reindexes the project once afterwards.
-      ::OpenGeographies::Indexing.suspend { build!(records, edges) }
+      ::OpenGeographiesPlatform::Indexing.suspend { build!(records, edges) }
     end
 
     # The fetched snapshot is cached on disk (tmp/og_import/<host>-<project>.json)

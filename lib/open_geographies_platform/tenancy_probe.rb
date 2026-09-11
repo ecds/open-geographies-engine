@@ -4,7 +4,7 @@ require 'net/http'
 require 'json'
 require 'uri'
 
-module OpenGeographies
+module OpenGeographiesPlatform
   # See lib/tasks/open_geographies_tasks.rake.
   class TenancyProbe
     Tenant = Struct.new(:key, :user, :project, :site, :collection, :job, :place, :token, keyword_init: true)

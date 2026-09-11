@@ -4,7 +4,7 @@
 #
 # It is deliberately additive: it mounts onto an UNMODIFIED host. Its migrations only
 # CREATE new tables; its modifications to upstream classes are applied as decorators at
-# boot (see OpenGeographies::Decorators), never as forked copies of upstream files.
+# boot (see OpenGeographiesPlatform::Decorators), never as forked copies of upstream files.
 #
 # The host provides the CoreDataConnector classes. On the merged core-data-cloud /
 # FairData app they are native, autoloaded code and there is nothing to require. Only
@@ -16,12 +16,12 @@ begin
 rescue LoadError
   nil
 end
-require 'open_geographies/version'
-require 'open_geographies/engine'
-require 'open_geographies/tenancy_probe'
-require 'open_geographies/facet_catalog'
-require 'open_geographies/field_catalog'
-require 'open_geographies/public_project_import'
+require 'open_geographies_platform/version'
+require 'open_geographies_platform/engine'
+require 'open_geographies_platform/tenancy_probe'
+require 'open_geographies_platform/facet_catalog'
+require 'open_geographies_platform/field_catalog'
+require 'open_geographies_platform/public_project_import'
 
-module OpenGeographies
+module OpenGeographiesPlatform
 end
