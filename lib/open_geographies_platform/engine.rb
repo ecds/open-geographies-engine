@@ -52,6 +52,11 @@ module OpenGeographiesPlatform
           get :facets, on: :member
           get :fields, on: :member
           post :build_tiles, on: :member
+
+          # Images uploaded for the atlas (logo, favicon, page images).
+          get :assets, on: :member
+          post 'assets', action: :upload_asset, on: :member, as: :upload_asset
+          delete 'assets/:key', action: :destroy_asset, on: :member, as: :destroy_asset
         end
 
         # NOTE: the admin `projects/:id/descriptors` route is NOT added here — it
@@ -76,6 +81,9 @@ module OpenGeographiesPlatform
           namespace :v1 do
             # Shared dynamic renderer: resolve a published atlas by slug.
             resources :atlases, only: [:show], param: :slug
+
+            # An atlas's uploaded images, by blob key (the filename is cosmetic).
+            get 'assets/:key(/*filename)', to: 'assets#show', as: nil, format: false
           end
         end
     end

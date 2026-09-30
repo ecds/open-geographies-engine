@@ -65,12 +65,20 @@ module CoreDataConnector
           polygons: true
         )
 
+        locale = atlas_params[:locale].presence || 'en'
+
+        # The starter home page (a banner with the description, a search box
+        # and a way into the map) is stored rather than left to the default,
+        # so the console opens on a page the curator owns and edits.
         site = Site.create!(
           project:,
           name:,
           slug:,
           area: atlas_params[:area],
-          config: default_config(search_collection, atlas_params[:locale].presence || 'en')
+          config: default_config(search_collection, locale),
+          content: {
+            'home' => SiteContent.default_home(description: atlas_params[:description], search_href: "/#{locale}/search/places")
+          }
         )
       end
 

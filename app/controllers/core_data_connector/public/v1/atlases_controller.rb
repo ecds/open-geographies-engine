@@ -6,7 +6,8 @@ module CoreDataConnector
       # Public, by-slug resolution of a published atlas for the shared dynamic
       # renderer (core-data-places). Returns everything the SSR app needs to
       # render an atlas at request time — the site config (the config.json
-      # document), branding, and navigation — in a single document, so the
+      # document), branding, navigation, and the atlas's own pages (home page
+      # and standalone pages, see SiteContent) — in a single document, so the
       # renderer resolves an atlas per request with one call instead of reading
       # a baked config file.
       #
@@ -35,7 +36,8 @@ module CoreDataConnector
               slug: site.slug,
               config:,
               branding: site.to_branding,
-              navigation: site.to_navigation(default_locale)
+              navigation: site.to_navigation(default_locale),
+              content: site.to_content
             }
           }, status: :ok
         end

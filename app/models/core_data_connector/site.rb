@@ -36,8 +36,28 @@ module CoreDataConnector
       'content_inverse' => '#ffffff',
       'content_inverse_alternate' => '#d1d5db',
       'header' => { 'hide_title' => false },
-      'footer' => { 'allow_login' => true }
+      'footer' => { 'allow_login' => false }
     }.freeze
+
+    # Branding values that end up in the renderer's CSS or in href/src
+    # attributes. Validated so a stored value can only ever be a color, a
+    # size or a safe URL (see #validate_branding).
+    BRANDING_COLORS = %w[
+      primary_color secondary_color tertiary_color background_color background_alternate
+      content_color content_alternate content_inverse content_inverse_alternate
+    ].freeze
+    BRANDING_SIZES = %w[header_size page_header_size].freeze
+    BRANDING_CAPITALIZATION = %w[none normal uppercase small-caps].freeze
+    COLOR_FORMAT = /\A#(?:\h{3}|\h{4}|\h{6}|\h{8})\z/
+    SIZE_FORMAT = /\A\d{1,3}(?:\.\d+)?(?:px|rem|em)\z/
+
+    # Images a curator can upload for the atlas (logo, favicon, page images).
+    # Served publicly by Public::V1::AssetsController.
+    ASSET_CONTENT_TYPES = %w[
+      image/png image/jpeg image/gif image/webp image/avif image/svg+xml
+      image/x-icon image/vnd.microsoft.icon
+    ].freeze
+    MAX_ASSET_BYTES = 10.megabytes
 
     # Fonts the console offers (must match the set the frontend loads).
     BRANDING_FONTS = [
@@ -56,6 +76,9 @@ module CoreDataConnector
     # Relationships
     belongs_to :project
 
+    # Uploaded images for the atlas's pages and branding.
+    has_many_attached :assets
+
     # A site is born on a project and stays there. Authorization runs against
     # the project a site belongs to *before* an update is applied, so allowing
     # project_id to change would let an owner of A re-parent a site onto B —
@@ -69,11 +92,23 @@ module CoreDataConnector
                      format: { with: /\A[a-z0-9][a-z0-9\-]*\z/, message: 'only lowercase letters, numbers, and hyphens' },
                      exclusion: { in: RESERVED_SLUGS, message: 'is reserved' }
     validate :validate_search_collections
+    validate :validate_content
+    validate :validate_branding
+    validate :validate_navigation
+
+    before_save :normalize_content
 
     def self.permitted_params
       [:project_id, :name, :slug,
        { config: {} }, { area: {} },
-       { branding: {} }, { navigation: {} }]
+       { branding: {} }, { navigation: {} }, { content: {} }]
+    end
+
+    # The public path of an uploaded asset (host-relative; the renderer
+    # resolves it against the console's public URL). The filename is
+    # cosmetic: the blob key alone identifies the file.
+    def self.asset_path(blob)
+      "/core_data/public/v1/assets/#{blob.key}/#{ERB::Util.url_encode(blob.filename.to_s)}"
     end
 
     # The branding document served to the renderer:
@@ -90,13 +125,32 @@ module CoreDataConnector
     end
 
     # The navbar document served to the renderer: the stored items, or a
-    # sensible default (Explore + Posts) pointing at the default locale's routes.
+    # default (Explore, then each page) when none are stored. Items that point
+    # at a page ({ _template: 'Page', page: <slug> }) become links to it,
+    # labelled with its title unless the item has its own label; an item
+    # whose page no longer exists is dropped.
     def to_navigation(default_locale = 'en')
+      pages = to_content['pages'].index_by { |page| page['slug'] }
       items = (navigation || {}).deep_stringify_keys['items']
 
-      items = default_navigation_items(default_locale) if items.blank?
+      items = default_navigation_items(default_locale, pages.values) if items.blank?
 
-      { 'items' => items }
+      { 'items' => items.filter_map { |item| resolve_navigation_item(item, pages, default_locale) } }
+    end
+
+    # The atlas's pages (see SiteContent), normalized, with a starter home
+    # page when none has been written yet: a banner with the atlas's
+    # description (or the legacy config.home.tagline), a search box and a
+    # button into the first search.
+    def to_content
+      document = SiteContent.new(content).to_h
+
+      document['home'] ||= SiteContent.default_home(
+        description: (config || {}).dig('home', 'tagline').presence || project&.description,
+        search_href: default_search_href(default_locale)
+      )
+
+      document
     end
 
     # Emits the config.json document for this site: the stored config with
@@ -122,13 +176,117 @@ module CoreDataConnector
 
     private
 
+    def default_locale
+      (config || {}).dig('i18n', 'default_locale').presence || 'en'
+    end
+
+    # The first search app's page, e.g. /en/search/places.
+    def default_search_href(locale)
+      name = Array((config || {})['search']).first&.dig('name')
+      name.present? ? "/#{locale}/search/#{name}" : nil
+    end
+
     # The starter navbar for a site that hasn't customized navigation:
-    # Explore (the places search) and Posts, pointed at the default locale.
-    def default_navigation_items(default_locale)
+    # Explore (the first search) and then every page, in order.
+    def default_navigation_items(default_locale, pages)
+      explore = default_search_href(default_locale)
+
       [
-        { '_template' => 'URL', 'label' => 'Explore', 'href' => "/#{default_locale}/search/places" },
-        { '_template' => 'URL', 'label' => 'Posts', 'href' => "/#{default_locale}/posts" }
-      ]
+        (explore && { '_template' => 'URL', 'label' => 'Explore', 'href' => explore }),
+        *pages.map { |page| { '_template' => 'Page', 'page' => page['slug'] } }
+      ].compact
+    end
+
+    def resolve_navigation_item(item, pages, locale)
+      return item unless item.is_a?(Hash) && item['_template'] == 'Page'
+
+      page = pages[item['page']]
+      return nil unless page
+
+      {
+        '_template' => 'URL',
+        'label' => item['label'].presence || page['title'],
+        'href' => "/#{locale}/pages/#{page['slug']}"
+      }
+    end
+
+    def validate_content
+      SiteContent.new(content).errors.each { |message| errors.add(:content, message) }
+    end
+
+    def normalize_content
+      self.content = SiteContent.new(content).to_h if will_save_change_to_content?
+    end
+
+    # Colors and sizes go into the renderer's CSS, URLs into src/href
+    # attributes; each is held to a format that can't carry anything else.
+    def validate_branding
+      document = branding.respond_to?(:to_unsafe_h) ? branding.to_unsafe_h : branding
+      return if document.blank?
+
+      unless document.is_a?(Hash)
+        errors.add(:branding, 'must be an object')
+        return
+      end
+
+      document = document.deep_stringify_keys
+      header = document['header'].is_a?(Hash) ? document['header'] : {}
+      footer = document['footer'].is_a?(Hash) ? document['footer'] : {}
+
+      BRANDING_COLORS.each do |key|
+        value = document[key]
+        errors.add(:branding, "#{key.humanize.downcase} must be a hex color such as #0a3a4d") if value.present? && !value.to_s.match?(COLOR_FORMAT)
+      end
+
+      %w[font_header font_body].each do |key|
+        value = document[key]
+        errors.add(:branding, "#{key.humanize.downcase} must be one of #{BRANDING_FONTS.join(', ')}") if value.present? && !BRANDING_FONTS.include?(value)
+      end
+
+      BRANDING_SIZES.each do |key|
+        value = document[key]
+        errors.add(:branding, "#{key.humanize.downcase} must be a size such as 48px") if value.present? && !value.to_s.match?(SIZE_FORMAT)
+      end
+
+      weight = document['header_font_weight']
+      errors.add(:branding, 'header font weight must be 100-900') if weight.present? && !weight.to_s.match?(/\A[1-9]00\z/)
+
+      capitalization = document['header_capitalization']
+      errors.add(:branding, "header capitalization must be one of #{BRANDING_CAPITALIZATION.join(', ')}") if capitalization.present? && !BRANDING_CAPITALIZATION.include?(capitalization)
+
+      images = [document['logo'], document['favicon'], document['share_image'], header['logo']]
+      links = footer.values_at('terms_url', 'privacy_url', 'accessibility_url')
+
+      Array(footer['logos']).each do |logo|
+        next unless logo.is_a?(Hash)
+
+        images << logo['image']
+        links << logo['url']
+      end
+
+      errors.add(:branding, 'images must be uploaded images or https:// addresses') unless images.all? { |value| SiteContent.safe_image?(value) }
+      errors.add(:branding, 'links must start with /, https://, http:// or mailto:') unless links.all? { |value| SiteContent.safe_link?(value) }
+    end
+
+    def validate_navigation
+      document = navigation.respond_to?(:to_unsafe_h) ? navigation.to_unsafe_h : navigation
+      return if document.blank?
+
+      items = document.is_a?(Hash) ? document.deep_stringify_keys['items'] : nil
+      return if items.nil?
+
+      unless items.is_a?(Array)
+        errors.add(:navigation, 'items must be a list')
+        return
+      end
+
+      hrefs = items.flat_map do |item|
+        next [] unless item.is_a?(Hash)
+
+        [item['href'], *Array(item['options']).map { |option| option.is_a?(Hash) ? option['href'] : nil }]
+      end
+
+      errors.add(:navigation, 'links must start with /, https://, http:// or mailto:') unless hrefs.all? { |href| SiteContent.safe_link?(href) }
     end
 
     # Expands a stored search entry for the renderer: the search_collection_id

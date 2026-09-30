@@ -155,6 +155,39 @@ written with independent tools (openpyxl, odfpy, GDAL), are in `test/fixtures/da
 Both suspend per-record indexing and queue one scoped reindex. Reindexes of one project run
 one at a time (advisory lock in `ReindexAtlasJob`).
 
+## An atlas is a site: home page, pages, branding
+
+Each atlas has its own home page and any number of standalone pages (About, Credits, …),
+edited in the console and served by the shared renderer. They live on the site as
+`content` (`CoreDataConnector::SiteContent`):
+
+```
+{ home:  { description, sections: [...] },
+  pages: [{ slug, title, description, sections: [...] }, ...] }
+```
+
+A section is a **banner** (`hero`: title, subtitle, background image, search box, button),
+**text** (Markdown), **text and image**, or a **call to action**. Text is stored as the
+curator wrote it; the renderer converts and sanitizes it. The server holds every link and
+image source to a site path, http(s) or mailto (never `javascript:`/`data:`), and branding
+colors, sizes and fonts to their formats, since they end up in the renderer's CSS.
+
+- A new atlas starts with a home page: a banner with its description, a search box and a
+  button into the map. Atlases without one get the same page by default.
+- The navigation can point at a page (`{ _template: 'Page', page: 'about' }`); the public
+  bundle turns it into a link labelled with the page's title. With no navigation saved it is
+  Explore plus every page.
+- Images (logo, favicon, page images) are uploaded to the site
+  (`POST /core_data/sites/:id/assets`, multipart `file`; `GET` lists, `DELETE …/assets/:key`
+  removes): PNG, JPEG, GIF, WebP, AVIF, SVG or ICO, read from the file's contents, up to
+  10 MB. They are ActiveStorage attachments (S3 in production) served publicly at
+  `/core_data/public/v1/assets/:key/:filename`, immutable, with a sandboxing CSP so an
+  SVG can't run script. Only site assets are served there, never a job's or an upload's
+  file. It's our route, not ActiveStorage's: on core-data-cloud the SPA catch-all is drawn
+  ahead of ActiveStorage's routes, so `rails_blob_url` answers with the console's HTML.
+- `GET /core_data/public/v1/atlases/:slug` carries `content` next to `config`, `branding`
+  and `navigation`; `config` (which the browser also fetches) never holds the pages.
+
 ## Upstream-PR posture
 
 A few decorators carry changes that are **general improvements** to Core Data, not

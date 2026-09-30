@@ -36,12 +36,13 @@ with no hosts-file change; an atlas created in the wizard with slug `foo` is at
 |---|---|---|
 | `db` | postgis/postgis 16-3.4 | `core_data` / `core_data_local`, published on :54334 |
 | `elasticsearch` | elasticsearch 8.15 | single node, security off, the `open_geographies_v1` index |
-| `host` | `host/Dockerfile` | `ecds/core-data-cloud` (`ecds` branch) + the two mount patches in `host/patches/` + this engine, built from the repo checkout you run it from |
+| `host` | `host/Dockerfile` | `ecds/core-data-cloud` (`ecds` branch) + the mount patches in `host/patches/` + this engine, built from the repo checkout you run it from |
 | `renderer` | `renderer/Dockerfile` | `ecds/core-data-places` `main` (pin with `RENDERER_REF`), Astro's standalone Node adapter |
 
 `host/patches/` is the future integration PR against the host, as patches:
-the `open_geographies_platform` gem mount (`path: '../open-geographies-engine'`)
-and the two additive migrations, on top of `ecds` @ `ff020c5` (which already pins
+the `open_geographies_platform` gem mount (`path: '../open-geographies-engine'`),
+the engines' migrations copied into the host (ours are additive), and the gem's
+roo/rubyzip lockfile lines, on top of `ecds` @ `ff020c5` (which already pins
 the lower engine, `open_geographies_fairdata`, at `67d0728`). Nothing in the host
 repo needs to change for the demo to run.
 

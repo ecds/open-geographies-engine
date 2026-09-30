@@ -76,7 +76,80 @@ module CoreDataConnector
       render json: { job: { id: job.id, status: job.status } }, status: :ok
     end
 
+    # GET /core_data/sites/:id/assets
+    #
+    # The images uploaded for this atlas, newest first: the console's image
+    # picker for the logo, favicon and page sections.
+    def assets
+      site = Site.find(params[:id])
+      authorize site, :show?
+
+      attachments = site.assets_attachments.includes(:blob).order(created_at: :desc)
+
+      render json: { assets: attachments.map { |attachment| asset_json(attachment.blob) } }, status: :ok
+    end
+
+    # POST /core_data/sites/:id/assets (multipart `file`)
+    #
+    # Uploads an image for the atlas. The type is read from the file's
+    # contents, not the browser's claim, and must be one of
+    # Site::ASSET_CONTENT_TYPES. Answers with the asset, including the public
+    # path the pages and branding reference it by.
+    def upload_asset
+      site = Site.find(params[:id])
+      authorize site, :update?
+
+      upload = params.require(:file)
+      filename = File.basename(upload.original_filename.to_s).presence || 'image'
+      content_type = Marcel::MimeType.for(Pathname.new(upload.tempfile.path), name: filename)
+
+      unless Site::ASSET_CONTENT_TYPES.include?(content_type)
+        render json: { errors: [{ base: 'Upload a PNG, JPEG, GIF, WebP, AVIF, SVG or ICO image.' }] }, status: :unprocessable_entity and return
+      end
+
+      if upload.size > Site::MAX_ASSET_BYTES
+        render json: { errors: [{ base: "Images can be at most #{Site::MAX_ASSET_BYTES / 1.megabyte} MB." }] }, status: :unprocessable_entity and return
+      end
+
+      blob = ActiveStorage::Blob.create_and_upload!(
+        io: File.open(upload.tempfile.path),
+        filename:,
+        content_type:,
+        identify: false
+      )
+      site.assets.attach(blob)
+
+      render json: { asset: asset_json(blob) }, status: :ok
+    end
+
+    # DELETE /core_data/sites/:id/assets/:key
+    #
+    # Removes an uploaded image. Pages or branding still pointing at it show
+    # nothing where the image was.
+    def destroy_asset
+      site = Site.find(params[:id])
+      authorize site, :update?
+
+      attachment = site.assets_attachments.joins(:blob).find_by(active_storage_blobs: { key: params[:key] })
+      return head :not_found unless attachment
+
+      attachment.purge
+
+      head :no_content
+    end
+
     private
+
+    def asset_json(blob)
+      {
+        key: blob.key,
+        filename: blob.filename.to_s,
+        content_type: blob.content_type,
+        byte_size: blob.byte_size,
+        path: Site.asset_path(blob),
+        created_at: blob.created_at
+      }
+    end
 
     # A site's project is fixed at creation (attr_readonly on the model):
     # authorization runs against the current project before an update, so a
