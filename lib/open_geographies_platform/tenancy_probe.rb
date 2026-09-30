@@ -1,13 +1,18 @@
 # frozen_string_literal: true
 
+require 'base64'
 require 'net/http'
 require 'json'
+require 'stringio'
 require 'uri'
 
 module OpenGeographiesPlatform
   # See lib/tasks/open_geographies_tasks.rake.
   class TenancyProbe
-    Tenant = Struct.new(:key, :user, :project, :site, :collection, :job, :place, :token, keyword_init: true)
+    Tenant = Struct.new(:key, :user, :project, :site, :collection, :job, :place, :asset_key, :job_file_key, :token, keyword_init: true)
+
+    # A 1x1 PNG: the uploaded-image fixture.
+    PNG = Base64.decode64('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==')
 
     # Creates and removes the two tenants' rows. Everything is namespaced
     # "og-tenancy-probe" so a crashed run can be cleaned up by hand.
@@ -71,7 +76,14 @@ module OpenGeographiesPlatform
 
         job = ::CoreDataConnector::Job.create!(project_id: project.id, user_id: user.id, job_type: ::CoreDataConnector::Job::JOB_TYPE_REINDEX, extra: { probe: true })
 
-        Tenant.new(key:, user:, project:, site:, collection:, job:, place:)
+        # An uploaded image on the site, and a file on the job (what a dataset
+        # upload or an export leaves behind): the public asset route must
+        # serve the first and never the second.
+        site.assets.attach(io: StringIO.new(PNG), filename: 'probe.png', content_type: 'image/png')
+        job.file.attach(io: StringIO.new("name\nProbe\n"), filename: 'probe.csv', content_type: 'text/csv')
+
+        Tenant.new(key:, user:, project:, site:, collection:, job:, place:,
+                   asset_key: site.assets_attachments.last.blob.key, job_file_key: job.file.blob.key)
       end
     end
 
@@ -99,6 +111,16 @@ module OpenGeographiesPlatform
         status 'non-discoverable atlas is 404', get("/core_data/public/v1/atlases/#{b.site.slug}"), '404'
         status 'unknown slug is 404', get('/core_data/public/v1/atlases/no-such-atlas'), '404'
         status 'slug lookup ignores a smuggled id', get("/core_data/public/v1/atlases/#{b.site.id}"), '404'
+        check 'and carries its home page', body(res).dig('atlas', 'content', 'home', 'sections').is_a?(Array)
+      end
+
+      group 'uploaded images' do
+        res = get("/core_data/public/v1/assets/#{a.asset_key}/probe.png")
+        status 'a site image is public', res, '200'
+        check 'as its image type', res['Content-Type'] == 'image/png', res['Content-Type']
+        check 'sandboxed and not sniffable', res['Content-Security-Policy'].to_s.include?('sandbox') && res['X-Content-Type-Options'] == 'nosniff'
+        status 'a job\'s file is not served', get("/core_data/public/v1/assets/#{a.job_file_key}/probe.csv"), '404'
+        status 'unknown key is 404', get('/core_data/public/v1/assets/nosuchkey/probe.png'), '404'
       end
 
       group 'anonymous is refused everywhere' do
@@ -111,6 +133,9 @@ module OpenGeographiesPlatform
         status 'atlas create', post('/core_data/atlases', { atlas: { name: 'x' } }), '401'
         status 'dataset preview', post("/core_data/projects/#{a.project.id}/dataset_imports/preview", {}), '401'
         status 'dataset import', post("/core_data/projects/#{a.project.id}/dataset_imports", { dataset_import: { columns: [] } }), '401'
+        status 'site images', get("/core_data/sites/#{a.site.id}/assets"), '401'
+        status 'image upload', upload("/core_data/sites/#{a.site.id}/assets", 'x.png', PNG), '401'
+        status 'image delete', delete("/core_data/sites/#{a.site.id}/assets/#{a.asset_key}"), '401'
         status 'wizard page itself is public html', request(Net::HTTP::Get, '/wizard', nil, nil, accept: 'text/html'), '200'
       end
 
@@ -140,6 +165,12 @@ module OpenGeographiesPlatform
         refused 'admin_children scoped to project', get("/core_data/projects/#{a.project.id}/place_imports/admin_children?geoname_id=6295630", b.token)
         refused 'dataset preview into A', post("/core_data/projects/#{a.project.id}/dataset_imports/preview", {}, b.token)
         refused 'dataset import into A', post("/core_data/projects/#{a.project.id}/dataset_imports", { dataset_import: { columns: [] } }, b.token)
+        refused 'list A\'s images', get("/core_data/sites/#{a.site.id}/assets", b.token)
+        refused 'upload an image to A', upload("/core_data/sites/#{a.site.id}/assets", 'x.png', PNG, b.token)
+        refused 'delete A\'s image', delete("/core_data/sites/#{a.site.id}/assets/#{a.asset_key}", b.token)
+        refused 'delete A\'s image through B\'s own site', delete("/core_data/sites/#{b.site.id}/assets/#{a.asset_key}", b.token)
+        check 'A\'s image is still there', a.site.assets_attachments.joins(:blob).exists?(active_storage_blobs: { key: a.asset_key })
+        refused 'edit A\'s pages', patch("/core_data/sites/#{a.site.id}", { site: { content: { pages: [{ slug: 'pwned', title: 'Pwned' }] } } }, b.token)
       end
 
       group 'cross-tenant references are rejected' do
@@ -180,6 +211,19 @@ module OpenGeographiesPlatform
         check 'own config names only own project', body(res).dig('core_data', 'project_ids') == [a.project.id.to_s], res.body.to_s[0, 200]
         status 'own job', get("/core_data/jobs/#{a.job.id}", a.token), '200'
         status 'own site update', patch("/core_data/sites/#{a.site.id}", { site: { name: 'OG Tenancy Probe A (renamed)' } }, a.token), '200'
+
+        res = patch("/core_data/sites/#{a.site.id}", { site: { content: { pages: [{ slug: 'about', title: 'About', sections: [{ type: 'text', body: 'Hello' }] }] } } }, a.token)
+        status 'own pages saved', res, '200'
+        res = patch("/core_data/sites/#{a.site.id}", { site: { content: { pages: [{ slug: 'about', title: 'About', sections: [{ type: 'call_to_action', button_url: 'javascript:alert(1)' }] }] } } }, a.token)
+        status 'but not a javascript: link', res, %w[400 422]
+        res = patch("/core_data/sites/#{a.site.id}", { site: { branding: { primary_color: '#000;}</style><script>' } } }, a.token)
+        status 'nor a color that isn\'t one', res, %w[400 422]
+
+        res = upload("/core_data/sites/#{a.site.id}/assets", 'own.png', PNG, a.token)
+        status 'own image upload', res, '200'
+        own_key = body(res).dig('asset', 'key')
+        status 'an HTML file named .png is refused', upload("/core_data/sites/#{a.site.id}/assets", 'page.png', '<html><script>alert(1)</script></html>', a.token), '422'
+        status 'own image delete', delete("/core_data/sites/#{a.site.id}/assets/#{own_key}", a.token), '204'
       end
     end
 
@@ -232,6 +276,18 @@ module OpenGeographiesPlatform
     end
 
     def get(path, token = nil) = request(Net::HTTP::Get, path, nil, token)
+
+    # A multipart file upload (the console's image upload).
+    def upload(path, filename, bytes, token = nil)
+      uri = URI.join(@host, path)
+      req = Net::HTTP::Post.new(uri)
+      req['Accept'] = 'application/json'
+      req['Authorization'] = token if token
+      req.set_form([['file', StringIO.new(bytes), { filename:, content_type: 'image/png' }]], 'multipart/form-data')
+
+      Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https') { |http| http.request(req) }
+    end
+
     def post(path, payload, token = nil) = request(Net::HTTP::Post, path, payload, token)
     def patch(path, payload, token = nil) = request(Net::HTTP::Patch, path, payload, token)
     def delete(path, token = nil) = request(Net::HTTP::Delete, path, nil, token)
