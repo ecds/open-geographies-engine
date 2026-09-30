@@ -13,6 +13,10 @@ module CoreDataConnector
   # the Types taxonomy) the way the template defines it when the project
   # lacks one.
   #
+  # After a run that imported anything, the project's atlases are set up to
+  # show it (configure_sites!): the category and each pick-list field become
+  # filters, and the identifier field is hidden on public pages.
+  #
   # Re-runs are safe when an identifier column is mapped: rows whose
   # identifier is already on a place in the model are skipped. Without one,
   # a re-run imports the rows again.
@@ -83,8 +87,11 @@ module CoreDataConnector
         end
       end
 
-      # Nothing new to index when every row was skipped or failed.
-      queue_reindex([model, @types&.related_model].compact) if @counts['imported'].positive?
+      # Nothing new to index (or show) when every row was skipped or failed.
+      if @counts['imported'].positive?
+        configure_sites!
+        queue_reindex([model, @types&.related_model].compact)
+      end
 
       job.update(
         status: Job::JOB_STATUS_COMPLETED,
@@ -93,6 +100,8 @@ module CoreDataConnector
           'counts' => @counts,
           'geometry' => @mapping,
           'fields_created' => @fields_created.presence,
+          'filters_added' => @filters_added.presence,
+          'hidden_fields' => @hidden_fields.presence,
           'problems' => @problems.presence
         ).compact
       )
@@ -245,6 +254,69 @@ module CoreDataConnector
       uuid = @fields[@identifier_column].uuid
       Place.where(project_model_id: @model.id).where('user_defined ? :uuid', uuid:)
            .pluck(Arel.sql("user_defined ->> #{ActiveRecord::Base.connection.quote(uuid)}")).to_set
+    end
+
+    # --- The atlas ------------------------------------------------------------
+
+    # Makes the import show up the way a curator expects, with no trip to
+    # Settings: the category and every pick-list field become filters on
+    # each search (of each of the project's atlases) that covers this model,
+    # and the identifier field — an internal key — is hidden on public
+    # pages. Only adds; never removes a filter or a hidden field a curator
+    # chose.
+    def configure_sites!
+      filters = {}
+      filters['types'] = TYPES if @types
+      @fields.each_value do |field|
+        filters["#{field.column_name.parameterize.underscore}_facet"] = field.column_name if field.data_type == 'Select'
+      end
+
+      hidden = []
+      hidden << @fields[@identifier_column].column_name.parameterize.underscore if @identifier_column
+
+      @filters_added = []
+      @hidden_fields = []
+
+      Site.where(project_id: @model.project_id).find_each do |site|
+        site.with_lock do
+          config = (site.config || {}).deep_dup
+
+          Array(config['search']).each do |search|
+            next unless covers_model?(search)
+
+            facets = (search['facets'] ||= [])
+            filters.each do |name, label|
+              next if facets.any? { |facet| facet['name'] == name }
+
+              facets << { 'name' => name, 'type' => 'list' }
+              @filters_added << label
+            end
+          end
+
+          if hidden.any?
+            places = ((config['detail_pages'] ||= {})['models'] ||= {})['places'] ||= {}
+            missing = hidden - Array(places['exclude'])
+
+            if missing.any?
+              places['exclude'] = Array(places['exclude']) + missing
+              @hidden_fields.concat(missing.map { |key| @fields.values.find { |f| f.column_name.parameterize.underscore == key }&.column_name || key })
+            end
+          end
+
+          site.update!(config:) unless config == site.config
+        end
+      end
+
+      @filters_added.uniq!
+      @hidden_fields.uniq!
+    end
+
+    # A search with no collection covers the whole project.
+    def covers_model?(search)
+      id = search['search_collection_id']
+      return true if id.blank?
+
+      Array(SearchCollection.where(id:).pick(:project_model_ids)).map(&:to_i).include?(@model.id)
     end
 
     # --- Bookkeeping ---------------------------------------------------------

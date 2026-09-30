@@ -1,23 +1,23 @@
-id,Name,Category,Year Built,Architect,Short Description,Latitude,Longitude,Open to Public
-atl-001,Fox Theatre,Theatre,1929,Marye Alger and Vinour,Moorish Revival movie palace on Peachtree Street.,33.7726,-84.3857,yes
-atl-002,Georgia State Capitol,Government,1889,Edbrooke and Burnham,Seat of Georgia government with a gilded dome.,33.7490,-84.3880,yes
-atl-003,Ebenezer Baptist Church,Church,1922,,Congregation where Martin Luther King Jr. was co-pastor.,33.7555,-84.3733,yes
-atl-004,Oakland Cemetery,Cemetery,1850,,Victorian garden cemetery east of downtown.,33.7486,-84.3714,yes
-atl-005,Swan House,House,1928,Philip Trammell Shutze,Classical revival residence in Buckhead.,33.8424,-84.3871,yes
-atl-006,The Wren's Nest,House,1870,,Home of writer Joel Chandler Harris in West End.,33.7383,-84.4203,yes
-atl-007,Rhodes Hall,House,1904,Willis F. Denny,Romanesque Revival mansion on Peachtree Street.,33.8012,-84.3872,yes
-atl-008,Margaret Mitchell House,House,1899,,Apartment house where Gone with the Wind was written.,33.7810,-84.3843,yes
-atl-009,Herndon Home,House,1910,,Beaux-Arts home of Alonzo Herndon.,33.7577,-84.4086,yes
-atl-010,Big Bethel AME Church,Church,1891,,Sweet Auburn congregation founded in 1847.,33.7552,-84.3778,yes
-atl-011,Hurt Building,Commercial,1926,J. E. R. Carpenter,Flatiron-plan office building on Hurt Plaza.,33.7560,-84.3862,no
-atl-012,Candler Building,Commercial,1906,George Murphy,Marble-clad early skyscraper.,33.7593,-84.3869,no
-atl-013,Georgian Terrace Hotel,Commercial,1911,William Lee Stoddart,Beaux-Arts hotel opposite the Fox.,33.7728,-84.3844,yes
-atl-014,Atlanta City Hall,Government,1930,G. Lloyd Preacher,Art Deco city hall tower.,33.7483,-84.3908,yes
-atl-015,Sweet Auburn Curb Market,Commercial,1924,,Municipal market on Edgewood Avenue.,33.7547,-84.3806,yes
-atl-016,Westview Cemetery,Cemetery,1884,,One of the largest civilian cemeteries in the Southeast.,33.7400,-84.4450,yes
-atl-017,Grant Park,Park,1883,,Oldest surviving city park in Atlanta.,33.7383,-84.3700,yes
-atl-018,Centennial Olympic Park,Park,1996,,Park built for the 1996 Summer Olympics.,33.7606,-84.3931,yes
-atl-019,Paschal's,Commercial,1947,,Restaurant and civil rights meeting place.,33.7532,-84.4128,no
-atl-020,Wheat Street Baptist Church,Church,1939,,Auburn Avenue congregation.,33.7556,-84.3770,yes
-atl-021,Stone Mountain Carving,Monument,,,Carving outside the city; row without coordinates,,,
-atl-022,Bad Coordinates Example,House,1900,,Coordinates in a projected system,1374000,2226000,no
+id,Name,Category,Neighborhood,Year Built,Architect,Short Description,Latitude,Longitude,Open to Public
+atl-001,Fox Theatre,Theatre,Midtown,1929,Marye Alger and Vinour,Moorish Revival movie palace on Peachtree Street.,33.7726,-84.3857,yes
+atl-002,Georgia State Capitol,Government,Downtown,1889,Edbrooke and Burnham,Seat of Georgia government with a gilded dome.,33.7490,-84.3880,yes
+atl-003,Ebenezer Baptist Church,Church,Sweet Auburn,1922,,Congregation where Martin Luther King Jr. was co-pastor.,33.7555,-84.3733,yes
+atl-004,Oakland Cemetery,Cemetery,Cabbagetown,1850,,Victorian garden cemetery east of downtown.,33.7486,-84.3714,yes
+atl-005,Swan House,House,Buckhead,1928,Philip Trammell Shutze,Classical revival residence in Buckhead.,33.8424,-84.3871,yes
+atl-006,The Wren's Nest,House,West End,1870,,Home of writer Joel Chandler Harris in West End.,33.7383,-84.4203,yes
+atl-007,Rhodes Hall,House,Midtown,1904,Willis F. Denny,Romanesque Revival mansion on Peachtree Street.,33.8012,-84.3872,yes
+atl-008,Margaret Mitchell House,House,Midtown,1899,,Apartment house where Gone with the Wind was written.,33.7810,-84.3843,yes
+atl-009,Herndon Home,House,Vine City,1910,,Beaux-Arts home of Alonzo Herndon.,33.7577,-84.4086,yes
+atl-010,Big Bethel AME Church,Church,Sweet Auburn,1891,,Sweet Auburn congregation founded in 1847.,33.7552,-84.3778,yes
+atl-011,Hurt Building,Commercial,Downtown,1926,J. E. R. Carpenter,Flatiron-plan office building on Hurt Plaza.,33.7560,-84.3862,no
+atl-012,Candler Building,Commercial,Downtown,1906,George Murphy,Marble-clad early skyscraper.,33.7593,-84.3869,no
+atl-013,Georgian Terrace Hotel,Commercial,Midtown,1911,William Lee Stoddart,Beaux-Arts hotel opposite the Fox.,33.7728,-84.3844,yes
+atl-014,Atlanta City Hall,Government,Downtown,1930,G. Lloyd Preacher,Art Deco city hall tower.,33.7483,-84.3908,yes
+atl-015,Sweet Auburn Curb Market,Commercial,Sweet Auburn,1924,,Municipal market on Edgewood Avenue.,33.7547,-84.3806,yes
+atl-016,Westview Cemetery,Cemetery,West End,1884,,One of the largest civilian cemeteries in the Southeast.,33.7400,-84.4450,yes
+atl-017,Grant Park,Park,Grant Park,1883,,Oldest surviving city park in Atlanta.,33.7383,-84.3700,yes
+atl-018,Centennial Olympic Park,Park,Downtown,1996,,Park built for the 1996 Summer Olympics.,33.7606,-84.3931,yes
+atl-019,Paschal's,Commercial,Vine City,1947,,Restaurant and civil rights meeting place.,33.7532,-84.4128,no
+atl-020,Wheat Street Baptist Church,Church,Sweet Auburn,1939,,Auburn Avenue congregation.,33.7556,-84.3770,yes
+atl-021,Stone Mountain Carving,Monument,,,,Carving outside the city; row without coordinates,,,
+atl-022,Bad Coordinates Example,House,,1900,,Coordinates in a projected system,1374000,2226000,no

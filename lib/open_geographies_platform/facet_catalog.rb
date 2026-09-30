@@ -20,12 +20,16 @@ module OpenGeographiesPlatform
   #   - a promoted scalar user-defined field is facetable when its promoted
   #     path is a keyword in the mapping (e.g. Media's "Media Type" →
   #     `media_type`);
+  #   - a pick-list (Select) field is facetable on its `<key>_facet` keyword
+  #     companion;
   #   - `administrative_area.name` is always available (derived server-side
-  #     from each place's centroid).
+  #     from each place's centroid);
+  #   - a non-canonical relationship's `<key>.name.keyword`, under the 0.3.0
+  #     mapping's relationship_name dynamic template.
   #
-  # Non-canonical relationships to non-taxonomy models, and non-promoted
-  # scalar fields, are not facetable as v1 indexes them today; they are
-  # listed with `facetable: false` so the console can say why.
+  # Other scalar fields (text, numbers, dates) are not facetable as v1
+  # indexes them; they are listed with `facetable: false` so the console can
+  # say why.
   class FacetCatalog
     Entry = Struct.new(:attribute, :label, :facetable, :reason, keyword_init: true) do
       def to_h
@@ -97,8 +101,15 @@ module OpenGeographiesPlatform
           return Entry.new(attribute: promoted_path.to_s, label:, facetable: true)
         end
 
+        # A pick-list (Select) field is a fixed, curator-defined set of values:
+        # the lower engine writes a `<key>_facet` keyword companion for it,
+        # which the mapping's facets_as_keyword template makes aggregatable.
+        if field.data_type == 'Select'
+          return Entry.new(attribute: "#{field.column_name.parameterize.underscore}_facet", label:, facetable: true)
+        end
+
         Entry.new(attribute: field.column_name.parameterize.underscore, label:, facetable: false,
-                  reason: 'Scalar fields index as searchable text, not as facets.')
+                  reason: 'Only pick-list fields become facets; other fields index as searchable text.')
       end
 
       # The mapping path to aggregate on for a dotted path, or nil: the path

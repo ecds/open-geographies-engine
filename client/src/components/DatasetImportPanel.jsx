@@ -226,7 +226,14 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
   };
 
   const renderResult = () => {
-    const { counts = {}, error, fields_created: created, problems: rowProblems } = result.extra || {};
+    const {
+      counts = {},
+      error,
+      fields_created: created,
+      filters_added: filters,
+      hidden_fields: hidden,
+      problems: rowProblems
+    } = result.extra || {};
 
     return (
       <div className='card'>
@@ -241,6 +248,8 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
           </div>
         )}
         { !_.isEmpty(created) && <p className='muted'>New fields: { created.join(', ') }</p> }
+        { !_.isEmpty(filters) && <p className='muted'>Added as filters on the atlas: { filters.join(', ') }</p> }
+        { !_.isEmpty(hidden) && <p className='muted'>Hidden on public pages: { hidden.join(', ') } (change in Settings → Detail pages)</p> }
         { !_.isEmpty(rowProblems) && <Message header='Rows to check' list={rowProblems} tone='warning' /> }
         { result.status === JobStatuses.completed && counts.imported > 0 && (
           <Message tone='positive'>Imported. The places appear on the atlas as soon as the reindex finishes.</Message>
