@@ -62,6 +62,7 @@ module CoreDataConnector
       @model = model
       @columns = columns
       @mapping = DatasetImports::Geometry.mapping_for(format, columns)
+      @row_label = %w[geojson shapefile].include?(format) ? 'Feature' : 'Row'
       @name_column = role_column('name')
       @identifier_column = role_column('identifier')
       @counts = Hash.new(0)
@@ -112,7 +113,7 @@ module CoreDataConnector
     def import_row(row)
       properties = row[:properties]
       name = properties[@name_column]
-      line = row[:index] + 2 # 1-based, after the header row of a CSV
+      line = row[:line] || (row[:index] + 2)
 
       if name.blank?
         fail_row(line, 'has no name')
@@ -331,7 +332,7 @@ module CoreDataConnector
     end
 
     def problem(line, message)
-      @problems << "Row #{line} #{message}" if @problems.size < SAMPLE_LIMIT
+      @problems << "#{@row_label} #{line} #{message}" if @problems.size < SAMPLE_LIMIT
     end
 
     def report_progress(completed, total)

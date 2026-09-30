@@ -23,6 +23,9 @@ module CoreDataConnector
       WKT = /\A\s*(SRID=\d+;\s*)?(POINT|LINESTRING|POLYGON|MULTIPOINT|MULTILINESTRING|MULTIPOLYGON|GEOMETRYCOLLECTION)\b/i
       TYPES = %w[Point MultiPoint LineString MultiLineString Polygon MultiPolygon GeometryCollection].freeze
 
+      # Formats whose rows carry their own geometry.
+      FEATURE_FORMATS = %w[geojson shapefile].freeze
+
       class Error < StandardError; end
 
       module_function
@@ -49,7 +52,7 @@ module CoreDataConnector
       # The mapping a file most likely wants, from its headers and a sample
       # of its rows.
       def detect(format, columns, rows)
-        return { 'mode' => 'feature' } if format == 'geojson' && rows.any? { |row| row[:geometry] }
+        return { 'mode' => 'feature' } if FEATURE_FORMATS.include?(format) && rows.any? { |row| row[:geometry] }
 
         latitude = columns.find { |c| c.match?(LATITUDE) }
         longitude = columns.find { |c| c.match?(LONGITUDE) }
@@ -82,7 +85,7 @@ module CoreDataConnector
           { 'mode' => 'latlon', 'latitude' => role.call('latitude'), 'longitude' => role.call('longitude') }
         elsif role.call('geometry')
           { 'mode' => 'column', 'column' => role.call('geometry') }
-        elsif format == 'geojson'
+        elsif FEATURE_FORMATS.include?(format)
           { 'mode' => 'feature' }
         else
           { 'mode' => 'none' }

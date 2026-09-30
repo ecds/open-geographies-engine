@@ -27,4 +27,9 @@ Gem::Specification.new do |spec|
   # autoloads them; a legacy gem-based host lists the gem before this one.
   # Other runtime libraries (rgeo, etc.) are the host's, not ours to pin.
   spec.add_dependency 'rails', '>= 8.1', '< 9'
+
+  # Dataset upload: workbooks (.xlsx/.ods) and zipped shapefiles. Both are
+  # already in core-data-cloud's bundle (FairData's own importers use them).
+  spec.add_dependency 'roo', '>= 2.10', '< 3'
+  spec.add_dependency 'rubyzip', '>= 2.3', '< 3'
 end

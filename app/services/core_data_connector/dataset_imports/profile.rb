@@ -121,6 +121,8 @@ module CoreDataConnector
         return 'longitude' if geometry['mode'] == 'latlon' && column == geometry['longitude']
         return 'geometry' if %w[wkt geojson].include?(geometry['mode']) && column == geometry['column']
         return 'skip' if stat[:filled].zero?
+        # The features carry their own geometry; coordinate columns are copies.
+        return 'skip' if geometry['mode'] == 'feature' && (column.match?(Geometry::LATITUDE) || column.match?(Geometry::LONGITUDE))
         return 'name' if column == name_column(columns, stats)
         return 'identifier' if column.match?(IDENTIFIER) && stat[:distinct] == stat[:filled] && stat[:distinct] < DISTINCT_CAP
         return 'types' if column.match?(TYPES)
@@ -139,7 +141,7 @@ module CoreDataConnector
 
           if error
             counts['invalid'] += 1
-            problems << "Row #{row[:index] + 2}: #{error}" if problems.size < 5
+            problems << "#{row_label(row)}: #{error}" if problems.size < 5
             next
           end
 
@@ -172,8 +174,13 @@ module CoreDataConnector
         bbox
       end
 
+      def row_label(row)
+        prefix = %w[geojson shapefile].include?(reader.format) ? 'Feature' : 'Row'
+        "#{prefix} #{row[:line] || (row[:index] + 2)}"
+      end
+
       def warnings(rows, columns, stats)
-        warnings = []
+        warnings = reader.warnings.dup
         warnings << 'The file has no rows.' if rows.empty?
         warnings << 'No column looks like a place name; choose one before importing.' unless name_column(columns, stats)
         warnings

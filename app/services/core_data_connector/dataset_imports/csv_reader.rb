@@ -18,12 +18,12 @@ module CoreDataConnector
         load!
 
         index = 0
-        @table.each do |values|
+        @table.each_with_index do |values, position|
           next if values.all? { |v| clean(v).nil? }
 
           check_row_limit!(index)
           properties = @columns.each_with_index.to_h { |column, i| [column, clean(values[i])] }
-          yield({ index:, properties:, geometry: nil })
+          yield({ index:, line: position + 2, properties:, geometry: nil })
           index += 1
         end
       end

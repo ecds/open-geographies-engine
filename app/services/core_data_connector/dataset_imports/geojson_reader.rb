@@ -18,7 +18,7 @@ module CoreDataConnector
         @features.each_with_index do |feature, index|
           check_row_limit!(index)
           properties = @columns.to_h { |column| [column, flatten(feature.dig('properties', column))] }
-          yield({ index:, properties:, geometry: feature['geometry'] })
+          yield({ index:, line: index + 1, properties:, geometry: feature['geometry'] })
         end
       end
 

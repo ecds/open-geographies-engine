@@ -14,9 +14,14 @@ module CoreDataConnector
     # coordinates live in its columns and are resolved by Geometry against
     # the curator's column mapping.
     #
-    # Supported: CSV (comma, semicolon or tab separated; any common encoding)
-    # and GeoJSON (a FeatureCollection, a single Feature, or a bare geometry).
-    # Everything else is refused with a message that says what to do instead.
+    # Supported: CSV (comma, semicolon or tab separated; any common encoding),
+    # Excel (.xlsx) and OpenDocument (.ods) workbooks, GeoJSON (a
+    # FeatureCollection, a single Feature, or a bare geometry) and zipped
+    # Shapefiles. Everything else is refused with a message that says what to
+    # do instead.
+    #
+    # Rows also carry `line`: where the curator will find the row in their own
+    # file (the spreadsheet row number, or the feature's position).
     class Reader
       class UnsupportedFormat < StandardError; end
       class Invalid < StandardError; end
@@ -26,13 +31,12 @@ module CoreDataConnector
 
       CSV_EXTENSIONS = %w[.csv .tsv .txt].freeze
       GEOJSON_EXTENSIONS = %w[.geojson .json].freeze
+      SPREADSHEET_EXTENSIONS = { '.xlsx' => :xlsx, '.ods' => :ods }.freeze
+      SHAPEFILE_EXTENSIONS = %w[.zip].freeze
 
       HINTS = {
-        '.xlsx' => 'Excel files are not read directly yet: in Excel, use File → Save As → CSV (UTF-8), then upload that.',
-        '.xls' => 'Excel files are not read directly yet: in Excel, use File → Save As → CSV (UTF-8), then upload that.',
-        '.ods' => 'Spreadsheet files are not read directly yet: save the sheet as CSV, then upload that.',
-        '.zip' => 'Shapefiles are not read directly yet: export the layer as GeoJSON (in QGIS: Export → Save Features As → GeoJSON, CRS EPSG:4326), then upload that.',
-        '.shp' => 'Shapefiles are not read directly yet: export the layer as GeoJSON (in QGIS: Export → Save Features As → GeoJSON, CRS EPSG:4326), then upload that.',
+        '.xls' => 'Older Excel files (.xls) are not read: in Excel, use File → Save As → Excel Workbook (.xlsx) or CSV, then upload that.',
+        '.shp' => 'A shapefile is several files: zip the layer’s .shp, .dbf, .shx and .prj together and upload the .zip.',
         '.kml' => 'KML is not read directly yet: convert it to GeoJSON (for example with QGIS or geojson.io), then upload that.',
         '.kmz' => 'KMZ is not read directly yet: convert it to GeoJSON (for example with QGIS or geojson.io), then upload that.'
       }.freeze
@@ -46,8 +50,14 @@ module CoreDataConnector
           CsvReader.new(path)
         elsif GEOJSON_EXTENSIONS.include?(extension)
           GeojsonReader.new(path)
+        elsif SPREADSHEET_EXTENSIONS.key?(extension)
+          SpreadsheetReader.new(path, extension: SPREADSHEET_EXTENSIONS[extension])
+        elsif SHAPEFILE_EXTENSIONS.include?(extension)
+          ShapefileReader.new(path)
         else
-          raise UnsupportedFormat, HINTS.fetch(extension) { "Upload a .csv or .geojson file (got #{extension.presence || 'no extension'})." }
+          raise UnsupportedFormat, HINTS.fetch(extension) {
+            "Upload a .csv, .xlsx, .ods, .geojson or zipped shapefile (.zip) (got #{extension.presence || 'no extension'})."
+          }
         end
       end
 
@@ -64,6 +74,11 @@ module CoreDataConnector
 
       def format
         raise NotImplementedError
+      end
+
+      # Things the curator should know about how the file was read.
+      def warnings
+        []
       end
 
       # Yields each row. Stops with Invalid past MAX_ROWS.

@@ -80,16 +80,29 @@ module CoreDataConnector
     # Matching ignores case and punctuation: "short description" fills the
     # canonical "Short Description", which the index promotes.
     def annotate_existing_fields!(profile, model)
-      existing = model.user_defined_fields.index_by { |field| field.column_name.parameterize }
+      fields = model.user_defined_fields.to_a
+      existing = fields.index_by { |field| field.column_name.parameterize }
 
       profile['columns'].each do |column|
-        field = existing[column['label'].to_s.parameterize]
+        field = existing[column['label'].to_s.parameterize] || truncated_match(column['label'], fields, profile['format'])
         next unless field
 
+        column['label'] = field.column_name
         column['field_uuid'] = field.uuid
         column['data_type'] = field.data_type if DATA_TYPES.include?(field.data_type)
         column['existing'] = true
       end
+    end
+
+    # A shapefile's .dbf cuts field names to 10 characters ("Short Desc");
+    # match one to the only existing field it is the start of.
+    DBF_NAME_LENGTH = 10
+
+    def truncated_match(label, fields, format)
+      return unless format == 'shapefile' && label.to_s.length == DBF_NAME_LENGTH
+
+      candidates = fields.select { |field| field.column_name.downcase.start_with?(label.downcase) }
+      candidates.first if candidates.one?
     end
 
     def validate_columns(columns)

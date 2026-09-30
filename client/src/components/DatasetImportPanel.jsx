@@ -23,7 +23,7 @@ import {
 // package bundles another), which the rest of the console never needs.
 const PreviewMap = lazy(() => import('./PreviewMap'));
 
-const ACCEPT = '.csv,.tsv,.txt,.geojson,.json';
+const ACCEPT = '.csv,.tsv,.txt,.xlsx,.ods,.geojson,.json,.zip';
 
 const ROLES = [
   { value: 'name', text: 'Place name' },
@@ -261,8 +261,8 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
   return (
     <div className='import-panel'>
       <p className='muted'>
-        A spreadsheet saved as CSV, or a GeoJSON file. Excel: File → Save As → CSV (UTF-8).
-        Nothing is imported until you review it and press Import.
+        A spreadsheet (Excel .xlsx, OpenDocument .ods, or CSV), a GeoJSON file, or a shapefile zipped
+        with its .dbf and .prj. Nothing is imported until you review it and press Import.
       </p>
 
       { !_.isEmpty(errors) && <Message list={errors} tone='negative' /> }
