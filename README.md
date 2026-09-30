@@ -120,6 +120,35 @@ pick-list never offers an attribute the index can't aggregate.
   the source. `npm run dev` serves it at http://localhost:5175 proxying `/core_data` to a
   host on :3001.
 
+## Getting places in: upload a dataset, or a gazetteer
+
+The wizard's "Add places" step and each atlas's Imports page offer two sources.
+
+**Upload your data** (`DatasetImportsController`, `ImportDatasetJob`,
+`app/services/core_data_connector/dataset_imports/`). A CSV (comma, semicolon or tab; any
+common encoding) or GeoJSON file, up to 50 MB / 50,000 rows. The preview proposes a role per
+column (place name, field, category, latitude, longitude, geometry, identifier, skip) and a
+field type, shows the rows on a map, and lists rows whose location can't be used (e.g. a
+projected CRS). Nothing is written until the curator presses Import. Then:
+
+- each row becomes a Place with its name, geometry and typed field values;
+- missing fields are created on the Places model; a column matching an existing field
+  (e.g. "Short Description") fills it, so canonical promotions still apply;
+- a category column becomes Types terms on the canonical Places→Types relationship
+  (created as the template defines it if the project lacks one) — the atlas's `types` facet;
+- short, repetitive text columns default to pick-list (Select) fields, which the index
+  turns into `*_facet` keywords;
+- with an identifier column, re-importing the file skips rows already imported.
+
+Excel, Shapefile and KML are refused with instructions to convert (Save As CSV; export
+GeoJSON in EPSG:4326). Fixtures covering each reader path are in `test/fixtures/datasets/`.
+
+**From a gazetteer**: GeoNames and Wikidata imports for the atlas's area (`PlaceImportsController`,
+`ImportPlacesJob`), idempotent by authority identifier.
+
+Both suspend per-record indexing and queue one scoped reindex. Reindexes of one project run
+one at a time (advisory lock in `ReindexAtlasJob`).
+
 ## Upstream-PR posture
 
 A few decorators carry changes that are **general improvements** to Core Data, not

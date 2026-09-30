@@ -109,6 +109,8 @@ module OpenGeographiesPlatform
         status 'import preview', post("/core_data/projects/#{a.project.id}/place_imports/preview", { place_import: {} }), '401'
         status 'admin_children', get('/core_data/place_imports/admin_children?geoname_id=6295630'), '401'
         status 'atlas create', post('/core_data/atlases', { atlas: { name: 'x' } }), '401'
+        status 'dataset preview', post("/core_data/projects/#{a.project.id}/dataset_imports/preview", {}), '401'
+        status 'dataset import', post("/core_data/projects/#{a.project.id}/dataset_imports", { dataset_import: { columns: [] } }), '401'
         status 'wizard page itself is public html', request(Net::HTTP::Get, '/wizard', nil, nil, accept: 'text/html'), '200'
       end
 
@@ -136,6 +138,8 @@ module OpenGeographiesPlatform
         refused 'import preview', post("/core_data/projects/#{a.project.id}/place_imports/preview", { place_import: { source: 'geonames', area: {}, filters: {} } }, b.token)
         refused 'import', post("/core_data/projects/#{a.project.id}/place_imports", { place_import: { source: 'geonames', area: {}, filters: {} } }, b.token)
         refused 'admin_children scoped to project', get("/core_data/projects/#{a.project.id}/place_imports/admin_children?geoname_id=6295630", b.token)
+        refused 'dataset preview into A', post("/core_data/projects/#{a.project.id}/dataset_imports/preview", {}, b.token)
+        refused 'dataset import into A', post("/core_data/projects/#{a.project.id}/dataset_imports", { dataset_import: { columns: [] } }, b.token)
       end
 
       group 'cross-tenant references are rejected' do
