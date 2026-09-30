@@ -19,6 +19,7 @@ end
 require 'open_geographies_platform/version'
 require 'open_geographies_platform/engine'
 require 'open_geographies_platform/tenancy_probe'
+require 'open_geographies_platform/host_tenancy_probe'
 require 'open_geographies_platform/facet_catalog'
 require 'open_geographies_platform/field_catalog'
 require 'open_geographies_platform/public_project_import'

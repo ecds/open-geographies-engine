@@ -37,6 +37,35 @@ namespace :open_geographies do
 
     puts "\nAll #{probe.checks} checks passed."
   end
+
+  # The host half: FairData's own admin API, as the same two owners. See
+  # OpenGeographiesPlatform::HostTenancyProbe for what it checks and why.
+  #
+  #   bin/rails open_geographies:host_tenancy_probe HOST=http://localhost:3001 [KEEP=1]
+  desc 'Two-tenant probe of the host\'s own admin API: re-parenting and cross-tenant links (HOST=)'
+  task host_tenancy_probe: :environment do
+    require 'net/http'
+    require 'json'
+
+    host = ENV.fetch('HOST', 'http://localhost:3001')
+    password = 'Tenancy-Probe-2026!'
+
+    fixtures = OpenGeographiesPlatform::TenancyProbe::Fixtures.build!(password:)
+    probe = OpenGeographiesPlatform::HostTenancyProbe.new(host:, fixtures:, password:)
+
+    begin
+      probe.run!
+    ensure
+      fixtures.teardown! unless ENV['KEEP'] == '1'
+    end
+
+    puts "\nSkipped (untestable on this host): #{probe.skipped.size}" if probe.skipped.any?
+    probe.skipped.each { |s| puts "  #{s}" }
+
+    abort("\n#{probe.failures.size} of #{probe.checks} check(s) FAILED:\n  #{probe.failures.join("\n  ")}") if probe.failures.any?
+
+    puts "\nAll #{probe.checks} checks passed."
+  end
 end
 
 namespace :open_geographies do
