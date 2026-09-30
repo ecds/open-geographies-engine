@@ -1,0 +1,285 @@
+module CoreDataConnector
+  # Imports a curator's dataset (the Job's attached CSV or GeoJSON) as places
+  # according to the column roles chosen in the preview
+  # (DatasetImportsController). Each row becomes a Place with its name, its
+  # geometry when it has one, its field values, and a Types term per
+  # category value.
+  #
+  # Fields are created on the place model on first use, typed as mapped;
+  # a column whose label matches an existing field fills that field, so a
+  # "Short Description" column lands in the canonical field the index
+  # promotes. A Select field's options grow to cover the file's values.
+  # Categories use the model's canonical Types relationship, created (with
+  # the Types taxonomy) the way the template defines it when the project
+  # lacks one.
+  #
+  # Re-runs are safe when an identifier column is mapped: rows whose
+  # identifier is already on a place in the model are skipped. Without one,
+  # a re-run imports the rows again.
+  #
+  # Per-record indexing is suspended for the duration; one scoped reindex of
+  # the touched models is queued at the end (ImportPlacesJob pattern).
+  # Progress and outcome land on the Job row.
+  class ImportDatasetJob < ApplicationJob
+    PROGRESS_INTERVAL = 2.seconds
+    BATCH_SIZE = 200
+    SAMPLE_LIMIT = 20
+    CATEGORY_SEPARATOR = /\s*[;|]\s*/
+    TYPES = 'Types'.freeze
+    TRUE_VALUES = %w[true yes y 1].freeze
+    FALSE_VALUES = %w[false no n 0].freeze
+
+    def perform(job_id)
+      job = Job.find(job_id)
+      job.update(status: Job::JOB_STATUS_PROCESSING)
+
+      begin
+        model = ProjectModel.find(job.extra['project_model_id'])
+        columns = job.extra['columns']
+
+        job.file.open do |file|
+          reader = DatasetImports::Reader.open(file.path, filename: job.extra['filename'])
+          rows = []
+          reader.each_row { |row| rows << row }
+
+          run(job, model, columns, reader.format, rows)
+        end
+      rescue StandardError => error
+        log_error error
+
+        job.update(status: Job::JOB_STATUS_FAILED, extra: job.extra.merge('error' => error.message.truncate(1000)))
+      end
+    end
+
+    private
+
+    def run(job, model, columns, format, rows)
+      @job = job
+      @model = model
+      @columns = columns
+      @mapping = DatasetImports::Geometry.mapping_for(format, columns)
+      @name_column = role_column('name')
+      @identifier_column = role_column('identifier')
+      @counts = Hash.new(0)
+      @problems = []
+
+      @fields = ensure_fields!(rows)
+      @types = ensure_types! if columns.any? { |c| c['role'] == 'types' }
+      @known_identifiers = known_identifiers
+
+      last_reported_at = nil
+
+      ::OpenGeographiesPlatform::Indexing.suspend do
+        rows.each_slice(BATCH_SIZE).with_index do |batch, batch_index|
+          ActiveRecord::Base.transaction do
+            batch.each { |row| import_row(row) }
+          end
+
+          now = Time.current
+          next unless last_reported_at.nil? || now - last_reported_at >= PROGRESS_INTERVAL
+
+          report_progress([(batch_index + 1) * BATCH_SIZE, rows.size].min, rows.size)
+          last_reported_at = now
+        end
+      end
+
+      # Nothing new to index when every row was skipped or failed.
+      queue_reindex([model, @types&.related_model].compact) if @counts['imported'].positive?
+
+      job.update(
+        status: Job::JOB_STATUS_COMPLETED,
+        extra: job.extra.merge(
+          'progress' => { 'completed' => rows.size, 'total' => rows.size },
+          'counts' => @counts,
+          'geometry' => @mapping,
+          'fields_created' => @fields_created.presence,
+          'problems' => @problems.presence
+        ).compact
+      )
+    end
+
+    # --- One row -------------------------------------------------------------
+
+    def import_row(row)
+      properties = row[:properties]
+      name = properties[@name_column]
+      line = row[:index] + 2 # 1-based, after the header row of a CSV
+
+      if name.blank?
+        fail_row(line, 'has no name')
+        return
+      end
+
+      identifier = @identifier_column && properties[@identifier_column]
+      if identifier && @known_identifiers.include?(identifier)
+        @counts['skipped'] += 1
+        return
+      end
+
+      geometry, geometry_error = DatasetImports::Geometry.resolve(row, @mapping)
+      problem(line, geometry_error) if geometry_error
+
+      # A savepoint per row, so one bad row doesn't undo its batch.
+      ActiveRecord::Base.transaction(requires_new: true) do
+        place = Place.new(project_model_id: @model.id, user_defined: user_defined_for(properties, line))
+        place.place_names.build(name:, primary: true)
+        place.save!
+
+        PlaceGeometry.create!(place:, geometry_json: geometry.to_json) if geometry
+        link_categories!(place, properties)
+      end
+
+      @known_identifiers << identifier if identifier
+      @counts['imported'] += 1
+      @counts['without_geometry'] += 1 unless geometry
+    rescue StandardError => e
+      fail_row(line, e.message)
+    end
+
+    def user_defined_for(properties, line)
+      @fields.each_with_object({}) do |(column, field), values|
+        value = cast(properties[column], field.data_type)
+
+        if value == :invalid
+          problem(line, "#{column}: \"#{properties[column].to_s.truncate(30)}\" is not a #{field.data_type.downcase}; left empty")
+          next
+        end
+
+        values[field.uuid] = value unless value.nil?
+      end
+    end
+
+    def cast(value, data_type)
+      return nil if value.nil?
+
+      case data_type
+      when 'Number'
+        return value.to_i if value.match?(/\A-?\d+\z/)
+
+        Float(value.tr(',', '.')) rescue :invalid
+      when 'Boolean'
+        return true if TRUE_VALUES.include?(value.downcase)
+        return false if FALSE_VALUES.include?(value.downcase)
+
+        :invalid
+      else
+        value
+      end
+    end
+
+    def link_categories!(place, properties)
+      return unless @types
+
+      @columns.select { |c| c['role'] == 'types' }.each do |column|
+        properties[column['name']].to_s.split(CATEGORY_SEPARATOR).reject(&:blank?).uniq.each do |value|
+          Relationship.create!(project_model_relationship: @types, primary_record: place, related_record: term_for(value))
+        end
+      end
+    end
+
+    def term_for(value)
+      key = value.downcase
+      @terms[key] ||= Taxonomy.create!(project_model: @types.related_model, name: value)
+    end
+
+    # --- Structure -----------------------------------------------------------
+
+    # { column name => UserDefinedField } for every field and identifier
+    # column, creating fields that don't exist yet.
+    def ensure_fields!(rows)
+      @fields_created = []
+      existing = @model.user_defined_fields.index_by { |field| field.column_name.parameterize }
+      order = (@model.user_defined_fields.maximum(:order) || -1) + 1
+
+      @columns.select { |c| %w[field identifier].include?(c['role']) }.to_h do |column|
+        label = column['label'].presence || column['name']
+        data_type = column['role'] == 'identifier' ? 'String' : column['data_type']
+        values = rows.filter_map { |row| row[:properties][column['name']] }.uniq
+        field = existing[label.parameterize]
+
+        if field
+          if field.data_type == 'Select'
+            missing = values - Array(field.options)
+            field.update!(options: Array(field.options) + missing.sort) if missing.any?
+          end
+        else
+          field = @model.user_defined_fields.create!(
+            table_name: Place.to_s, column_name: label, data_type:,
+            options: data_type == 'Select' ? values.sort : [],
+            searchable: true, required: false, allow_multiple: false, order:
+          )
+          order += 1
+          @fields_created << label
+        end
+
+        [column['name'], field]
+      end
+    end
+
+    # The model's canonical Types relationship, or one created as the
+    # template defines it (Places —Types→ Types, multiple, inverse "Places").
+    def ensure_types!
+      relationship = @model.project_model_relationships.includes(:related_model).find do |r|
+        r.name.casecmp?(TYPES) && r.related_model.model_class == Taxonomy.to_s
+      end
+
+      unless relationship
+        taxonomy = ProjectModel.find_by(project_id: @model.project_id, name: TYPES, model_class: Taxonomy.to_s) ||
+                   ProjectModel.create!(project_id: @model.project_id, name: TYPES, model_class: Taxonomy.to_s,
+                                        order: (ProjectModel.where(project_id: @model.project_id).maximum(:order) || 0) + 1)
+
+        relationship = ProjectModelRelationship.create!(
+          primary_model: @model, related_model: taxonomy, name: TYPES,
+          multiple: true, allow_inverse: true, inverse_name: @model.name, inverse_multiple: true
+        )
+        @fields_created << 'Types (taxonomy)'
+      end
+
+      @terms = Taxonomy.where(project_model: relationship.related_model).index_by { |t| t.name.downcase }
+      relationship
+    end
+
+    def known_identifiers
+      return Set.new unless @identifier_column
+
+      uuid = @fields[@identifier_column].uuid
+      Place.where(project_model_id: @model.id).where('user_defined ? :uuid', uuid:)
+           .pluck(Arel.sql("user_defined ->> #{ActiveRecord::Base.connection.quote(uuid)}")).to_set
+    end
+
+    # --- Bookkeeping ---------------------------------------------------------
+
+    def role_column(role)
+      @columns.find { |c| c['role'] == role }&.dig('name')
+    end
+
+    def fail_row(line, message)
+      @counts['failed'] += 1
+      problem(line, message)
+    end
+
+    def problem(line, message)
+      @problems << "Row #{line} #{message}" if @problems.size < SAMPLE_LIMIT
+    end
+
+    def report_progress(completed, total)
+      @job.update_columns(
+        extra: @job.extra.merge('progress' => { 'completed' => completed, 'total' => total }),
+        updated_at: Time.current
+      )
+    end
+
+    def queue_reindex(models)
+      Job.create(
+        project_id: @job.project_id,
+        user_id: @job.user_id,
+        job_type: Job::JOB_TYPE_REINDEX,
+        extra: { project_model_ids: models.map(&:id) }
+      )
+    end
+
+    def log_error(error)
+      Rails.logger.error(["#{self.class} - #{error.class}: #{error.message}", error.backtrace].join("\n"))
+    end
+  end
+end

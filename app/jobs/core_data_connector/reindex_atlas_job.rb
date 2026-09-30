@@ -7,12 +7,36 @@ module CoreDataConnector
   # only ever touches the records of the project models it is given
   # (extra.project_model_ids), defaulting to all of the job's project's models.
   # Progress lands on the Job row (extra.progress) for the console.
+  #
+  # Reindexes of one project run one at a time (a Postgres advisory lock
+  # keyed on the project): two imports in quick succession each queue one,
+  # and run side by side they write the same records' derived rows (the
+  # lower engine's GeoNames hierarchy cache is unique per place) and the
+  # loser fails. A queued reindex waits in "initializing" until the one
+  # ahead of it finishes, then covers every record written since.
   class ReindexAtlasJob < ApplicationJob
     PROGRESS_INTERVAL = 2.seconds
+
+    # Advisory lock namespace ("OG"), paired with the project id.
+    LOCK_NAMESPACE = 0x4F47
 
     def perform(job_id)
       job = Job.find(job_id)
 
+      with_project_lock(job.project_id) { reindex(job) }
+    end
+
+    private
+
+    def with_project_lock(project_id)
+      connection = ActiveRecord::Base.connection
+      connection.execute("SELECT pg_advisory_lock(#{LOCK_NAMESPACE}, #{project_id.to_i})")
+      yield
+    ensure
+      connection&.execute("SELECT pg_advisory_unlock(#{LOCK_NAMESPACE}, #{project_id.to_i})")
+    end
+
+    def reindex(job)
       job.update(status: Job::JOB_STATUS_PROCESSING)
 
       begin
@@ -47,8 +71,6 @@ module CoreDataConnector
         )
       end
     end
-
-    private
 
     def project_models_for(job)
       scope = ProjectModel.where(project_id: job.project_id)

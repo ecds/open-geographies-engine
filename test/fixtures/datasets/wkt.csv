@@ -1,0 +1,4 @@
+Name,WKT
+WKT Point,"POINT (-84.3880 33.7490)"
+WKT Poly,"POLYGON ((-84.38 33.77, -84.37 33.77, -84.37 33.78, -84.38 33.77))"
+WKT Bad,"POINT (oops)"

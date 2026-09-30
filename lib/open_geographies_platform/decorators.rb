@@ -62,12 +62,14 @@ module OpenGeographiesPlatform
     JOB_TYPE_BUILD_TILES = 'build_tiles'
     JOB_TYPE_PROVISION_ATLAS = 'provision_atlas'
     JOB_TYPE_IMPORT_PLACES = 'import_places'
+    JOB_TYPE_IMPORT_DATASET = 'import_dataset'
 
     included do
       after_create_commit :queue_reindex_job, if: :reindex?
       after_create_commit :queue_build_tiles_job, if: :build_tiles?
       after_create_commit :queue_provision_atlas_job, if: :provision_atlas?
       after_create_commit :queue_import_places_job, if: :import_places?
+      after_create_commit :queue_import_dataset_job, if: :import_dataset?
     end
 
     def reindex?
@@ -86,6 +88,10 @@ module OpenGeographiesPlatform
       job_type == JOB_TYPE_IMPORT_PLACES
     end
 
+    def import_dataset?
+      job_type == JOB_TYPE_IMPORT_DATASET
+    end
+
     private
 
     def queue_reindex_job
@@ -102,6 +108,10 @@ module OpenGeographiesPlatform
 
     def queue_import_places_job
       CoreDataConnector::ImportPlacesJob.perform_later(id)
+    end
+
+    def queue_import_dataset_job
+      CoreDataConnector::ImportDatasetJob.perform_later(id)
     end
   end
 

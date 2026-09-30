@@ -1,0 +1,5 @@
+{"type":"FeatureCollection","features":[
+{"type":"Feature","properties":{"title":"Piedmont Park","kind":"Park","acres":189,"notes":{"designer":"Olmsted Brothers"}},"geometry":{"type":"Polygon","coordinates":[[[-84.3790,33.7880],[-84.3700,33.7880],[-84.3690,33.7800],[-84.3780,33.7790],[-84.3790,33.7880]]]}},
+{"type":"Feature","properties":{"title":"Atlanta Botanical Garden","kind":"Garden","acres":30},"geometry":{"type":"Point","coordinates":[-84.3727,33.7899]}},
+{"type":"Feature","properties":{"title":"BeltLine Eastside Trail","kind":"Trail"},"geometry":{"type":"LineString","coordinates":[[-84.3650,33.7870],[-84.3640,33.7750],[-84.3620,33.7620]]}}
+]}

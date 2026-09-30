@@ -67,6 +67,10 @@ module OpenGeographiesPlatform
         get 'projects/:project_id/place_imports/admin_children', to: 'place_imports#admin_children', as: nil
         get 'place_imports/admin_children', to: 'place_imports#admin_children', as: nil
 
+        # A curator's own dataset (CSV / GeoJSON): preview, then import.
+        post 'projects/:project_id/dataset_imports/preview', to: 'dataset_imports#preview', as: nil
+        post 'projects/:project_id/dataset_imports', to: 'dataset_imports#create', as: nil
+
         # --- Public V1 API (→ /core_data/public/v1/...) ---
         namespace :public do
           namespace :v1 do
