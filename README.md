@@ -126,7 +126,11 @@ The wizard's "Add places" step and each atlas's Imports page offer two sources.
 
 **Upload your data** (`DatasetImportsController`, `ImportDatasetJob`,
 `app/services/core_data_connector/dataset_imports/`). A CSV (comma, semicolon or tab; any
-common encoding) or GeoJSON file, up to 50 MB / 50,000 rows. The preview proposes a role per
+common encoding), an Excel (.xlsx) or OpenDocument (.ods) workbook (first sheet), a GeoJSON
+file, or a zipped shapefile (.shp + .dbf, with .prj/.cpg when present; longitude/latitude
+only — projected files are refused with re-export steps), up to 50 MB / 50,000 rows.
+Workbooks use roo and shapefiles rubyzip, both already in core-data-cloud's bundle; the
+shapefile reader needs no GIS library. The preview proposes a role per
 column (place name, field, category, latitude, longitude, geometry, identifier, skip) and a
 field type, shows the rows on a map, and lists rows whose location can't be used (e.g. a
 projected CRS). Nothing is written until the curator presses Import. Then:
@@ -138,10 +142,12 @@ projected CRS). Nothing is written until the curator presses Import. Then:
   (created as the template defines it if the project lacks one) — the atlas's `types` facet;
 - short, repetitive text columns default to pick-list (Select) fields, which the index
   turns into `*_facet` keywords;
-- with an identifier column, re-importing the file skips rows already imported.
+- with an identifier column, re-importing the file skips rows already imported;
+- afterwards the project's atlases get the category and pick-list fields as filters, and
+  the identifier is hidden on public pages (only ever added, never removed).
 
-Excel, Shapefile and KML are refused with instructions to convert (Save As CSV; export
-GeoJSON in EPSG:4326). Fixtures covering each reader path are in `test/fixtures/datasets/`.
+Older .xls, a bare .shp and KML are refused with instructions. Fixtures for each reader,
+written with independent tools (openpyxl, odfpy, GDAL), are in `test/fixtures/datasets/`.
 
 **From a gazetteer**: GeoNames and Wikidata imports for the atlas's area (`PlaceImportsController`,
 `ImportPlacesJob`), idempotent by authority identifier.
