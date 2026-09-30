@@ -14,6 +14,8 @@
   "dependencies": {
     "@performant-software/geospatial": "^3.1.29",
     "maplibre-gl": "^5.24.0",
+    "micromark": "^4.0.3",
+    "micromark-extension-gfm": "^3.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "underscore": "^1.13.6"

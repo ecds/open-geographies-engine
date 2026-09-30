@@ -70,15 +70,29 @@ const request = async (method, path, { body, form, params } = {}) => {
  */
 export const signIn = (email, password) => request('POST', '/auth/login', { body: { email, password } });
 
+// How each attribute's validation messages are introduced. Page messages
+// ("content") already name the page and section.
+const ERROR_PREFIXES = {
+  base: '',
+  content: '',
+  branding: 'Branding: ',
+  navigation: 'Menu: '
+};
+
 export const errorMessages = (error) => {
-  const errors = error?.errors;
+  // Validation failures come as { attribute: [messages] }; other errors as
+  // a list of such objects.
+  const errors = error?.errors && !Array.isArray(error.errors) && typeof error.errors === 'object'
+    ? [error.errors]
+    : error?.errors;
 
   if (Array.isArray(errors) && errors.length > 0) {
     return errors.flatMap((entry) => {
       if (entry && typeof entry === 'object') {
-        return Object.entries(entry).map(([key, value]) => (
-          key === 'base' ? String(value) : `${key} ${value}`
-        ));
+        return Object.entries(entry).flatMap(([key, value]) => {
+          const prefix = ERROR_PREFIXES[key] ?? `${key} `;
+          return (Array.isArray(value) ? value : [value]).map((message) => `${prefix}${message}`);
+        });
       }
 
       return [String(entry)];
@@ -129,6 +143,17 @@ export const fetchSiteConfig = (id) => request('GET', `/core_data/sites/${id}/co
 export const fetchSiteFacets = (id) => request('GET', `/core_data/sites/${id}/facets`);
 
 export const fetchSiteFields = (id) => request('GET', `/core_data/sites/${id}/fields`);
+
+export const fetchSiteAssets = (id) => request('GET', `/core_data/sites/${id}/assets`);
+
+export const uploadSiteAsset = (id, file) => {
+  const form = new FormData();
+  form.append('file', file);
+
+  return request('POST', `/core_data/sites/${id}/assets`, { form });
+};
+
+export const deleteSiteAsset = (id, key) => request('DELETE', `/core_data/sites/${id}/assets/${encodeURIComponent(key)}`);
 
 export const buildTiles = (id) => request('POST', `/core_data/sites/${id}/build_tiles`, { body: {} });
 
