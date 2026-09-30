@@ -16,7 +16,20 @@ export const getSession = () => {
 
 export const getToken = () => getSession().token;
 
-export const isSignedIn = () => !!getToken();
+/**
+ * Signed in means a token that hasn't expired: a stale token would otherwise
+ * hide the sign-in form while every API call is refused.
+ */
+export const isSignedIn = () => {
+  const { exp, token } = getSession();
+
+  if (!token) {
+    return false;
+  }
+
+  const expiresAt = exp ? Date.parse(exp) : NaN;
+  return Number.isNaN(expiresAt) || expiresAt > Date.now();
+};
 
 /**
  * Stores a session as the console would (the /auth/login response: token,

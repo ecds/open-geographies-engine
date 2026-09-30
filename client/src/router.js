@@ -29,7 +29,7 @@ const TITLES = {
   wizard: 'Create your atlas',
   atlases: 'Atlases',
   atlas: 'Atlas settings',
-  imports: 'Place imports',
+  imports: 'Imports',
   jobs: 'Jobs'
 };
 

@@ -171,3 +171,9 @@ textarea.input { resize: vertical; }
 .details { margin-top: 16px; }
 .details summary { cursor: pointer; color: var(--og-muted); }
 .details ul { margin: 8px 0 0; padding-left: 20px; color: var(--og-muted); }
+
+/* Wide tables scroll inside their card, never the page. */
+.scroll-x { overflow-x: auto; }
+.scroll-x .table { min-width: 720px; }
+.scroll-x .table .input { min-width: 140px; }
+.preview-map { width: 100%; border-radius: 6px; overflow: hidden; border: 1px solid var(--og-border); }

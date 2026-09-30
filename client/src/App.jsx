@@ -7,7 +7,7 @@ import useJobPolling from './hooks/useJobPolling';
 import { isSignedIn, setSession } from './session';
 import { paths, useRoute } from './router';
 import AtlasAreaForm from './components/AtlasAreaForm';
-import PlaceImportPanel from './components/PlaceImportPanel';
+import PlaceSources from './components/PlaceSources';
 import Shell from './components/Shell';
 import { Button, Field, Message } from './components/ui';
 import AtlasEditor from './pages/AtlasEditor';
@@ -27,7 +27,7 @@ const STEP_ORDER = [Steps.basics, Steps.provision, Steps.seed, Steps.done];
 const STEP_LABELS = {
   basics: { title: 'Basics', description: 'Name, language, and area' },
   provision: { title: 'Provision', description: 'Set up the atlas' },
-  seed: { title: 'Seed places', description: 'Import from authorities' },
+  seed: { title: 'Add places', description: 'Your own data, or a gazetteer' },
   done: { title: 'Done', description: 'Your atlas is live' }
 };
 
@@ -247,7 +247,7 @@ const Wizard = ({ navigate }) => {
 
       { step === Steps.seed && provisioned && (
         <section className='panel'>
-          <PlaceImportPanel
+          <PlaceSources
             area={atlas.area}
             onImported={() => setSeeded(true)}
             projectId={provisioned.project_id}
@@ -272,7 +272,7 @@ const Wizard = ({ navigate }) => {
             </p>
           )}
           <p>Add your own places from the project’s data entry pages — they appear in your atlas immediately.</p>
-          <p>Need more data later? Re-run authority imports any time from the project’s “Place imports” page.</p>
+          <p>Need more data later? Upload another file or run a gazetteer import any time from the atlas’s Imports page.</p>
           <div className='actions actions-centered'>
             <Button onClick={() => navigate(paths.atlas(provisioned.site_id))} primary>Open atlas settings</Button>
             <a className='button' href={projectUrl}>Go to the project's data</a>

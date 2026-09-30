@@ -14,7 +14,7 @@ export class ApiError extends Error {
   }
 }
 
-const request = async (method, path, { body, params } = {}) => {
+const request = async (method, path, { body, form, params } = {}) => {
   const url = new URL(`${config.apiBaseUrl}${path}`, window.location.origin);
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -34,10 +34,11 @@ const request = async (method, path, { body, params } = {}) => {
     headers['Content-Type'] = 'application/json';
   }
 
+  // A FormData body (file uploads) sets its own multipart content type.
   const response = await fetch(url, {
     method,
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body)
+    body: form || (body === undefined ? undefined : JSON.stringify(body))
   });
 
   let data = null;
@@ -141,4 +142,15 @@ export const fetchJobs = (projectId) => request('GET', '/core_data/jobs', {
   params: { per_page: 0, project_id: projectId, sort_by: 'created_at', sort_direction: 'descending' }
 });
 
-export const fetchDescriptors = (projectId) => request('GET', `/core_data/projects/${projectId}/descriptors`);
+export const previewDatasetImport = (projectId, file) => {
+  const form = new FormData();
+  form.append('file', file);
+
+  return request('POST', `/core_data/projects/${projectId}/dataset_imports/preview`, { form });
+};
+
+export const createDatasetImport = (projectId, datasetImport) => request(
+  'POST',
+  `/core_data/projects/${projectId}/dataset_imports`,
+  { body: { dataset_import: datasetImport } }
+);
