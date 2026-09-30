@@ -1,0 +1,26 @@
+From da9c72780c3b62c15799ffdd2b84147328ee052a Mon Sep 17 00:00:00 2001
+From: terminusfilms <steve@terminusfilms.com>
+Date: Wed, 30 Sep 2026 18:24:27 -0400
+Subject: [PATCH 4/4] open_geographies_platform now declares roo and rubyzip
+ (both already in this bundle)
+
+---
+ Gemfile.lock | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/Gemfile.lock b/Gemfile.lock
+index e75419e..540aa9a 100644
+--- a/Gemfile.lock
++++ b/Gemfile.lock
+@@ -60,6 +60,8 @@ PATH
+   specs:
+     open_geographies_platform (0.1.0)
+       rails (>= 8.1, < 9)
++      roo (>= 2.10, < 3)
++      rubyzip (>= 2.3, < 3)
+ 
+ GEM
+   remote: https://rubygems.org/
+-- 
+2.49.0
+
