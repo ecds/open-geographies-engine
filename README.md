@@ -238,6 +238,28 @@ colors, sizes and fonts to their formats, since they end up in the renderer's CS
   `branding` and `navigation`; `config` (which the browser also fetches) never holds the
   pages.
 
+## Drafts and preview links
+
+An atlas is private until its curator publishes it (`sites.published`; atlases that existed
+before this was added were published by the migration). The wizard creates drafts.
+
+- `GET /core_data/public/v1/atlases/:slug` answers 404 for a draft, unless the request
+  carries the site's `preview_token` in an `X-OG-Preview` header. Then it serves the bundle
+  marked `preview: true` with `Cache-Control: private, no-store`. A wrong token looks
+  exactly like an unknown slug.
+- The console's Settings → General → Visibility shows the draft's preview link
+  (`<atlas address>/?preview=<token>`) with Copy and Open, publishes and unpublishes at once
+  (separately from Save), and replaces the link (`POST /core_data/sites/:id/preview_token`;
+  old links stop working). Atlas pages show a Draft/Published label.
+- The renderer turns `?preview=<token>` into an HttpOnly cookie and redirects to the same
+  address without it, then forwards the token with every bundle lookup. Preview responses
+  are `no-store` and `noindex`, show a "Preview" notice, and are cached apart from the
+  public bundle. An address with no published atlas (unknown, or a draft without the
+  link) gets a 404 page instead of an empty atlas.
+- The project stays `discoverable` either way (the renderer's detail pages read its
+  records through FairData's public API), so a draft's records are reachable there by
+  anyone who knows the project's ids, as before; it's the atlas that's private.
+
 ## Upstream-PR posture
 
 A few decorators carry changes that are **general improvements** to Core Data, not

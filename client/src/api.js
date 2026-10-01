@@ -138,6 +138,8 @@ export const fetchSite = (id) => request('GET', `/core_data/sites/${id}`);
 
 export const updateSite = (id, site) => request('PATCH', `/core_data/sites/${id}`, { body: { site } });
 
+export const regeneratePreviewToken = (id) => request('POST', `/core_data/sites/${id}/preview_token`);
+
 export const fetchSiteConfig = (id) => request('GET', `/core_data/sites/${id}/config`);
 
 export const fetchSiteFacets = (id) => request('GET', `/core_data/sites/${id}/facets`);

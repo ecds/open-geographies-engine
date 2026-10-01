@@ -1,0 +1,45 @@
+From 6ca4a0d9fc74ce9f24f648e4b8c60db591bc89c0 Mon Sep 17 00:00:00 2001
+From: terminusfilms <steve@terminusfilms.com>
+Date: Thu, 1 Oct 2026 17:56:46 -0400
+Subject: [PATCH 7/7] Copy the platform engine's publishing migration (draft
+ atlases, preview links)
+
+---
+ ...nnector_sites.open_geographies_platform.rb | 25 +++++++++++++++++++
+ 1 file changed, 25 insertions(+)
+ create mode 100644 db/migrate/20261001215006_add_publishing_to_core_data_connector_sites.open_geographies_platform.rb
+
+diff --git a/db/migrate/20261001215006_add_publishing_to_core_data_connector_sites.open_geographies_platform.rb b/db/migrate/20261001215006_add_publishing_to_core_data_connector_sites.open_geographies_platform.rb
+new file mode 100644
+index 0000000..a83450d
+--- /dev/null
++++ b/db/migrate/20261001215006_add_publishing_to_core_data_connector_sites.open_geographies_platform.rb
+@@ -0,0 +1,25 @@
++# This migration comes from open_geographies_platform (originally 20261002120000)
++# An atlas is private until its curator publishes it: `published` gates the
++# public atlas-by-slug endpoint, and `preview_token` lets the curator (and
++# whoever they share the link with) see a draft. Atlases that exist when this
++# runs were already public, so they stay published; new ones start as drafts.
++class AddPublishingToCoreDataConnectorSites < ActiveRecord::Migration[8.1]
++  def up
++    add_column :core_data_connector_sites, :published, :boolean, default: false, null: false
++    add_column :core_data_connector_sites, :preview_token, :string
++    add_index :core_data_connector_sites, :preview_token, unique: true
++
++    # Tokens made in SQL so none is written to the migration log.
++    execute <<~SQL
++      UPDATE core_data_connector_sites
++         SET published = TRUE,
++             preview_token = replace(gen_random_uuid()::text, '-', '') || replace(gen_random_uuid()::text, '-', '')
++    SQL
++  end
++
++  def down
++    remove_index :core_data_connector_sites, :preview_token
++    remove_column :core_data_connector_sites, :preview_token
++    remove_column :core_data_connector_sites, :published
++  end
++end
+-- 
+2.49.0
+

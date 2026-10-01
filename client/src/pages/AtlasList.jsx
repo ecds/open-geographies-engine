@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import _ from 'underscore';
 import { errorMessages, fetchSites } from '../api';
-import config from '../config';
+import { liveUrl } from '../atlasLinks';
 import { paths } from '../router';
 import { Button, Message } from '../components/ui';
 
@@ -19,8 +19,6 @@ const AtlasList = ({ navigate }) => {
       .catch((error) => setErrors(errorMessages(error)));
   }, []);
 
-  const liveUrl = (site) => config.atlasUrlTemplate && config.atlasUrlTemplate.replace('{slug}', site.slug);
-
   return (
     <main className='wizard'>
       <div className='page-head'>
@@ -29,12 +27,12 @@ const AtlasList = ({ navigate }) => {
       </div>
       { !_.isEmpty(errors) && <Message list={errors} tone='negative' /> }
       { sites && _.isEmpty(sites) && (
-        <Message>No atlases yet. Create one and it is live the moment it's provisioned.</Message>
+        <Message>No atlases yet. Create one: it stays private, with a preview link, until you publish it.</Message>
       )}
       { !_.isEmpty(sites) && (
         <table className='table'>
           <thead>
-            <tr><th>Name</th><th>Slug</th><th>Updated</th><th /></tr>
+            <tr><th>Name</th><th>Status</th><th>Slug</th><th>Updated</th><th /></tr>
           </thead>
           <tbody>
             { _.map(sites, (site) => (
@@ -44,10 +42,15 @@ const AtlasList = ({ navigate }) => {
                     <strong>{ site.name }</strong>
                   </a>
                 </td>
+                <td>
+                  <span className={`status-pill ${site.published ? 'status-published' : 'status-draft'}`}>
+                    { site.published ? 'Published' : 'Draft' }
+                  </span>
+                </td>
                 <td><code>{ site.slug }</code></td>
                 <td>{ new Date(site.updated_at).toLocaleDateString() }</td>
                 <td className='table-actions'>
-                  { liveUrl(site) && <a href={liveUrl(site)} rel='noreferrer' target='_blank'>View</a> }
+                  { site.published && liveUrl(site) && <a href={liveUrl(site)} rel='noreferrer' target='_blank'>View</a> }
                   <a href={paths.imports(site.id)} onClick={(e) => { e.preventDefault(); navigate(paths.imports(site.id)); }}>Imports</a>
                   <a href={paths.jobs(site.id)} onClick={(e) => { e.preventDefault(); navigate(paths.jobs(site.id)); }}>Jobs</a>
                 </td>

@@ -56,6 +56,7 @@ module OpenGeographiesPlatform
 
           # Images uploaded for the atlas (logo, favicon, page images).
           get :assets, on: :member
+          post :preview_token, action: :regenerate_preview_token, on: :member
           post 'assets', action: :upload_asset, on: :member, as: :upload_asset
           delete 'assets/:key', action: :destroy_asset, on: :member, as: :destroy_asset
         end

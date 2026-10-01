@@ -1,7 +1,7 @@
 From da9c72780c3b62c15799ffdd2b84147328ee052a Mon Sep 17 00:00:00 2001
 From: terminusfilms <steve@terminusfilms.com>
 Date: Wed, 30 Sep 2026 18:24:27 -0400
-Subject: [PATCH 4/6] open_geographies_platform now declares roo and rubyzip
+Subject: [PATCH 4/7] open_geographies_platform now declares roo and rubyzip
  (both already in this bundle)
 
 ---

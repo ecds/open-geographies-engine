@@ -97,6 +97,8 @@ site = CoreDataConnector::Site.create!(
   project_id: project.id,
   name: NAME,
   slug: SLUG,
+  # The demo shows a live atlas; a new site would otherwise be a draft.
+  published: true,
   config: {
     'i18n' => { 'locales' => ['en'], 'default_locale' => 'en' },
     'layers' => [

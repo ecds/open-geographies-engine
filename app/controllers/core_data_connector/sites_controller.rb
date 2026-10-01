@@ -143,6 +143,19 @@ module CoreDataConnector
       render json: { errors: [{ base: e.message }] }, status: :unprocessable_entity
     end
 
+    # POST /core_data/sites/:id/preview_token
+    #
+    # A new preview link for a draft atlas; links handed out before stop
+    # working.
+    def regenerate_preview_token
+      site = Site.find(params[:id])
+      authorize site, :update?
+
+      site.regenerate_preview_token
+
+      render json: { preview_token: site.preview_token }, status: :ok
+    end
+
     # DELETE /core_data/sites/:id/assets/:key
     #
     # Removes an uploaded image and its copies. Pages or branding still

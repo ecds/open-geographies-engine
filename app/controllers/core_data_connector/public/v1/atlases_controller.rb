@@ -13,7 +13,11 @@ module CoreDataConnector
       # a baked config file.
       #
       # Only atlases whose project is discoverable are served; an unknown or
-      # non-discoverable slug returns 404. The gate is the explicit
+      # non-discoverable slug returns 404. So does an unpublished atlas (a
+      # draft), unless the request carries its preview token in the
+      # X-OG-Preview header (the renderer forwards it from the curator's
+      # preview link): then it's served marked `preview: true`, uncacheable.
+      # A wrong token is indistinguishable from an unknown slug. The gate is the explicit
       # `discoverable?` check below rather than a shared concern: the host no
       # longer ships the old connector-patch DiscoverableProjectScope, and the
       # v1 engine enforces discoverability on its own endpoints via a Project
@@ -29,12 +33,19 @@ module CoreDataConnector
 
           return head :not_found unless site&.project&.discoverable?
 
+          preview = !site.published?
+          return head :not_found if preview && !site.preview_token?(request.headers['X-OG-Preview'])
+
+          response.headers['Cache-Control'] = 'private, no-store' if preview
+
           config = site.to_site_config
           default_locale = config.dig('i18n', 'default_locale') || 'en'
 
           render json: {
             atlas: {
               slug: site.slug,
+              published: site.published,
+              preview:,
               config:,
               branding: site.to_branding,
               navigation: site.to_navigation(default_locale),

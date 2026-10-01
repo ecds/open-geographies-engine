@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import _ from 'underscore';
 import { createAtlas, errorMessages, signIn } from './api';
+import { liveUrl, previewUrl } from './atlasLinks';
 import config from './config';
 import { JobStatuses } from './jobs';
 import useJobPolling from './hooks/useJobPolling';
@@ -28,7 +29,7 @@ const STEP_LABELS = {
   basics: { title: 'Basics', description: 'Name, language, and area' },
   provision: { title: 'Provision', description: 'Set up the atlas' },
   seed: { title: 'Add places', description: 'Your own data, or a gazetteer' },
-  done: { title: 'Done', description: 'Your atlas is live' }
+  done: { title: 'Done', description: 'Ready to build' }
 };
 
 const PROVISION_STAGES = [
@@ -65,8 +66,9 @@ const MODULES = [
  * provisions the atlas (project, models, search collection, site) while
  * reporting the job's stages, optionally seeds it with places from
  * geographic authorities, and hands off to the new project in the console.
- * The atlas is live on the shared dynamic renderer as soon as it is
- * provisioned — there is no build or deploy.
+ * The atlas renders on the shared dynamic renderer as soon as it is
+ * provisioned — there is no build or deploy — as a draft, seen only through
+ * its preview link until the curator publishes it.
  */
 const Wizard = ({ navigate }) => {
   const [step, setStep] = useState(Steps.basics);
@@ -254,7 +256,7 @@ const Wizard = ({ navigate }) => {
           { provisionComplete && (
             <>
               <Message tone='positive'>
-                Your atlas is live — it renders on the shared platform the moment it’s provisioned, no build or deploy.
+                Your atlas is set up. It’s a draft: private, with a preview link, until you publish it.
               </Message>
               <div className='actions'>
                 <Button onClick={() => setStep(Steps.seed)} primary>Continue</Button>
@@ -282,12 +284,15 @@ const Wizard = ({ navigate }) => {
       { step === Steps.done && provisioned && (
         <section className='panel panel-centered'>
           <div className='done-icon' aria-hidden='true'>✓</div>
-          <h2>“{ atlas.name }” is live</h2>
-          { provisioned.live_url && (
+          <h2>“{ atlas.name }” is ready to build</h2>
+          <p>It’s a draft: only people with the preview link can see it. Publish it from the atlas’s settings when it’s ready.</p>
+          { previewUrl({ slug: provisioned.slug, preview_token: provisioned.preview_token }) && (
             <p>
-              View your atlas:
+              Preview:
               {' '}
-              <a href={provisioned.live_url} rel='noreferrer' target='_blank'>{ provisioned.live_url }</a>
+              <a href={previewUrl({ slug: provisioned.slug, preview_token: provisioned.preview_token })} rel='noreferrer' target='_blank'>
+                { liveUrl({ slug: provisioned.slug }) } (preview)
+              </a>
             </p>
           )}
           <p>Add your own places from the project’s data entry pages — they appear in your atlas immediately.</p>

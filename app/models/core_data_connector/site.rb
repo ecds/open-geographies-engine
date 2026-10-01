@@ -96,7 +96,14 @@ module CoreDataConnector
     # and the public by-slug endpoint would then publish it under B's data.
     attr_readonly :project_id
 
+    # An atlas is private until published: the public atlas-by-slug endpoint
+    # serves a draft only to a request carrying its preview token (the
+    # curator's shareable preview link). Regenerating the token revokes
+    # every link handed out so far.
+    has_secure_token :preview_token, length: 32
+
     # Validations
+    validates :published, inclusion: { in: [true, false] }
     validates :name, presence: true
     validates :slug, presence: true, uniqueness: true,
                      length: { maximum: 63 },
@@ -110,9 +117,15 @@ module CoreDataConnector
     before_save :normalize_content
 
     def self.permitted_params
-      [:project_id, :name, :slug,
+      [:project_id, :name, :slug, :published,
        { config: {} }, { area: {} },
        { branding: {} }, { navigation: {} }, { content: {} }]
+    end
+
+    # True when `token` is this site's preview token (compared in constant
+    # time).
+    def preview_token?(token)
+      token.present? && preview_token.present? && ActiveSupport::SecurityUtils.secure_compare(token.to_s, preview_token)
     end
 
     # The public path of an uploaded asset (host-relative; the renderer

@@ -1,7 +1,7 @@
 From 79c02c87410563898b0925a74c22f3bb3eda948d Mon Sep 17 00:00:00 2001
 From: terminusfilms <steve@terminusfilms.com>
 Date: Wed, 30 Sep 2026 21:58:29 -0400
-Subject: [PATCH 6/6] open_geographies_platform now declares ruby-vips (libvips
+Subject: [PATCH 6/7] open_geographies_platform now declares ruby-vips (libvips
  is already in Dockerfile-ecds)
 
 ---

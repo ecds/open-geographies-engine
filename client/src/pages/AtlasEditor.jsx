@@ -16,6 +16,7 @@ import {
 } from '../api';
 import config from '../config';
 import AtlasHeader from '../components/AtlasHeader';
+import PublishPanel from '../components/PublishPanel';
 import ImageField from '../components/ImageField';
 import PagesEditor from '../components/PagesEditor';
 import SectionsEditor from '../components/SectionsEditor';
@@ -213,6 +214,8 @@ const AtlasEditor = ({ id, navigate }) => {
 
   const renderGeneral = () => (
     <>
+      <h3>Visibility</h3>
+      <PublishPanel onChange={(changes) => setSite((prev) => ({ ...prev, ...changes }))} site={site} />
       <Field label='Name' required>
         <input className='input' onChange={(e) => update({ name: e.target.value })} value={site.name || ''} />
       </Field>

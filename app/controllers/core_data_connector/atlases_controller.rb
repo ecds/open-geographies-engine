@@ -78,10 +78,12 @@ module CoreDataConnector
         # The starter home page (a banner with the description, a search box
         # and a way into the map) is stored rather than left to the default,
         # so the console opens on a page the curator owns and edits.
+        # A draft: private until the curator publishes it from the console.
         site = Site.create!(
           project:,
           name:,
           slug:,
+          published: false,
           area: atlas_params[:area],
           config: default_config(search_collection, locale),
           content: {
@@ -109,6 +111,8 @@ module CoreDataConnector
           site_id: site.id,
           slug: site.slug,
           live_url: atlas_url(site.slug),
+          published: site.published,
+          preview_token: site.preview_token,
           search_collection_id: search_collection.id,
           job: { id: job.id, status: job.status }
         }

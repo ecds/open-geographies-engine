@@ -70,7 +70,7 @@ module OpenGeographiesPlatform
         )
 
         site = ::CoreDataConnector::Site.create!(
-          project:, name: "OG Tenancy Probe #{key.upcase}", slug: "og-tenancy-probe-#{key}",
+          project:, name: "OG Tenancy Probe #{key.upcase}", slug: "og-tenancy-probe-#{key}", published: true,
           config: { 'search' => [{ 'name' => 'places', 'route' => '/places', 'search_collection_id' => collection.id }] }
         )
 
@@ -112,6 +112,32 @@ module OpenGeographiesPlatform
         status 'unknown slug is 404', get('/core_data/public/v1/atlases/no-such-atlas'), '404'
         status 'slug lookup ignores a smuggled id', get("/core_data/public/v1/atlases/#{b.site.id}"), '404'
         check 'and carries its home page', body(res).dig('atlas', 'content', 'home', 'sections').is_a?(Array)
+        check 'but never its preview token', !res.body.to_s.include?(a.site.preview_token.to_s)
+      end
+
+      group 'a draft atlas is private' do
+        a.site.update!(published: false)
+        path = "/core_data/public/v1/atlases/#{a.site.slug}"
+        status 'unpublished atlas is 404', get(path), '404'
+        status 'with a wrong preview token too', get(path, nil, preview: 'x' * 32), '404'
+        status 'with another atlas\'s token too', get(path, nil, preview: b.site.preview_token), '404'
+        res = get(path, nil, preview: a.site.preview_token)
+        status 'its preview token shows it', res, '200'
+        check 'marked as a preview, not to be cached', body(res).dig('atlas', 'preview') == true && res['Cache-Control'].to_s.include?('no-store'),
+              "#{body(res).dig('atlas', 'preview').inspect} #{res['Cache-Control']}"
+
+        status 'anonymous can\'t make a new preview link', post("/core_data/sites/#{a.site.id}/preview_token", {}), '401'
+        status 'nor another tenant', post("/core_data/sites/#{a.site.id}/preview_token", {}, b.token), %w[401 404]
+        old_token = a.site.preview_token
+        res = post("/core_data/sites/#{a.site.id}/preview_token", {}, a.token)
+        status 'the owner can', res, '200'
+        status 'and the old link stops working', get(path, nil, preview: old_token), '404'
+        a.site.reload
+
+        status 'publishing it', patch("/core_data/sites/#{a.site.id}", { site: { published: true } }, a.token), '200'
+        status 'makes it public', get(path), '200'
+      ensure
+        a.site.update!(published: true) unless a.site.reload.published
       end
 
       group 'uploaded images' do
@@ -385,7 +411,7 @@ module OpenGeographiesPlatform
       {}
     end
 
-    def get(path, token = nil) = request(Net::HTTP::Get, path, nil, token)
+    def get(path, token = nil, preview: nil) = request(Net::HTTP::Get, path, nil, token, preview:)
 
     # A multipart file upload (the console's image upload).
     def upload(path, filename, bytes, token = nil)
@@ -402,11 +428,12 @@ module OpenGeographiesPlatform
     def patch(path, payload, token = nil) = request(Net::HTTP::Patch, path, payload, token)
     def delete(path, token = nil) = request(Net::HTTP::Delete, path, nil, token)
 
-    def request(klass, path, payload, token, accept: 'application/json')
+    def request(klass, path, payload, token, accept: 'application/json', preview: nil)
       uri = URI.join(@host, path)
       req = klass.new(uri)
       req['Accept'] = accept
       req['Authorization'] = token if token
+      req['X-OG-Preview'] = preview if preview
 
       if payload
         req['Content-Type'] = 'application/json'
