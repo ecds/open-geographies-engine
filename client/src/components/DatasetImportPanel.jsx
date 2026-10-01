@@ -325,6 +325,7 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
             <strong>{ column.name }</strong>
             <div className='muted'>{ column.filled } of { preview.row_count } filled</div>
             { column.note && column.role === 'skip' && <div className='muted column-note'>{ column.note }</div> }
+            { column.identifier_note && column.role === 'identifier' && <div className='muted column-note'>{ column.identifier_note }</div> }
             { column.role === 'types' && column.capitalize_example && (
               <label className='column-option'>
                 <input
@@ -334,6 +335,11 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
                 />
                 Capitalize: { column.capitalize_example[0] } → { column.capitalize_example[1] }
               </label>
+            )}
+            { column.role === 'types' && column.capitalize_example && column.terms > column.capitalize_terms && (
+              <div className='muted column-note'>
+                { column.capitalize_terms } of { column.terms } terms are in lower case; the ones with capitals stay as written.
+              </div>
             )}
             { column.role === 'identifier' && column.duplicates > 0 && (
               <div className='column-warning'>

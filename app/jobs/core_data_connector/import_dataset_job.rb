@@ -31,7 +31,6 @@ module CoreDataConnector
     PROGRESS_INTERVAL = 2.seconds
     BATCH_SIZE = 200
     SAMPLE_LIMIT = 20
-    CATEGORY_SEPARATOR = /\s*[;|]\s*/
     TYPES = 'Types'.freeze
 
     def perform(job_id)
@@ -193,8 +192,8 @@ module CoreDataConnector
       return unless @types
 
       @columns.select { |c| c['role'] == 'types' }.each do |column|
-        properties[column['name']].to_s.split(CATEGORY_SEPARATOR).reject(&:blank?).uniq.each do |value|
-          term = term_for(column['capitalize'] ? DatasetImports::Values.title_case(value) : value)
+        DatasetImports::Values.terms(properties[column['name']]).uniq.each do |value|
+          term = term_for(column['capitalize'] ? DatasetImports::Values.capitalize_term(value) : value)
           Relationship.create!(project_model_relationship: @types, primary_record: place, related_record: term)
         end
       end
@@ -276,7 +275,8 @@ module CoreDataConnector
     # Settings: the category and every pick-list field become filters on
     # each search (of each of the project's atlases) that covers this model,
     # and the identifier field — an internal key — is hidden on public
-    # pages. A photo column becomes the places' photo
+    # pages, unless its values are web addresses (a record page at the
+    # source, which visitors can follow). A photo column becomes the places' photo
     # (detail_pages.models.places.photo_field), shown as an image rather
     # than listed as an address. Only adds; never removes a filter or a
     # hidden field a curator chose, or replaces a photo field.
@@ -288,7 +288,9 @@ module CoreDataConnector
       end
 
       hidden = []
-      hidden << @fields[@identifier_column].column_name.parameterize.underscore if @identifier_column
+      if @identifier_column && !@link_columns.include?(@identifier_column)
+        hidden << @fields[@identifier_column].column_name.parameterize.underscore
+      end
       # The photo shows as the place's image, not as an address in its fields.
       photo_key = @photo_column && @fields[@photo_column].column_name.parameterize.underscore
       hidden << photo_key if photo_key

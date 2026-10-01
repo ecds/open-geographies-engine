@@ -22,6 +22,9 @@ module CoreDataConnector
       FALSE_VALUES = %w[false no n 0].freeze
       CHECKMARKS = %w[x ✓ ✔ *].freeze
 
+      # Between the terms of a category cell.
+      TERM_SEPARATOR = /\s*[;|]\s*/
+
       INTEGER = /\A-?\d+\z/
       DECIMAL = /\A-?\d+([.,]\d+)?\z/
 
@@ -135,14 +138,27 @@ module CoreDataConnector
         :invalid
       end
 
-      # True when a column's values are written all in lower case (`building`,
-      # `district`): category labels a curator would rather show capitalized.
-      def lowercase?(values)
-        values.any? { |v| v.match?(/\p{Ll}/) } && values.none? { |v| v.match?(/\p{Lu}/) }
+      # A category cell can list several terms: "houses; Greek Revival
+      # architectural elements".
+      def terms(value)
+        value.to_s.split(TERM_SEPARATOR).reject(&:blank?)
       end
 
-      # `church of god` -> `Church of God`. Only for lower-case values: a value
-      # with capitals in it (AME Church, NHL) is already written as meant.
+      # True when a term is written all in lower case (`houses`, `railroad
+      # companies`): a label a curator would rather show capitalized.
+      def lowercase_term?(term)
+        term.match?(/\p{Ll}/) && !term.match?(/\p{Lu}/)
+      end
+
+      # Capitalizes a term written all in lower case and leaves one with
+      # capitals in it (AME Church, NHL, Greek Revival architectural
+      # elements) as written. Decided per term, so a Library of Congress
+      # column mixing both comes out consistent.
+      def capitalize_term(term)
+        lowercase_term?(term) ? title_case(term) : term
+      end
+
+      # `church of god` -> `Church of God`.
       def title_case(value)
         index = -1
 

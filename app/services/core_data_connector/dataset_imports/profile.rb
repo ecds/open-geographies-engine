@@ -44,7 +44,22 @@ module CoreDataConnector
       # resource name", "county name", "owner name", ...
       NOT_A_PLACE_NAME = /multi|county|state|city|owner|architect|builder|file|layer|user|author|creator|editor/i
       IDENTIFIER = /\A(id|identifier|source_?id|record_?id|uuid|objectid|fid|gid|ref|reference)\z/i
+      # Headers that suggest an id without being exactly one ("LOC record",
+      # "Accession no.", "RecordID", "Catalog number").
+      IDISH = /(\A|[^\p{L}])(id|no|num|number|ref|record|accession|catalog|catalogue|inventory|permalink|uri|url|link|key|code)(\z|[^\p{L}])|\p{Ll}(ID|Id)\z/
+      # A code: one token with a digit in it (ga0141, 77000435, HABS-GA-225).
+      CODE = %r{\A(?=.*\d)[\p{L}\p{N}][\p{L}\p{N}._:/#-]{0,39}\z}
       TYPES = /\A(type|types|category|categories|kind|classification|place_?type|site_?type)\z/i
+      # Headers with a category word in them ("Building types", NPS's
+      # "ResType", "site_type", "Property category") are proposed as a
+      # category only when their terms repeat; these words beside it say the
+      # column describes something else (a file's type, a record's type).
+      TYPEISH_WORD = /\A(\p{L}*types?|categor(y|ies)|kinds?|class(es|ification)?)\z/
+      NOT_TYPEISH_WORD = /\A(proto|arche|geno|pheno|stereo)types?\z/
+      NOT_A_CATEGORY = %w[file data geometry geom shape bnd boundary mime media content record document doc feature field value unit].freeze
+      # Longest term a category is likely to have (LOC subject headings run
+      # to about 50 characters).
+      TERM_MAX_LENGTH = 80
 
       BOOLEAN_VALUES = %w[true false yes no].freeze
 
@@ -109,6 +124,9 @@ module CoreDataConnector
         columns.to_h do |column|
           values = rows.filter_map { |row| row[:properties][column] }
           distinct = values.uniq
+          terms = values.flat_map { |value| Values.terms(value) }
+          distinct_terms = terms.uniq
+          lowercase_terms = distinct_terms.select { |term| Values.lowercase_term?(term) }
 
           [column, {
             rows: rows.size,
@@ -121,8 +139,16 @@ module CoreDataConnector
             epoch_ms: values.any? && values.all? { |v| v.match?(EPOCH_MS_DIGITS) && EPOCH_MS.cover?(v.to_i) },
             not_a_name: values.any? && values.count { |v| v.match?(DATE_LIKE) || v.match?(URL_LIKE) || v.match?(GUID) } * 2 > values.size,
             checkmarks: Values.checkmark_column?(values),
-            lowercase: Values.lowercase?(distinct),
+            # Category terms (a cell may list several) written all in lower
+            # case, and how many distinct terms there are.
+            lowercase_terms: lowercase_terms.size,
+            lowercase_sample: lowercase_terms.find { |term| Values.title_case(term) != term },
+            terms: distinct_terms.size,
+            # Terms that repeat across rows and stay short: what a category
+            # column looks like.
+            categorical: terms.size > distinct_terms.size && distinct_terms.all? { |term| term.length <= TERM_MAX_LENGTH },
             links: values.any? && values.all? { |v| v.match?(URL_LIKE) },
+            codes: values.any? && values.all? { |v| v.match?(CODE) },
             image_links: values.any? && values.count { |v| v.match?(IMAGE_URL) } * 10 >= values.size * 8,
             # How many values each typed choice couldn't take, so the console
             # can warn before an import leaves them empty.
@@ -186,6 +212,30 @@ module CoreDataConnector
         end
       end
 
+      # The column that tells this file's rows apart, so importing the file
+      # again skips the places already here: one headed "id" (or similar)
+      # whose values don't repeat; else one filled in every row with values
+      # that don't repeat and look like ids — links to record pages (LOC's
+      # https://www.loc.gov/item/ga0141/), or codes under an id-like header.
+      # Never the name or photo column, or GUIDs (skipped as internal). One
+      # at most.
+      def identifier_column(columns, stats)
+        return @identifier_column if defined?(@identifier_column)
+
+        taken = [name_column(columns, stats), photo_column(columns, stats)]
+        unique = ->(column) { stats[column][:filled].positive? && stats[column][:duplicates].zero? && !taken.include?(column) }
+
+        @identifier_column = columns.find { |column| column.match?(IDENTIFIER) && unique.(column) } ||
+                             columns.find { |column| inferred_identifier?(column, stats[column]) && unique.(column) }
+      end
+
+      def inferred_identifier?(column, stat)
+        return false unless stat[:filled] == stat[:rows] && stat[:rows] > 1
+        return false if stat[:guid] || stat[:image_links] || skip_reason(column, stat)
+
+        (stat[:links] || stat[:codes]) && column.match?(IDISH)
+      end
+
       # Why a column defaults to skip, or nil when it doesn't.
       def skip_reason(column, stat)
         return 'Same value in every row' if stat[:rows] > 1 && stat[:filled] == stat[:rows] && stat[:all_distinct] == 1
@@ -217,18 +267,42 @@ module CoreDataConnector
           'options' => stat[:options],
           'misfits' => stat[:misfits].presence,
           'checkmarks' => stat[:checkmarks] || nil,
-          # Category values written all in lower case are proposed capitalized
-          # (the curator can keep them as written); the example shows how.
-          'capitalize' => stat[:lowercase] || nil,
-          'capitalize_example' => stat[:lowercase] ? capitalize_example(stat[:samples]) : nil,
-          'note' => role == 'skip' ? skip_reason(column, stat) : nil
+          # Category terms written all in lower case are proposed capitalized
+          # (the curator can keep them as written); the example shows how,
+          # and the counts say how many of the terms it touches.
+          'capitalize' => stat[:lowercase_sample] ? true : nil,
+          'capitalize_example' => stat[:lowercase_sample] && [stat[:lowercase_sample], Values.title_case(stat[:lowercase_sample])],
+          'capitalize_terms' => stat[:lowercase_sample] ? stat[:lowercase_terms] : nil,
+          'terms' => role == 'types' ? stat[:terms] : nil,
+          'note' => role == 'skip' ? skip_reason(column, stat) : nil,
+          'identifier_note' => role == 'identifier' ? 'Every row has its own value, so importing this file again skips the places already here.' : nil
         }.compact
       end
 
-      def capitalize_example(samples)
-        sample = samples.find { |s| Values.title_case(s) != s }
+      # Every category column feeds the one Types filter, so a header that
+      # only contains a category word is proposed for at most one column, and
+      # only when no column is plainly "Type"/"Category": the one whose terms
+      # repeat and that has the most of them (NPS's ResType over BND_TYPE).
+      def category_column(columns, stats)
+        return @category_column if defined?(@category_column)
+        return @category_column = nil if columns.any? { |column| column.match?(TYPES) }
 
-        sample && [sample, Values.title_case(sample)]
+        @category_column = columns.each_with_index.filter_map do |column, index|
+          stat = stats[column]
+          next unless category_header?(column) && stat[:categorical] && stat[:terms] >= 2 && !skip_reason(column, stat)
+
+          [stat[:terms], -index, column]
+        end.max&.last
+      end
+
+      # "Building types", "ResType", "site_type": a category word among the
+      # header's words (camelCase split), and nothing saying it's a file's or
+      # a record's type.
+      def category_header?(column)
+        words = column.gsub(/(\p{Ll})(\p{Lu})/, '\\1 \\2').downcase.split(/[^\p{L}\p{N}]+/)
+
+        words.any? { |word| word.match?(TYPEISH_WORD) && !word.match?(NOT_TYPEISH_WORD) } &&
+          (words & NOT_A_CATEGORY).empty?
       end
 
       def suggest_role(column, stat, geometry, columns, stats)
@@ -239,9 +313,9 @@ module CoreDataConnector
         # The features carry their own geometry; coordinate columns are copies.
         return 'skip' if geometry['mode'] == 'feature' && (column.match?(Geometry::LATITUDE) || column.match?(Geometry::LONGITUDE))
         return 'name' if column == name_column(columns, stats)
-        return 'identifier' if column.match?(IDENTIFIER) && stat[:duplicates].zero?
         return 'photo' if column == photo_column(columns, stats)
-        return 'types' if column.match?(TYPES)
+        return 'identifier' if column == identifier_column(columns, stats)
+        return 'types' if column.match?(TYPES) || column == category_column(columns, stats)
         return 'skip' if skip_reason(column, stat)
 
         'field'
