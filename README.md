@@ -195,6 +195,27 @@ written with independent tools (openpyxl, odfpy, GDAL), are in `test/fixtures/da
 Both suspend per-record indexing and queue one scoped reindex. Reindexes of one project run
 one at a time (advisory lock in `ReindexAtlasJob`).
 
+## Places without a location
+
+A place imported without coordinates (a description such as "Cockspur Island", an
+intersection, an address the lookup couldn't place) is listed and searchable on the atlas
+but not on its map. The atlas's **Places** page (`/atlases/:id/places`) puts them there:
+
+- **One by one:** pick a place from the list, then click the map where it is (or search for
+  it by name with MapTiler, limited to the atlas's area first) and drag the marker to
+  adjust. The map is framed to the places already located.
+- **All at once:** look their addresses up with the Census geocoder (street from one of
+  their fields, city/state/ZIP from a field or typed), prefilled from the last upload's
+  address lookup. Exact matches are ticked; matches near the address are listed for
+  review; nothing is saved until "Save N locations".
+- `GET /core_data/sites/:id/unlocated_places`, `POST …/unlocated_places/lookup`,
+  `POST …/unlocated_places/locate` (owner only; only the atlas's own places, only those still
+  without a location). Saved places are reindexed in the background (`ReindexRecordsJob`,
+  under the same per-project lock as a full reindex): indexing a newly located place looks
+  its administrative area up on GeoNames, about one a second.
+- An upload now records a city/state/ZIP column that held one value throughout but wasn't
+  kept as a field (HABS's City), so the lookup can be prefilled later.
+
 ## An atlas is a site: home page, pages, branding
 
 Each atlas has its own home page and any number of standalone pages (About, Credits, …),

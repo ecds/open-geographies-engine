@@ -403,10 +403,28 @@ module CoreDataConnector
         wanted[row[:index]] = parts if parts.first.present?
       end
 
+      record_geocode_constants(rows, config)
       DatasetImports::Geocoder.locate(addresses)
     rescue DatasetImports::Geocoder::Unavailable => e
       @geocode_error = "#{e.message} Places without coordinates were imported without a location."
       {}
+    end
+
+    # An address part from a column that wasn't kept as a field but held
+    # one value throughout (HABS's City: "Savannah" in every row), so the
+    # console's Places page can look the rest of the places up later.
+    def record_geocode_constants(rows, config)
+      kept = @columns.select { |c| %w[field identifier].include?(c['role']) }.map { |c| c['name'] }
+
+      constants = %w[city state zip].each_with_object({}) do |part, found|
+        column = config[part].presence
+        next if column.nil? || kept.include?(column)
+
+        values = rows.filter_map { |row| row[:properties][column].presence }.uniq
+        found[part] = values.first if values.size == 1
+      end
+
+      @job.update_columns(extra: @job.extra.merge('geocode_constants' => constants)) if constants.any?
     end
 
     def geocoded_geometry(row, line, name)

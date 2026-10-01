@@ -23,18 +23,20 @@ module CoreDataConnector
     def perform(job_id)
       job = Job.find(job_id)
 
-      with_project_lock(job.project_id) { reindex(job) }
+      self.class.with_project_lock(job.project_id) { reindex(job) }
     end
 
-    private
-
-    def with_project_lock(project_id)
+    # Runs the block holding the project's reindex lock (shared with
+    # ReindexRecordsJob).
+    def self.with_project_lock(project_id)
       connection = ActiveRecord::Base.connection
       connection.execute("SELECT pg_advisory_lock(#{LOCK_NAMESPACE}, #{project_id.to_i})")
       yield
     ensure
       connection&.execute("SELECT pg_advisory_unlock(#{LOCK_NAMESPACE}, #{project_id.to_i})")
     end
+
+    private
 
     def reindex(job)
       job.update(status: Job::JOB_STATUS_PROCESSING)

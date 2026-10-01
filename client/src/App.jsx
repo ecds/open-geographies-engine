@@ -14,6 +14,7 @@ import { Button, Field, Message } from './components/ui';
 import AtlasEditor from './pages/AtlasEditor';
 import AtlasImports from './pages/AtlasImports';
 import AtlasJobs from './pages/AtlasJobs';
+import AtlasPlaces from './pages/AtlasPlaces';
 import AtlasList from './pages/AtlasList';
 
 const Steps = {
@@ -368,7 +369,8 @@ const App = () => {
     atlases: () => <AtlasList navigate={navigate} />,
     atlas: () => <AtlasEditor id={route.id} key={route.id} navigate={navigate} />,
     imports: () => <AtlasImports id={route.id} key={route.id} navigate={navigate} />,
-    jobs: () => <AtlasJobs id={route.id} key={route.id} navigate={navigate} />
+    jobs: () => <AtlasJobs id={route.id} key={route.id} navigate={navigate} />,
+    places: () => <AtlasPlaces id={route.id} key={route.id} navigate={navigate} />
   }[route.name];
 
   return (

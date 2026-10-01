@@ -57,6 +57,9 @@ module OpenGeographiesPlatform
           # Images uploaded for the atlas (logo, favicon, page images).
           get :assets, on: :member
           post :preview_token, action: :regenerate_preview_token, on: :member
+          get :unlocated_places, to: 'unlocated_places#index', on: :member
+          post 'unlocated_places/lookup', to: 'unlocated_places#lookup', on: :member, as: :lookup_unlocated_places
+          post 'unlocated_places/locate', to: 'unlocated_places#locate', on: :member, as: :locate_unlocated_places
           post 'assets', action: :upload_asset, on: :member, as: :upload_asset
           delete 'assets/:key', action: :destroy_asset, on: :member, as: :destroy_asset
         end

@@ -263,6 +263,32 @@ module OpenGeographiesPlatform
         status 'own image delete', delete("/core_data/sites/#{a.site.id}/assets/#{own_key}", a.token), '204'
       end
 
+      group 'placing places without a location' do
+        unplaced = ::CoreDataConnector::Place.create!(project_model_id: a.place.project_model_id, place_names_attributes: [{ name: 'Probe Unplaced', primary: true }])
+        list = "/core_data/sites/#{a.site.id}/unlocated_places"
+        locate = "#{list}/locate"
+        point = { locations: [{ place_id: unplaced.id, latitude: 33.75, longitude: -84.39 }] }
+
+        status 'anonymous can\'t list them', get(list), '401'
+        status 'nor look them up', post("#{list}/lookup", { place_ids: [unplaced.id] }), '401'
+        status 'nor place them', post(locate, point), '401'
+        status 'another tenant can\'t list them', get(list, b.token), %w[401 404]
+        status 'nor place them', post(locate, point, b.token), %w[401 404]
+        res = post("/core_data/sites/#{b.site.id}/unlocated_places/locate", point, b.token)
+        check 'nor through its own atlas', body(res)['located'].to_i.zero? && unplaced.reload.place_geometry.nil?, res.body.to_s[0, 120]
+
+        res = get(list, a.token)
+        status 'the owner lists them', res, '200'
+        check '... including the new one', Array(body(res)['places']).any? { |p| p['id'] == unplaced.id }
+        status 'coordinates must be coordinates', post(locate, { locations: [{ place_id: unplaced.id, latitude: 95, longitude: 0 }] }, a.token), '422'
+        res = post(locate, point, a.token)
+        check 'the owner places it', body(res)['located'] == 1 && unplaced.reload.place_geometry.present?, res.body.to_s[0, 120]
+        res = post(locate, { locations: [{ place_id: unplaced.id, latitude: 1, longitude: 1 }] }, a.token)
+        check 'a placed place isn\'t moved here', body(res)['located'].to_i.zero?, res.body.to_s[0, 120]
+      ensure
+        unplaced&.destroy
+      end
+
       group 'photo links can\'t reach the server\'s own network' do
         remote_files_refusals
       end

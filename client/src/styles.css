@@ -253,3 +253,24 @@ td .status-pill { margin-left: 0; }
 .publish-panel .row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 10px; }
 .preview-link { display: flex; gap: 8px; align-items: center; }
 .preview-link .input { flex: 1; min-width: 0; font-family: ui-monospace, monospace; font-size: 13px; }
+
+.unlocated-layout { display: grid; grid-template-columns: minmax(220px, 300px) 1fr; gap: 20px; align-items: start; }
+.unlocated-list ul { list-style: none; margin: 0; padding: 0; max-height: 640px; overflow-y: auto; border: 1px solid var(--og-border); border-radius: 6px; }
+.unlocated-list li button { display: block; width: 100%; text-align: left; padding: 8px 12px; border: 0; border-bottom: 1px solid var(--og-border); background: #fff; cursor: pointer; font: inherit; }
+.unlocated-list li button .muted { display: block; margin: 2px 0 0; font-size: 13px; }
+.unlocated-list li button:hover { background: #f3f6f8; }
+.unlocated-list li button.is-selected { background: #e6eef2; box-shadow: inset 3px 0 0 var(--og-primary, #0a3a4d); }
+.unlocated-detail h4 { margin-top: 0; }
+.place-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px 16px; margin: 0 0 12px; }
+.place-fields dt { font-size: 12px; color: var(--og-muted); }
+.place-fields dd { margin: 0; font-size: 14px; }
+.place-search { display: flex; gap: 8px; margin-bottom: 8px; }
+.place-search .input { flex: 1; }
+.place-results { list-style: none; margin: 0 0 8px; padding: 0; border: 1px solid var(--og-border); border-radius: 6px; }
+.place-results li button { display: block; width: 100%; text-align: left; padding: 6px 10px; border: 0; background: #fff; cursor: pointer; font: inherit; }
+.place-results li button:hover { background: #f3f6f8; }
+.address-part { display: flex; gap: 8px; }
+.address-part > * { flex: 1; min-width: 0; }
+.lookup-results { margin-top: 12px; }
+.unlocated .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 10px; }
+@media (max-width: 800px) { .unlocated-layout { grid-template-columns: 1fr; } }

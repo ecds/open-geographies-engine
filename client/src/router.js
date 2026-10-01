@@ -10,7 +10,8 @@ const ROUTES = [
   { name: 'atlases', pattern: /^\/atlases\/?$/ },
   { name: 'atlas', pattern: /^\/atlases\/(\d+)\/?$/ },
   { name: 'imports', pattern: /^\/atlases\/(\d+)\/imports\/?$/ },
-  { name: 'jobs', pattern: /^\/atlases\/(\d+)\/jobs\/?$/ }
+  { name: 'jobs', pattern: /^\/atlases\/(\d+)\/jobs\/?$/ },
+  { name: 'places', pattern: /^\/atlases\/(\d+)\/places\/?$/ }
 ];
 
 export const match = (pathname) => {
@@ -30,7 +31,8 @@ const TITLES = {
   atlases: 'Atlases',
   atlas: 'Atlas settings',
   imports: 'Imports',
-  jobs: 'Jobs'
+  jobs: 'Jobs',
+  places: 'Places'
 };
 
 export const useRoute = () => {
@@ -60,5 +62,6 @@ export const paths = {
   atlases: () => '/atlases',
   atlas: (id) => `/atlases/${id}`,
   imports: (id) => `/atlases/${id}/imports`,
-  jobs: (id) => `/atlases/${id}/jobs`
+  jobs: (id) => `/atlases/${id}/jobs`,
+  places: (id) => `/atlases/${id}/places`
 };

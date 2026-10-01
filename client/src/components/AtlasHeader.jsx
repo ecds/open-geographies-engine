@@ -41,6 +41,7 @@ const AtlasHeader = ({ active, navigate, site }) => {
       { site && (
         <div className='tabs' role='tablist'>
           { tab(paths.atlas(site.id), 'Settings', 'settings') }
+          { tab(paths.places(site.id), 'Places', 'places') }
           { tab(paths.imports(site.id), 'Imports', 'imports') }
           { tab(paths.jobs(site.id), 'Jobs', 'jobs') }
         </div>

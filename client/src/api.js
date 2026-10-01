@@ -190,3 +190,11 @@ export const createDatasetImport = (projectId, datasetImport) => request(
   `/core_data/projects/${projectId}/dataset_imports`,
   { body: { dataset_import: datasetImport } }
 );
+
+// --- Places without a location ----------------------------------------------
+
+export const fetchUnlocatedPlaces = (siteId, page = 1) => request('GET', `/core_data/sites/${siteId}/unlocated_places`, { params: { page } });
+
+export const lookupUnlocatedPlaces = (siteId, body) => request('POST', `/core_data/sites/${siteId}/unlocated_places/lookup`, { body });
+
+export const locateUnlocatedPlaces = (siteId, locations) => request('POST', `/core_data/sites/${siteId}/unlocated_places/locate`, { body: { locations } });

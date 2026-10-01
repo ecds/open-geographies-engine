@@ -69,6 +69,18 @@ module OpenGeographiesPlatform
         end
       end
 
+      # Reindexes the given records of one upstream model class (a few places
+      # just given a location), in one bulk request.
+      def reindex_records(model_class, ids)
+        return 0 unless available? && ids.present?
+
+        klass = v1_class_for(model_class)
+        return 0 unless klass
+
+        klass.where(id: ids).reindex
+        ids.size
+      end
+
       # Reindexes the records of the passed project models — and only those —
       # into the shared index. Yields (completed, total) as batches finish so a
       # job can report progress. Returns the number of records reindexed.
