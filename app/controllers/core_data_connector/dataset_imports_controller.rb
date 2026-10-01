@@ -12,7 +12,7 @@ module CoreDataConnector
   #     sample of features, plus `blob_id` to import it by.
   #
   #   POST /core_data/projects/:project_id/dataset_imports
-  #     { dataset_import: { blob_id:, project_model_id:, columns: [{ name:, role:, label:, data_type: }] } }
+  #     { dataset_import: { blob_id:, project_model_id:, columns: [{ name:, role:, label:, data_type:, capitalize: }] } }
   #     Queues an import_dataset Job with the file attached (ImportDatasetJob).
   class DatasetImportsController < ApplicationController
     ROLES = %w[name latitude longitude geometry identifier types field skip].freeze
@@ -55,13 +55,19 @@ module CoreDataConnector
       project = Project.find(params[:project_id])
       authorize project, :update?
 
-      attributes = params.require(:dataset_import).permit(:blob_id, :project_model_id, columns: [:name, :role, :label, :data_type])
+      attributes = params.require(:dataset_import).permit(:blob_id, :project_model_id, columns: [:name, :role, :label, :data_type, :capitalize])
       model = place_model(project, attributes[:project_model_id])
       blob = ActiveStorage::Blob.find_signed(attributes[:blob_id])
 
       render json: { errors: [{ base: 'The uploaded file has expired; upload it again.' }] }, status: :unprocessable_entity and return if blob.nil?
 
-      columns = Array(attributes[:columns]).map { |c| c.to_h.slice('name', 'role', 'label', 'data_type') }
+      columns = Array(attributes[:columns]).map do |c|
+        column = c.to_h.slice('name', 'role', 'label', 'data_type')
+        # A category column records the curator's choice either way, so the
+        # next upload of the same file can repeat it.
+        column['capitalize'] = ActiveModel::Type::Boolean.new.cast(c[:capitalize]) == true if column['role'] == 'types'
+        column
+      end
       errors = validate_columns(columns)
       render json: { errors: errors.map { |e| { base: e } } }, status: :unprocessable_entity and return if errors.any?
 
@@ -93,7 +99,7 @@ module CoreDataConnector
     # The choices from the last upload into this model, by column name, so a
     # second file of the same shape (the polygons after the points, next
     # month's export) starts where the curator left off: each matching
-    # column gets `previous` (role, label, type — and the existing field its
+    # column gets `previous` (role, label, type, capitalizing — and the existing field its
     # label now fills), and the profile says which upload they came from.
     # The console applies them; "Restore suggestions" starts over.
     def attach_previous_choices!(profile, model)
@@ -110,7 +116,9 @@ module CoreDataConnector
         choice = previous[column['name']]
         next unless choice
 
-        choice = choice.slice('role', 'label', 'data_type')
+        choice = choice.slice('role', 'label', 'data_type', 'capitalize')
+        # Capitalizing applies where this file's categories are lower case.
+        choice['capitalize'] &&= column['capitalize'] == true
         field = %w[field identifier].include?(choice['role']) ? existing_field(model, choice['label'], profile['format']) : nil
         mark_existing!(choice, field) if field
 

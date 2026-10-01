@@ -230,6 +230,7 @@ textarea.input { resize: vertical; }
 /* Dataset upload */
 .column-actions { margin: 8px 0 12px; }
 .column-note { font-size: 12px; font-style: italic; }
+.column-option { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 12px; cursor: pointer; }
 .column-warning { margin-top: 4px; font-size: 12px; color: var(--og-warning); max-width: 260px; }
 .table tr.has-note td { border-bottom: 0; }
 .column-note-row td { padding-top: 0; }

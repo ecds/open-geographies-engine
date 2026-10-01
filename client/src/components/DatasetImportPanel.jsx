@@ -219,7 +219,7 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
     createDatasetImport(projectId, {
       blob_id: preview.blob_id,
       project_model_id: preview.project_model_id,
-      columns: _.map(columns, (c) => _.pick(c, 'name', 'role', 'label', 'data_type'))
+      columns: _.map(columns, (c) => _.pick(c, 'name', 'role', 'label', 'data_type', 'capitalize'))
     })
       .then((data) => setJobId(data.job.id))
       .catch((error) => setErrors(errorMessages(error)));
@@ -291,6 +291,16 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
             <strong>{ column.name }</strong>
             <div className='muted'>{ column.filled } of { preview.row_count } filled</div>
             { column.note && column.role === 'skip' && <div className='muted column-note'>{ column.note }</div> }
+            { column.role === 'types' && column.capitalize_example && (
+              <label className='column-option'>
+                <input
+                  checked={!!column.capitalize}
+                  onChange={(e) => updateColumn(column.name, { capitalize: e.target.checked })}
+                  type='checkbox'
+                />
+                Capitalize: { column.capitalize_example[0] } → { column.capitalize_example[1] }
+              </label>
+            )}
             { column.role === 'identifier' && column.duplicates > 0 && (
               <div className='column-warning'>
                 { column.duplicates } { column.duplicates === 1 ? 'row repeats' : 'rows repeat' } another row’s value.

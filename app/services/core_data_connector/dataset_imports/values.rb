@@ -34,6 +34,9 @@ module CoreDataConnector
 
       ACCURACY = { year: 0, month: 1, date: 2 }.freeze
 
+      # Words a category label keeps in lower case after its first word.
+      MINOR_WORDS = %w[a an and as at but by de del des du for from in into la le nor of on or per the to via von].freeze
+
       module_function
 
       # The stored value for `value` as `data_type`, nil when blank, :invalid
@@ -130,6 +133,23 @@ module CoreDataConnector
         :invalid
       rescue Date::Error
         :invalid
+      end
+
+      # True when a column's values are written all in lower case (`building`,
+      # `district`): category labels a curator would rather show capitalized.
+      def lowercase?(values)
+        values.any? { |v| v.match?(/\p{Ll}/) } && values.none? { |v| v.match?(/\p{Lu}/) }
+      end
+
+      # `church of god` -> `Church of God`. Only for lower-case values: a value
+      # with capitals in it (AME Church, NHL) is already written as meant.
+      def title_case(value)
+        index = -1
+
+        value.gsub(/\p{L}[\p{L}\p{M}'’]*/) do |word|
+          index += 1
+          index.positive? && MINOR_WORDS.include?(word) ? word : word[0].upcase + word[1..]
+        end
       end
 
       # Core Data's fuzzy date document.

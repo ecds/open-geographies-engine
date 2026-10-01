@@ -154,6 +154,9 @@ until the curator presses Import. Then:
   (e.g. "Short Description") fills it, so canonical promotions still apply;
 - a category column becomes Types terms on the canonical Places→Types relationship
   (created as the template defines it if the project lacks one) — the atlas's `types` facet;
+  values written all in lower case (`building`) are proposed title-cased (`Building`,
+  `Church of God`), which the curator can turn off per column; mixed-case values stay as
+  written. Terms match case-insensitively, so a later upload reuses them;
 - short, repetitive text columns default to pick-list (Select) fields, which the index
   turns into `*_facet` keywords;
 - with an identifier column, importing again skips rows whose id is already in the atlas;

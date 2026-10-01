@@ -109,6 +109,7 @@ module CoreDataConnector
             epoch_ms: values.any? && values.all? { |v| v.match?(EPOCH_MS_DIGITS) && EPOCH_MS.cover?(v.to_i) },
             not_a_name: values.any? && values.count { |v| v.match?(DATE_LIKE) || v.match?(URL_LIKE) || v.match?(GUID) } * 2 > values.size,
             checkmarks: Values.checkmark_column?(values),
+            lowercase: Values.lowercase?(distinct),
             # How many values each typed choice couldn't take, so the console
             # can warn before an import leaves them empty.
             misfits: TYPED.to_h { |type| [type, Values.misfits(values, type)] }.compact,
@@ -191,8 +192,18 @@ module CoreDataConnector
           'options' => stat[:options],
           'misfits' => stat[:misfits].presence,
           'checkmarks' => stat[:checkmarks] || nil,
+          # Category values written all in lower case are proposed capitalized
+          # (the curator can keep them as written); the example shows how.
+          'capitalize' => stat[:lowercase] || nil,
+          'capitalize_example' => stat[:lowercase] ? capitalize_example(stat[:samples]) : nil,
           'note' => role == 'skip' ? skip_reason(column, stat) : nil
         }.compact
+      end
+
+      def capitalize_example(samples)
+        sample = samples.find { |s| Values.title_case(s) != s }
+
+        sample && [sample, Values.title_case(sample)]
       end
 
       def suggest_role(column, stat, geometry, columns, stats)

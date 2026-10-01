@@ -184,7 +184,8 @@ module CoreDataConnector
 
       @columns.select { |c| c['role'] == 'types' }.each do |column|
         properties[column['name']].to_s.split(CATEGORY_SEPARATOR).reject(&:blank?).uniq.each do |value|
-          Relationship.create!(project_model_relationship: @types, primary_record: place, related_record: term_for(value))
+          term = term_for(column['capitalize'] ? DatasetImports::Values.title_case(value) : value)
+          Relationship.create!(project_model_relationship: @types, primary_record: place, related_record: term)
         end
       end
     end
