@@ -114,6 +114,10 @@ module CoreDataConnector
         reindex = queue_reindex([model, @types&.related_model].compact)
       end
 
+      # Copied even when every row was already here: a re-run fetches the
+      # photos an earlier run couldn't.
+      copy = queue_copy_photos
+
       job.update(
         status: Job::JOB_STATUS_COMPLETED,
         extra: job.extra.merge(
@@ -126,7 +130,8 @@ module CoreDataConnector
           'hidden_fields' => @hidden_fields.presence,
           'problems' => @problems.presence,
           'geocode_error' => @geocode_error,
-          'reindex_job_id' => reindex&.id
+          'reindex_job_id' => reindex&.id,
+          'copy_photos_job_id' => copy&.id
         ).compact
       )
     end
@@ -446,6 +451,18 @@ module CoreDataConnector
       @job.update_columns(
         extra: @job.extra.merge('progress' => { 'completed' => completed, 'total' => total }),
         updated_at: Time.current
+      )
+    end
+
+    def queue_copy_photos
+      column = @photo_column && @columns.find { |c| c['name'] == @photo_column }
+      return unless column && column['copy'] && PlacePhotos.available? && @fields[@photo_column]
+
+      Job.create(
+        project_id: @job.project_id,
+        user_id: @job.user_id,
+        job_type: Job::JOB_TYPE_COPY_PHOTOS,
+        extra: { project_model_id: @model.id, photo_field_uuid: @fields[@photo_column].uuid, import_job_id: @job.id }
       )
     end
 

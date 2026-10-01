@@ -46,6 +46,9 @@ module CoreDataConnector
           'filename' => upload.original_filename,
           'project_model_id' => model.id,
           'project_model_name' => model.name,
+          # Where a Photo column's images can be copied to (an IIIF image
+          # server), or nil when they can only be shown from the source.
+          'photo_server' => PlacePhotos.server,
           # So the console can tell, as the curator renames a column, whether
           # the name fills an existing field (and takes its type).
           'existing_fields' => model.user_defined_fields.map { |f| { 'label' => f.column_name, 'data_type' => f.data_type, 'uuid' => f.uuid } }
@@ -136,7 +139,7 @@ module CoreDataConnector
       project = Project.find(params[:project_id])
       authorize project, :update?
 
-      attributes = params.require(:dataset_import).permit(:blob_id, :project_model_id, columns: [:name, :role, :label, :data_type, :capitalize])
+      attributes = params.require(:dataset_import).permit(:blob_id, :project_model_id, columns: [:name, :role, :label, :data_type, :capitalize, :copy])
       model = place_model(project, attributes[:project_model_id])
       blob = ActiveStorage::Blob.find_signed(attributes[:blob_id])
 
@@ -147,6 +150,9 @@ module CoreDataConnector
         # A category column records the curator's choice either way, so the
         # next upload of the same file can repeat it.
         column['capitalize'] = ActiveModel::Type::Boolean.new.cast(c[:capitalize]) == true if column['role'] == 'types'
+        # A photo column's images are copied to the image server unless the
+        # curator unticked it (and only where there is one).
+        column['copy'] = ActiveModel::Type::Boolean.new.cast(c[:copy]) != false && PlacePhotos.available? if column['role'] == 'photo'
         column
       end
       errors = validate_columns(columns)
@@ -211,7 +217,7 @@ module CoreDataConnector
         choice = previous[column['name']]
         next unless choice
 
-        choice = choice.slice('role', 'label', 'data_type', 'capitalize')
+        choice = choice.slice('role', 'label', 'data_type', 'capitalize', 'copy')
         # Capitalizing applies where this file's categories are lower case.
         choice['capitalize'] &&= column['capitalize'] == true
         field = %w[field identifier photo].include?(choice['role']) ? existing_field(model, choice['label'], profile['format']) : nil

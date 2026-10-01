@@ -107,6 +107,31 @@ module CoreDataConnector
           models.values
         end
 
+        # Makes sure `primary` has the template's relationship called `name`
+        # (as defined on the template model `template_model`), creating the
+        # related model with its template fields when the project has none
+        # yet. Returns the relationship. For imports that need what the
+        # starter template left out: a Photo column needs Places → Media.
+        def ensure_relationship!(primary, name, template_model: primary.name)
+          spec = document[:project_models].find { |model| model[:name] == template_model }
+          relationship = (spec && spec[:project_model_relationships] || []).find { |r| r[:name] == name }
+          raise ArgumentError, "The template has no #{name} relationship on #{template_model}" unless relationship
+
+          related_spec = document[:project_models].find { |model| model[:name] == relationship[:related_model] }
+
+          existing = primary.project_model_relationships.includes(:related_model).find do |r|
+            r.name.casecmp?(name) && r.related_model.model_class == related_spec[:model_class]
+          end
+          return existing if existing
+
+          ProjectModel.transaction do
+            related = ProjectModel.find_by(project_id: primary.project_id, name: related_spec[:name], model_class: related_spec[:model_class]) ||
+                      create_model!(primary.project_id, related_spec)
+
+            create_relationship!(primary, related, relationship)
+          end
+        end
+
         # The roles the template's Place-classed models play, in the lower
         # engine's terms. CoreDataConnector::Place backs both "Places" and
         # "Map Layers" (layers need PlaceGeometry), so the indexer tells them
@@ -119,6 +144,19 @@ module CoreDataConnector
         }.freeze
 
         private
+
+        def create_model!(project_id, definition)
+          model = ProjectModel.create!(
+            project_id:,
+            name: definition[:name],
+            model_class: definition[:model_class],
+            order: (ProjectModel.where(project_id:).maximum(:order) || 0) + 1
+          )
+
+          create_fields!(model, definition[:user_defined_fields], table_name: definition[:model_class])
+          assign_role!(model, definition)
+          model
+        end
 
         def assign_role!(model, definition)
           return unless defined?(::OpenGeographies::ProjectModelRole)

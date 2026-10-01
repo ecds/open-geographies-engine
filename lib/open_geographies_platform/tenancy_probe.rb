@@ -237,6 +237,10 @@ module OpenGeographiesPlatform
         status 'own image delete', delete("/core_data/sites/#{a.site.id}/assets/#{own_key}", a.token), '204'
       end
 
+      group 'photo links can\'t reach the server\'s own network' do
+        remote_files_refusals
+      end
+
       group 'uploaded photos get web-sized copies' do
         if ::CoreDataConnector::SiteImages.available?
           image_copies(a)
@@ -286,6 +290,33 @@ module OpenGeographiesPlatform
       status 'deletes its copies', get(largest['path'].to_s), '404'
 
       tiff_copies(a, photo)
+    end
+
+    # RemoteFiles (photo links in uploaded data are fetched by the server):
+    # every address that leads inside is refused before a connection is made.
+    def remote_files_refusals
+      fetcher = ::CoreDataConnector::RemoteFiles
+      {
+        'loopback' => 'http://127.0.0.1/',
+        'localhost by name' => 'http://localhost/',
+        'cloud metadata' => 'http://169.254.169.254/latest/meta-data/',
+        'a private network' => 'http://10.0.0.1/',
+        'carrier-grade NAT (Tailscale)' => 'http://100.100.100.100/',
+        'IPv6 loopback' => 'http://[::1]/',
+        'IPv4 inside IPv6' => 'http://[::ffff:127.0.0.1]/',
+        'another port' => 'http://example.com:9200/',
+        'another scheme' => 'file:///etc/passwd',
+        'a user:password address' => 'http://user:pass@example.com/'
+      }.each do |label, url|
+        begin
+          fetcher.fetch(url)
+          check "refuses #{label}", false, url
+        rescue fetcher::Refused
+          check "refuses #{label}", true
+        rescue fetcher::Error => e
+          check "refuses #{label}", false, "#{e.class}: #{e.message}"
+        end
+      end
     end
 
     # A 16-bit TIFF scan (what archives hand out) is stored as a JPEG.

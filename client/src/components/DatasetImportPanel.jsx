@@ -13,6 +13,7 @@ import useJobPolling from '../hooks/useJobPolling';
 import { isTerminal, JobStatuses } from '../jobs';
 import AddressLookup from './AddressLookup';
 import JobStatus from './JobStatus';
+import CopyPhotosStatus from './CopyPhotosStatus';
 import ReindexStatus from './ReindexStatus';
 import {
   Button,
@@ -228,7 +229,7 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
     createDatasetImport(projectId, {
       blob_id: preview.blob_id,
       project_model_id: preview.project_model_id,
-      columns: _.map(columns, (c) => _.pick(c, 'name', 'role', 'label', 'data_type', 'capitalize')),
+      columns: _.map(columns, (c) => _.pick(c, 'name', 'role', 'label', 'data_type', 'capitalize', 'copy')),
       geocode: useGeocode && geocodeResult ? _.pick(geocodeConfig, (value) => value === true || (_.isString(value) && value !== '')) : undefined
     })
       .then((data) => setJobId(data.job.id))
@@ -326,6 +327,22 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
             <div className='muted'>{ column.filled } of { preview.row_count } filled</div>
             { column.note && column.role === 'skip' && <div className='muted column-note'>{ column.note }</div> }
             { column.identifier_note && column.role === 'identifier' && <div className='muted column-note'>{ column.identifier_note }</div> }
+            { column.role === 'photo' && preview.photo_server && (
+              <>
+                <label className='column-option'>
+                  <input
+                    checked={column.copy !== false}
+                    onChange={(e) => updateColumn(column.name, { copy: e.target.checked })}
+                    type='checkbox'
+                  />
+                  Copy the photos to the atlas’s image server
+                </label>
+                <div className='muted column-note'>
+                  Kept on { preview.photo_server } with sizes for every screen, and shown on result cards. Copy them
+                  when you may reuse them (public domain, your own, or licensed); unticked, they’re shown from the source.
+                </div>
+              </>
+            )}
             { column.role === 'types' && column.capitalize_example && (
               <label className='column-option'>
                 <input
@@ -426,6 +443,7 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
             ? <ReindexStatus jobId={result.extra.reindex_job_id} />
             : <Message tone='positive'>Imported. The places appear on the atlas as soon as the reindex finishes.</Message>
         )}
+        { result.status === JobStatuses.completed && <CopyPhotosStatus jobId={result.extra?.copy_photos_job_id} /> }
       </div>
     );
   };
