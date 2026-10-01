@@ -82,6 +82,10 @@ module CoreDataConnector
         values.any? && values.all? { |value| value.match?(DatasetImports::Profile::URL_LIKE) }
       end
       @types = ensure_types! if columns.any? { |c| c['role'] == 'types' }
+      if @types
+        @spellings = category_spellings(rows)
+        @casing = DatasetImports::Values.word_casing(@spellings.values)
+      end
       @known_identifiers = known_identifiers
       @file_identifiers = Set.new
       @geocoded = geocode_missing(rows, job.extra['geocode'])
@@ -193,10 +197,19 @@ module CoreDataConnector
 
       @columns.select { |c| c['role'] == 'types' }.each do |column|
         DatasetImports::Values.terms(properties[column['name']]).uniq.each do |value|
-          term = term_for(column['capitalize'] ? DatasetImports::Values.capitalize_term(value) : value)
+          value = @spellings.fetch(value.downcase, value)
+          term = term_for(column['capitalize'] ? DatasetImports::Values.capitalize_term(value, @casing) : value)
           Relationship.create!(project_model_relationship: @types, primary_record: place, related_record: term)
         end
       end
+    end
+
+    # The spelling each category term is created with, decided over the
+    # whole file so a term's capitalized spelling wins wherever it appears
+    # (not whichever row comes first).
+    def category_spellings(rows)
+      names = @columns.select { |c| c['role'] == 'types' }.map { |c| c['name'] }
+      DatasetImports::Values.preferred_spellings(rows.flat_map { |row| names.flat_map { |name| DatasetImports::Values.terms(row[:properties][name]) } })
     end
 
     def term_for(value)

@@ -38,6 +38,7 @@ module CoreDataConnector
       ACCURACY = { year: 0, month: 1, date: 2 }.freeze
 
       # Words a category label keeps in lower case after its first word.
+      WORD = /\p{L}[\p{L}\p{M}'’]*/
       MINOR_WORDS = %w[a an and as at but by de del des du for from in into la le nor of on or per the to via von].freeze
 
       module_function
@@ -144,6 +145,17 @@ module CoreDataConnector
         value.to_s.split(TERM_SEPARATOR).reject(&:blank?)
       end
 
+      # { lower-cased term => the spelling to use } for a column's terms. A
+      # term the file also writes with capitals somewhere keeps that spelling
+      # (LOC lists both "Greek Revival architectural elements" and "greek
+      # revival architectural elements"); otherwise the first one wins.
+      def preferred_spellings(terms)
+        terms.each_with_object({}) do |term, spellings|
+          key = term.downcase
+          spellings[key] = term if !spellings.key?(key) || (lowercase_term?(spellings[key]) && !lowercase_term?(term))
+        end
+      end
+
       # True when a term is written all in lower case (`houses`, `railroad
       # companies`): a label a curator would rather show capitalized.
       def lowercase_term?(term)
@@ -154,17 +166,32 @@ module CoreDataConnector
       # capitals in it (AME Church, NHL, Greek Revival architectural
       # elements) as written. Decided per term, so a Library of Congress
       # column mixing both comes out consistent.
-      def capitalize_term(term)
-        lowercase_term?(term) ? title_case(term) : term
+      def capitalize_term(term, casing = {})
+        lowercase_term?(term) ? title_case(term, casing) : term
+      end
+
+      # How the file's own capitalized terms write each word after the
+      # first: { "architectural" => "architectural", "revival" => "Revival" }.
+      # A lower-case term then follows the source's convention: LOC's
+      # "classical revival architectural elements" becomes "Classical
+      # Revival architectural elements", like its "Greek Revival
+      # architectural elements". The first spelling seen wins.
+      def word_casing(terms)
+        terms.reject { |term| lowercase_term?(term) }.each_with_object({}) do |term, casing|
+          term.scan(WORD).drop(1).each { |word| casing[word.downcase] ||= word }
+        end
       end
 
       # `church of god` -> `Church of God`.
-      def title_case(value)
+      def title_case(value, casing = {})
         index = -1
 
-        value.gsub(/\p{L}[\p{L}\p{M}'’]*/) do |word|
+        value.gsub(WORD) do |word|
           index += 1
-          index.positive? && MINOR_WORDS.include?(word) ? word : word[0].upcase + word[1..]
+          next word[0].upcase + word[1..] if index.zero?
+          next casing[word] if casing.key?(word)
+
+          MINOR_WORDS.include?(word) ? word : word[0].upcase + word[1..]
         end
       end
 

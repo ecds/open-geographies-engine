@@ -126,7 +126,11 @@ module CoreDataConnector
           distinct = values.uniq
           terms = values.flat_map { |value| Values.terms(value) }
           distinct_terms = terms.uniq
-          lowercase_terms = distinct_terms.select { |term| Values.lowercase_term?(term) }
+          # One spelling per term, as the import will use it; the ones still
+          # in lower case are what capitalizing would change.
+          spellings = Values.preferred_spellings(distinct_terms).values
+          casing = Values.word_casing(spellings)
+          lowercase_terms = spellings.select { |term| Values.lowercase_term?(term) }
 
           [column, {
             rows: rows.size,
@@ -142,8 +146,9 @@ module CoreDataConnector
             # Category terms (a cell may list several) written all in lower
             # case, and how many distinct terms there are.
             lowercase_terms: lowercase_terms.size,
-            lowercase_sample: lowercase_terms.find { |term| Values.title_case(term) != term },
-            terms: distinct_terms.size,
+            lowercase_sample: lowercase_terms.find { |term| Values.title_case(term, casing) != term },
+            casing:,
+            terms: spellings.size,
             # Terms that repeat across rows and stay short: what a category
             # column looks like.
             categorical: terms.size > distinct_terms.size && distinct_terms.all? { |term| term.length <= TERM_MAX_LENGTH },
@@ -271,7 +276,7 @@ module CoreDataConnector
           # (the curator can keep them as written); the example shows how,
           # and the counts say how many of the terms it touches.
           'capitalize' => stat[:lowercase_sample] ? true : nil,
-          'capitalize_example' => stat[:lowercase_sample] && [stat[:lowercase_sample], Values.title_case(stat[:lowercase_sample])],
+          'capitalize_example' => stat[:lowercase_sample] && [stat[:lowercase_sample], Values.title_case(stat[:lowercase_sample], stat[:casing])],
           'capitalize_terms' => stat[:lowercase_sample] ? stat[:lowercase_terms] : nil,
           'terms' => role == 'types' ? stat[:terms] : nil,
           'note' => role == 'skip' ? skip_reason(column, stat) : nil,

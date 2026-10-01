@@ -55,6 +55,8 @@ a { color: var(--og-info); }
 .field-label { display: block; font-weight: 600; margin-bottom: 6px; }
 .field-hint { display: block; color: var(--og-muted); font-size: 13px; margin-top: 4px; }
 .field-error { display: block; color: var(--og-negative); font-size: 13px; margin-top: 4px; }
+.facet-label-row { display: grid; grid-template-columns: minmax(120px, 220px) 1fr; gap: 12px; align-items: center; margin-bottom: 6px; }
+.facet-label-row .muted { margin: 0; overflow-wrap: anywhere; }
 .field.has-error .input { border-color: var(--og-negative); }
 .required { color: var(--og-negative); }
 .input { width: 100%; padding: 8px 10px; border: 1px solid var(--og-border); border-radius: 6px; font: inherit; background: #fff; color: inherit; }

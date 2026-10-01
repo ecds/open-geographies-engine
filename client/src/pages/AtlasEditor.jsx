@@ -459,6 +459,31 @@ const AtlasEditor = ({ id, navigate }) => {
               value={_.pluck(entry.facets || [], 'name')}
             />
           </Field>
+          { !_.isEmpty(entry.facets) && (
+            <fieldset className='field'>
+              <legend className='field-label'>Filter names</legend>
+              { _.map(entry.facets, (facet, facetIndex) => {
+                const fallback = _.findWhere(facets, { attribute: facet.name })?.label || facet.name;
+
+                return (
+                  <div className='facet-label-row' key={facet.name}>
+                    <span className='muted'>{ fallback }</span>
+                    <input
+                      aria-label={`Name shown for ${fallback}`}
+                      className='input'
+                      maxLength={80}
+                      onChange={(e) => updateSearch(index, {
+                        facets: _.map(entry.facets, (f, i) => (i === facetIndex ? _.omit({ ...f, label: e.target.value }, (v) => v === '') : f))
+                      })}
+                      placeholder={fallback}
+                      value={facet.label || ''}
+                    />
+                  </div>
+                );
+              })}
+              <span className='field-hint'>What visitors see above each filter, e.g. “Building types” for Types. Leave a name empty to keep the default.</span>
+            </fieldset>
+          )}
           <div className='grid-2'>
             <Field label='Result card title' hint='A document field, e.g. name.'>
               <input className='input' onChange={(e) => updateSearch(index, { result_card: { ...(entry.result_card || {}), title: e.target.value } })} placeholder='name' value={entry.result_card?.title || ''} />
