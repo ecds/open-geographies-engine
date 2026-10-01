@@ -85,8 +85,10 @@ module CoreDataConnector
     # Relationships
     belongs_to :project
 
-    # Uploaded images for the atlas's pages and branding.
+    # Uploaded images for the atlas's pages and branding, and the web-sized
+    # copies made of them (SiteImages).
     has_many_attached :assets
+    has_many_attached :asset_variants
 
     # A site is born on a project and stays there. Authorization runs against
     # the project a site belongs to *before* an update is applied, so allowing
@@ -117,7 +119,11 @@ module CoreDataConnector
     # resolves it against the console's public URL). The filename is
     # cosmetic: the blob key alone identifies the file.
     def self.asset_path(blob)
-      "/core_data/public/v1/assets/#{blob.key}/#{ERB::Util.url_encode(blob.filename.to_s)}"
+      asset_path_for(blob.key, blob.filename.to_s)
+    end
+
+    def self.asset_path_for(key, filename)
+      "/core_data/public/v1/assets/#{key}/#{ERB::Util.url_encode(filename)}"
     end
 
     # The branding document served to the renderer:
@@ -160,6 +166,12 @@ module CoreDataConnector
       )
 
       document
+    end
+
+    # The sizes and web-sized copies of the site's uploaded images, for the
+    # renderer's srcset (see SiteImages.bundle).
+    def to_images
+      SiteImages.bundle(self)
     end
 
     # Emits the config.json document for this site: the stored config with

@@ -209,8 +209,18 @@ colors, sizes and fonts to their formats, since they end up in the renderer's CS
   SVG can't run script. Only site assets are served there, never a job's or an upload's
   file. It's our route, not ActiveStorage's: on core-data-cloud the SPA catch-all is drawn
   ahead of ActiveStorage's routes, so `rails_blob_url` answers with the console's HTML.
-- `GET /core_data/public/v1/atlases/:slug` carries `content` next to `config`, `branding`
-  and `navigation`; `config` (which the browser also fetches) never holds the pages.
+- Uploaded JPEG, PNG, WebP and AVIF images get web-sized copies at upload
+  (`SiteImages`): 160–2000 px wide, never wider than the original, upright, sRGB, no
+  metadata; JPEG when opaque, WebP with transparency. They're attached as
+  `Site#asset_variants` (not listed in the image library), served by the same route, and
+  listed by the public bundle's `images` (original key → size and copies), which the
+  renderer turns into `srcset`/`sizes` and single URLs for the logo, favicon and share
+  image. Truncated files and images over 100 megapixels are refused. Needs libvips (already
+  in FairData's Dockerfile) through `ruby-vips`; without it images are served as uploaded.
+  `bin/rails open_geographies:image_copies [SITE=id]` makes copies for earlier uploads.
+- `GET /core_data/public/v1/atlases/:slug` carries `content` and `images` next to `config`,
+  `branding` and `navigation`; `config` (which the browser also fetches) never holds the
+  pages.
 
 ## Upstream-PR posture
 

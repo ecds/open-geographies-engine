@@ -87,3 +87,17 @@ namespace :open_geographies do
     puts "\nImported project #{project.id} (#{project.name})."
   end
 end
+
+namespace :open_geographies do
+  desc 'Make web-sized copies of atlas images uploaded before copies existed or without libvips ([SITE=id])'
+  task image_copies: :environment do
+    abort('libvips is not available: install it (Debian: libvips42, macOS: brew install vips) and retry.') unless CoreDataConnector::SiteImages.available?
+
+    sites = ENV['SITE'].present? ? CoreDataConnector::Site.where(id: ENV['SITE']) : CoreDataConnector::Site.all
+
+    sites.find_each do |site|
+      count = CoreDataConnector::SiteImages.backfill(site)
+      puts "#{site.slug}: #{count} image(s) copied" if count.positive?
+    end
+  end
+end

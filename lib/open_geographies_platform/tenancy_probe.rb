@@ -227,9 +227,55 @@ module OpenGeographiesPlatform
         status 'an HTML file named .png is refused', upload("/core_data/sites/#{a.site.id}/assets", 'page.png', '<html><script>alert(1)</script></html>', a.token), '422'
         status 'own image delete', delete("/core_data/sites/#{a.site.id}/assets/#{own_key}", a.token), '204'
       end
+
+      group 'uploaded photos get web-sized copies' do
+        if ::CoreDataConnector::SiteImages.available?
+          image_copies(a)
+        else
+          puts '  skip (libvips is not available to this host: images are served as uploaded)'
+        end
+      end
     end
 
     private
+
+    # A 2400 x 1600 photo through upload, the public bundle, the public route
+    # and delete (SiteImages).
+    def image_copies(a)
+      xyz = Vips::Image.xyz(2400, 1600)
+      photo = (xyz[0] * (255.0 / 2400)).bandjoin([xyz[1] * (255.0 / 1600), xyz[0] * 0 + 128]).cast(:uchar)
+                                       .copy(interpretation: :srgb).jpegsave_buffer(Q: 90)
+
+      res = upload("/core_data/sites/#{a.site.id}/assets", 'photo.jpg', photo, a.token)
+      status 'a 2400 px photo uploads', res, '200'
+      asset = body(res)['asset'] || {}
+      check 'with its size', asset['width'] == 2400 && asset['height'] == 1600, asset.slice('width', 'height').inspect
+      check 'and a smaller preview for the console', asset['thumbnail_path'].present? && asset['thumbnail_path'] != asset['path']
+
+      image = body(get("/core_data/public/v1/atlases/#{a.site.slug}")).dig('atlas', 'images', asset['key']) || {}
+      variants = image['variants'] || []
+      check 'the public bundle lists its copies, 2000 px at most',
+            variants.map { |v| v['width'] } == [160, 320, 640, 1024, 1440, 2000], variants.map { |v| v['width'] }.inspect
+
+      largest = variants.last || {}
+      res = get(largest['path'].to_s)
+      status 'the largest copy is public', res, '200'
+      served = res.code == '200' ? Vips::Image.new_from_buffer(res.body, '') : nil
+      check 'as a JPEG of the advertised size',
+            res['Content-Type'] == 'image/jpeg' && served && [served.width, served.height] == [largest['width'], largest['height']],
+            "#{res['Content-Type']} #{served && [served.width, served.height].inspect}"
+
+      keys = (body(get("/core_data/sites/#{a.site.id}/assets", a.token))['assets'] || []).map { |listed| listed['key'] }
+      variant_keys = variants.map { |v| v['path'].to_s.split('/')[-2] }
+      check 'the image library lists the photo, not its copies', keys.include?(asset['key']) && (keys & variant_keys).empty?
+
+      status 'a truncated photo is refused', upload("/core_data/sites/#{a.site.id}/assets", 'cut.jpg', photo[0, photo.bytesize / 3], a.token), '422'
+      status 'too many pixels is refused',
+             upload("/core_data/sites/#{a.site.id}/assets", 'huge.png', Vips::Image.black(11_000, 10_000).pngsave_buffer(compression: 9), a.token), '422'
+
+      status 'deleting the photo', delete("/core_data/sites/#{a.site.id}/assets/#{asset['key']}", a.token), '204'
+      status 'deletes its copies', get(largest['path'].to_s), '404'
+    end
 
     def group(title)
       puts "\n#{title}"

@@ -42,7 +42,8 @@ with no hosts-file change; an atlas created in the wizard with slug `foo` is at
 `host/patches/` is the future integration PR against the host, as patches:
 the `open_geographies_platform` gem mount (`path: '../open-geographies-engine'`),
 the engines' migrations copied into the host (ours are additive), and the gem's
-roo/rubyzip lockfile lines, on top of `ecds` @ `ff020c5` (which already pins
+roo/rubyzip/ruby-vips lockfile lines (libvips itself is already in the host's
+Dockerfile), on top of `ecds` @ `ff020c5` (which already pins
 the lower engine, `open_geographies_fairdata`, at `67d0728`). Nothing in the host
 repo needs to change for the demo to run.
 

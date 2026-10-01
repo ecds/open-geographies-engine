@@ -1,7 +1,7 @@
 From ec626a01b6edccddd69893a791ad5aa8e50c1389 Mon Sep 17 00:00:00 2001
 From: terminusfilms <steve@terminusfilms.com>
 Date: Wed, 30 Sep 2026 18:54:00 -0400
-Subject: [PATCH 5/5] Copy the platform engine's content migration (atlas home
+Subject: [PATCH 5/6] Copy the platform engine's content migration (atlas home
  and standalone pages)
 
 ---

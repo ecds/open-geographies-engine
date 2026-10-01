@@ -108,8 +108,9 @@ module CoreDataConnector
     #
     # Uploads an image for the atlas. The type is read from the file's
     # contents, not the browser's claim, and must be one of
-    # Site::ASSET_CONTENT_TYPES. Answers with the asset, including the public
-    # path the pages and branding reference it by.
+    # Site::ASSET_CONTENT_TYPES; raster images get web-sized copies
+    # (SiteImages). Answers with the asset, including the public path the
+    # pages and branding reference it by.
     def upload_asset
       site = Site.find(params[:id])
       authorize site, :update?
@@ -126,21 +127,17 @@ module CoreDataConnector
         render json: { errors: [{ base: "Images can be at most #{Site::MAX_ASSET_BYTES / 1.megabyte} MB." }] }, status: :unprocessable_entity and return
       end
 
-      blob = ActiveStorage::Blob.create_and_upload!(
-        io: File.open(upload.tempfile.path),
-        filename:,
-        content_type:,
-        identify: false
-      )
-      site.assets.attach(blob)
+      blob = SiteImages.upload(site, upload.tempfile.path, filename:, content_type:)
 
       render json: { asset: asset_json(blob) }, status: :ok
+    rescue SiteImages::Error => e
+      render json: { errors: [{ base: e.message }] }, status: :unprocessable_entity
     end
 
     # DELETE /core_data/sites/:id/assets/:key
     #
-    # Removes an uploaded image. Pages or branding still pointing at it show
-    # nothing where the image was.
+    # Removes an uploaded image and its copies. Pages or branding still
+    # pointing at it show nothing where the image was.
     def destroy_asset
       site = Site.find(params[:id])
       authorize site, :update?
@@ -148,7 +145,7 @@ module CoreDataConnector
       attachment = site.assets_attachments.joins(:blob).find_by(active_storage_blobs: { key: params[:key] })
       return head :not_found unless attachment
 
-      attachment.purge
+      SiteImages.purge(site, attachment)
 
       head :no_content
     end
@@ -161,7 +158,10 @@ module CoreDataConnector
         filename: blob.filename.to_s,
         content_type: blob.content_type,
         byte_size: blob.byte_size,
+        width: blob.metadata['width'],
+        height: blob.metadata['height'],
         path: Site.asset_path(blob),
+        thumbnail_path: SiteImages.thumbnail_path(blob) || Site.asset_path(blob),
         created_at: blob.created_at
       }
     end

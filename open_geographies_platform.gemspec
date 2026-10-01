@@ -32,4 +32,9 @@ Gem::Specification.new do |spec|
   # already in core-data-cloud's bundle (FairData's own importers use them).
   spec.add_dependency 'roo', '>= 2.10', '< 3'
   spec.add_dependency 'rubyzip', '>= 2.3', '< 3'
+
+  # Web-sized copies of uploaded atlas images. A Ruby binding (over ffi, which
+  # the host already bundles) to libvips, which FairData's Dockerfile already
+  # installs. Loaded softly: without libvips, uploads are served as uploaded.
+  spec.add_dependency 'ruby-vips', '>= 2.2', '< 3'
 end

@@ -1,7 +1,7 @@
 From 151d8e7bc5a1586b89e2fc393a3381c167282e38 Mon Sep 17 00:00:00 2001
 From: terminusfilms <steve@terminusfilms.com>
 Date: Fri, 11 Sep 2026 18:11:22 -0400
-Subject: [PATCH 3/5] Copy the lower engine's two create-table migrations ahead
+Subject: [PATCH 3/6] Copy the lower engine's two create-table migrations ahead
  of its rename (fresh-DB db:prepare)
 
 ---

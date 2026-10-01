@@ -39,7 +39,7 @@ export const AssetPicker = ({ assets, onCancel, onPick, onUpload }) => {
       <div className='row'>
         <Button loading={uploading} onClick={() => input.current?.click()}>Upload an image…</Button>
         <input accept={ACCEPT} hidden onChange={onFile} ref={input} type='file' />
-        <span className='muted'>PNG, JPEG, GIF, WebP, AVIF, SVG or ICO, up to 10 MB.</span>
+        <span className='muted'>PNG, JPEG, GIF, WebP, AVIF, SVG or ICO, up to 10 MB. Large photos are fine: visitors get a copy sized for their screen.</span>
       </div>
       { !_.isEmpty(assets) && (
         <>
@@ -50,10 +50,10 @@ export const AssetPicker = ({ assets, onCancel, onPick, onUpload }) => {
                 className='asset-tile'
                 key={asset.key}
                 onClick={() => onPick(asset.path, asset)}
-                title={asset.filename}
+                title={asset.width ? `${asset.filename} (${asset.width} × ${asset.height})` : asset.filename}
                 type='button'
               >
-                <img alt='' src={asset.path} />
+                <img alt='' loading='lazy' src={asset.thumbnail_path || asset.path} />
                 <span>{ asset.filename }</span>
               </button>
             ))}
@@ -87,12 +87,15 @@ export const AssetPicker = ({ assets, onCancel, onPick, onUpload }) => {
 const ImageField = ({ alt, assets, background, hint, label, onAltChange, onChange, onUpload, value }) => {
   const [picking, setPicking] = useState(false);
 
+  // An uploaded image previews from its small copy.
+  const preview = _.findWhere(assets, { path: value })?.thumbnail_path || value;
+
   return (
     <div className='field'>
       <span className='field-label'>{ label }</span>
       <div className='image-field'>
         <div className='image-preview' style={background ? { background } : undefined}>
-          { value ? <img alt='' src={value} /> : <span className='muted'>No image</span> }
+          { value ? <img alt='' src={preview} /> : <span className='muted'>No image</span> }
         </div>
         <div className='image-actions'>
           <Button onClick={() => setPicking(!picking)}>{ value ? 'Change…' : 'Add image…' }</Button>

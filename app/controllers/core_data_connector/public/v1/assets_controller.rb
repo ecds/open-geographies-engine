@@ -4,8 +4,9 @@ module CoreDataConnector
       # GET /core_data/public/v1/assets/:key(/:filename)
       #
       # Serves an image a curator uploaded for an atlas (Site#assets) to the
-      # public: the atlas's logo, favicon and page images, which the renderer
-      # references by this path. Only blobs attached to a site as an asset are
+      # public, or one of its web-sized copies (Site#asset_variants): the
+      # atlas's logo, favicon and page images, which the renderer references
+      # by this path. Only blobs attached to a site as one of those are
       # served: the same blob table holds dataset uploads and job exports,
       # which this must never hand out.
       #
@@ -28,7 +29,7 @@ module CoreDataConnector
           attached = blob && ActiveStorage::Attachment.exists?(
             blob_id: blob.id,
             record_type: Site.name,
-            name: 'assets'
+            name: %w[assets asset_variants]
           )
 
           return head :not_found unless attached
