@@ -60,6 +60,8 @@ module OpenGeographiesPlatform
           get :unlocated_places, to: 'unlocated_places#index', on: :member
           post 'unlocated_places/lookup', to: 'unlocated_places#lookup', on: :member, as: :lookup_unlocated_places
           post 'unlocated_places/locate', to: 'unlocated_places#locate', on: :member, as: :locate_unlocated_places
+          get :categories, to: 'categories#index', on: :member
+          patch 'categories/:term_id', to: 'categories#update', on: :member, as: :category
           post 'assets', action: :upload_asset, on: :member, as: :upload_asset
           delete 'assets/:key', action: :destroy_asset, on: :member, as: :destroy_asset
         end

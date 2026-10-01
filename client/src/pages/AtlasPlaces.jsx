@@ -2,16 +2,18 @@ import { useEffect, useState } from 'react';
 import _ from 'underscore';
 import { errorMessages, fetchSite } from '../api';
 import AtlasHeader from '../components/AtlasHeader';
+import CategoryValues from '../components/CategoryValues';
 import UnlocatedPlaces from '../components/UnlocatedPlaces';
 import { Message } from '../components/ui';
 
 const TABS = [
-  { key: 'unlocated', label: 'Without a location' }
+  { key: 'unlocated', label: 'Without a location' },
+  { key: 'categories', label: 'Categories' }
 ];
 
 /**
  * Work on the atlas's places after they're in: put the ones without a
- * location on the map.
+ * location on the map, and rename category values.
  */
 const AtlasPlaces = ({ id, navigate }) => {
   const [site, setSite] = useState(null);
@@ -38,6 +40,7 @@ const AtlasPlaces = ({ id, navigate }) => {
             </div>
           )}
           { tab === 'unlocated' && <UnlocatedPlaces site={site} /> }
+          { tab === 'categories' && <CategoryValues site={site} /> }
         </section>
       )}
     </main>

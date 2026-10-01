@@ -198,3 +198,9 @@ export const fetchUnlocatedPlaces = (siteId, page = 1) => request('GET', `/core_
 export const lookupUnlocatedPlaces = (siteId, body) => request('POST', `/core_data/sites/${siteId}/unlocated_places/lookup`, { body });
 
 export const locateUnlocatedPlaces = (siteId, locations) => request('POST', `/core_data/sites/${siteId}/unlocated_places/locate`, { body: { locations } });
+
+// --- Category values ----------------------------------------------------------
+
+export const fetchCategories = (siteId) => request('GET', `/core_data/sites/${siteId}/categories`);
+
+export const renameCategoryValue = (siteId, termId, name) => request('PATCH', `/core_data/sites/${siteId}/categories/${termId}`, { body: { name } });

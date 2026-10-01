@@ -289,6 +289,43 @@ module OpenGeographiesPlatform
         unplaced&.destroy
       end
 
+      group 'renaming category values' do
+        model = ::CoreDataConnector::ProjectModel.find(a.place.project_model_id)
+        types = ::CoreDataConnector::Atlases::Template.ensure_relationship!(model, 'Types', template_model: 'Places')
+        house = ::CoreDataConnector::Taxonomy.create!(project_model: types.related_model, name: 'house')
+        houses = ::CoreDataConnector::Taxonomy.create!(project_model: types.related_model, name: 'Houses')
+        ::CoreDataConnector::Relationship.create!(project_model_relationship: types, primary_record: a.place, related_record: house)
+        path = "/core_data/sites/#{a.site.id}/categories"
+
+        status 'anonymous can\'t list them', get(path), '401'
+        status 'nor rename one', patch("#{path}/#{house.id}", { name: 'x' }), '401'
+        status 'another tenant can\'t rename one', patch("#{path}/#{house.id}", { name: 'x' }, b.token), %w[401 404]
+        status 'nor through its own atlas', patch("/core_data/sites/#{b.site.id}/categories/#{house.id}", { name: 'x' }, b.token), '404'
+        check 'and the name is unchanged', house.reload.name == 'house', house.name
+
+        res = get(path, a.token)
+        status 'the owner lists them', res, '200'
+        terms = Array(body(res)['categories']).flat_map { |c| c['terms'] }
+        check 'with how many places use each', terms.any? { |t| t['id'] == house.id && t['places'] == 1 }, terms.inspect[0, 200]
+        status 'a blank name is refused', patch("#{path}/#{house.id}", { name: '  ' }, a.token), '422'
+
+        patch("#{path}/#{house.id}", { name: 'House' }, a.token)
+        check 'the owner renames one', house.reload.name == 'House', house.name
+        res = patch("#{path}/#{house.id}", { name: 'houses' }, a.token)
+        linked = ::CoreDataConnector::Relationship.where(project_model_relationship: types, primary_record: a.place).map(&:related_record_id)
+        check 'renaming onto another value merges the two', body(res)['merged'] == true && !::CoreDataConnector::Taxonomy.exists?(house.id) &&
+                                                              linked == [houses.id] && houses.reload.name == 'houses',
+              "#{res.body.to_s[0, 120]} linked=#{linked.inspect}"
+      ensure
+        if types
+          ::CoreDataConnector::Relationship.where(project_model_relationship: types).delete_all
+          ::CoreDataConnector::Taxonomy.where(project_model_id: types.related_model_id).delete_all
+          related = types.related_model
+          types.destroy
+          related.destroy
+        end
+      end
+
       group 'photo links can\'t reach the server\'s own network' do
         remote_files_refusals
       end

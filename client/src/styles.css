@@ -274,3 +274,9 @@ td .status-pill { margin-left: 0; }
 .lookup-results { margin-top: 12px; }
 .unlocated .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 10px; }
 @media (max-width: 800px) { .unlocated-layout { grid-template-columns: 1fr; } }
+
+.category-values section { margin-top: 20px; }
+.category-values .table td { vertical-align: top; }
+.category-values .table .input { min-width: 260px; }
+.category-filter { max-width: 360px; margin-bottom: 8px; }
+.numeric { text-align: right; font-variant-numeric: tabular-nums; }

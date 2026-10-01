@@ -216,6 +216,14 @@ but not on its map. The atlas's **Places** page (`/atlases/:id/places`) puts the
 - An upload now records a city/state/ZIP column that held one value throughout but wasn't
   kept as a field (HABS's City), so the lookup can be prefilled later.
 
+The same page's **Categories** tab lists every category value of the atlas's places (each
+taxonomy its place models relate to: Types, and others such as Denomination) with how many
+places use it, and renames them in place (`GET /core_data/sites/:id/categories`,
+`PATCH …/categories/:term_id { name }`). Renaming to a name another value has (any letter
+case) merges the two: every link moves to the existing value, which takes the typed
+spelling, and the renamed value is deleted (its search document with it). The affected
+places and the value are reindexed in the background.
+
 ## An atlas is a site: home page, pages, branding
 
 Each atlas has its own home page and any number of standalone pages (About, Credits, …),
