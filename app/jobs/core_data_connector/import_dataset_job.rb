@@ -96,9 +96,11 @@ module CoreDataConnector
       end
 
       # Nothing new to index (or show) when every row was skipped or failed.
+      # The reindex's id goes on this job so the console can follow it: the
+      # places are saved now, but visitors see them only once it succeeds.
       if @counts['imported'].positive?
         configure_sites!
-        queue_reindex([model, @types&.related_model].compact)
+        reindex = queue_reindex([model, @types&.related_model].compact)
       end
 
       job.update(
@@ -110,7 +112,8 @@ module CoreDataConnector
           'fields_created' => @fields_created.presence,
           'filters_added' => @filters_added.presence,
           'hidden_fields' => @hidden_fields.presence,
-          'problems' => @problems.presence
+          'problems' => @problems.presence,
+          'reindex_job_id' => reindex&.id
         ).compact
       )
     end

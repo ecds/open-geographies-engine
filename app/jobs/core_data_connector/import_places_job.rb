@@ -76,7 +76,7 @@ module CoreDataConnector
           end
         end
 
-        queue_reindexes job, project_model
+        reindex = queue_reindexes job, project_model
 
         job.update(
           status: Job::JOB_STATUS_COMPLETED,
@@ -85,7 +85,8 @@ module CoreDataConnector
             'counts' => counts,
             'errors_sample' => error_samples.presence,
             'warnings' => source.warnings.presence,
-            'duplicates' => duplicate_report(imported_place_ids)
+            'duplicates' => duplicate_report(imported_place_ids),
+            'reindex_job_id' => reindex&.id
           ).compact
         )
       rescue StandardError => error

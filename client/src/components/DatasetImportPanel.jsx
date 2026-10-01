@@ -12,6 +12,7 @@ import { createDatasetImport, errorMessages, previewDatasetImport } from '../api
 import useJobPolling from '../hooks/useJobPolling';
 import { isTerminal, JobStatuses } from '../jobs';
 import JobStatus from './JobStatus';
+import ReindexStatus from './ReindexStatus';
 import {
   Button,
   Message,
@@ -312,7 +313,9 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
         { !_.isEmpty(hidden) && <p className='muted'>Hidden on public pages: { hidden.join(', ') } (change in Settings → Detail pages)</p> }
         { !_.isEmpty(rowProblems) && <Message header='Rows to check' list={rowProblems} tone='warning' /> }
         { result.status === JobStatuses.completed && counts.imported > 0 && (
-          <Message tone='positive'>Imported. The places appear on the atlas as soon as the reindex finishes.</Message>
+          result.extra?.reindex_job_id
+            ? <ReindexStatus jobId={result.extra.reindex_job_id} />
+            : <Message tone='positive'>Imported. The places appear on the atlas as soon as the reindex finishes.</Message>
         )}
       </div>
     );

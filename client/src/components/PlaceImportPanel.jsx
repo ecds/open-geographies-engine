@@ -7,6 +7,7 @@ import useJobPolling from '../hooks/useJobPolling';
 import AreaMap from './AreaMap';
 import AtlasAreaForm from './AtlasAreaForm';
 import JobStatus from './JobStatus';
+import ReindexStatus from './ReindexStatus';
 import {
   Button,
   Field,
@@ -274,6 +275,7 @@ const PlaceImportPanel = ({ area: initialArea, onImported, projectId }) => {
           </div>
         )}
         { error && <Message tone='negative'>{ error }</Message> }
+        { counts?.imported > 0 && resultJob.extra?.reindex_job_id && <ReindexStatus jobId={resultJob.extra.reindex_job_id} /> }
         { !_.isEmpty(warnings) && <Message header='Warnings' list={warnings} tone='warning' /> }
         { !_.isEmpty(duplicates) && (
           <>
@@ -405,7 +407,7 @@ const PlaceImportPanel = ({ area: initialArea, onImported, projectId }) => {
         <>
           <h3>Import results</h3>
           { _.map(results, renderResult) }
-          { !importing && (
+          { !importing && _.every(results, (r) => !r.job.extra?.reindex_job_id) && (
             <Message tone='positive'>
               Imports complete. New places are searchable as soon as the reindex finishes.
             </Message>
