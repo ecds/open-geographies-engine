@@ -79,6 +79,7 @@ const Wizard = ({ navigate }) => {
     area: {}
   });
   const [errors, setErrors] = useState([]);
+  const [nameError, setNameError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [provisioned, setProvisioned] = useState(null);
   const [seeded, setSeeded] = useState(false);
@@ -92,13 +93,20 @@ const Wizard = ({ navigate }) => {
   const onCreate = useCallback(() => {
     setSaving(true);
     setErrors([]);
+    setNameError(null);
 
     createAtlas(atlas)
       .then((data) => {
         setProvisioned(data.atlas);
         setStep(Steps.provision);
       })
-      .catch((error) => setErrors(errorMessages(error)))
+      .catch((error) => {
+        // The server words name problems for the curator; they're shown
+        // under the name field as well as by the button.
+        const entry = _.find(_.flatten([error?.errors || []]), (e) => e && e.name);
+        setNameError(entry ? _.flatten([entry.name])[0] : null);
+        setErrors(errorMessages(error, { name: '' }));
+      })
       .finally(() => setSaving(false));
   }, [atlas]);
 
@@ -150,12 +158,15 @@ const Wizard = ({ navigate }) => {
 
       { step === Steps.basics && (
         <section className='panel'>
-          { !_.isEmpty(errors) && <Message header='Unable to create the atlas' list={errors} tone='negative' /> }
-          <Field label='Atlas name' required>
+          <Field error={nameError} label='Atlas name' required>
             <input
+              aria-invalid={!!nameError}
               autoFocus
               className='input'
-              onChange={(e) => update({ name: e.target.value })}
+              onChange={(e) => {
+                update({ name: e.target.value });
+                setNameError(null);
+              }}
               value={atlas.name}
             />
           </Field>
@@ -206,12 +217,20 @@ const Wizard = ({ navigate }) => {
               ))}
             </fieldset>
           )}
-          <h3>Geographic area</h3>
+          <h3>Geographic area <span className='muted'>(optional)</span></h3>
+          <p className='muted'>
+            Used to find places in gazetteers such as GeoNames. Skip it if you’re bringing your own
+            data; you can choose one later when importing.
+          </p>
           <AtlasAreaForm onChange={(area) => update({ area })} value={atlas.area} />
+          { /* Beside the button, not at the top of the form: the curator is
+               looking here when the create fails. */ }
+          { !_.isEmpty(errors) && <Message header='Unable to create the atlas' list={errors} tone='negative' /> }
           <div className='actions'>
             <Button disabled={!atlas.name.trim() || saving} loading={saving} onClick={onCreate} primary>
               Create atlas
             </Button>
+            { !atlas.name.trim() && <span className='muted'>Give the atlas a name first.</span> }
           </div>
         </section>
       )}

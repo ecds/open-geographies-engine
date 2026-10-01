@@ -32,6 +32,14 @@ module CoreDataConnector
       name = atlas_params[:name]
       slug = atlas_params[:slug].presence || name.to_s.parameterize
 
+      # The name problems a curator can fix, said in their terms, before
+      # anything is created. Otherwise the first record to fail speaks for
+      # them all: a reused name surfaced as the internal search collection's
+      # "name has already been taken".
+      if (problem = name_problem(name, slug))
+        render json: { errors: [{ name: [problem] }] }, status: :unprocessable_entity and return
+      end
+
       project = nil
       site = nil
       search_collection = nil
@@ -59,7 +67,7 @@ module CoreDataConnector
 
         search_collection = SearchCollection.create!(
           project:,
-          name: "#{slug.tr('-', '_')}_places",
+          name: collection_name(slug),
           project_model_ids: [places_model.id],
           auto_index: true,
           polygons: true
@@ -113,6 +121,32 @@ module CoreDataConnector
 
     def atlas_params
       params.require(:atlas).permit(:name, :slug, :description, :locale, :template, area: {}, modules: [])
+    end
+
+    # A curator-facing sentence when the name can't make an atlas, else nil.
+    # Two names that differ only in punctuation or case ("Savannah,
+    # Documented" / "savannah documented") share a web address, so the
+    # address is what has to be free.
+    def name_problem(name, slug)
+      return 'Give the atlas a name.' if name.blank?
+      return 'The name needs at least one letter or number.' if slug.blank?
+      return 'That name is reserved. Choose a different one.' if Site::RESERVED_SLUGS.include?(slug)
+      return 'The name is too long for a web address. Shorten it.' if slug.length > 63
+
+      return unless Site.exists?(slug:)
+
+      "Another atlas already uses this name (its address is “#{slug}”). Choose a different name."
+    end
+
+    # The search collection is internal (the site config points at it by
+    # id), so a leftover collection from a deleted atlas just moves the new
+    # one to the next free name.
+    def collection_name(slug)
+      base = "#{slug.tr('-', '_')}_places"
+      name = base
+      suffix = 1
+      name = "#{base}_#{suffix += 1}" while SearchCollection.exists?(name:)
+      name
     end
 
     # The atlas's public URL on the shared dynamic renderer, when a URL template

@@ -79,7 +79,7 @@ const ERROR_PREFIXES = {
   navigation: 'Menu: '
 };
 
-export const errorMessages = (error) => {
+export const errorMessages = (error, prefixes = {}) => {
   // Validation failures come as { attribute: [messages] }; other errors as
   // a list of such objects.
   const errors = error?.errors && !Array.isArray(error.errors) && typeof error.errors === 'object'
@@ -90,7 +90,7 @@ export const errorMessages = (error) => {
     return errors.flatMap((entry) => {
       if (entry && typeof entry === 'object') {
         return Object.entries(entry).flatMap(([key, value]) => {
-          const prefix = ERROR_PREFIXES[key] ?? `${key} `;
+          const prefix = prefixes[key] ?? ERROR_PREFIXES[key] ?? `${key} `;
           return (Array.isArray(value) ? value : [value]).map((message) => `${prefix}${message}`);
         });
       }

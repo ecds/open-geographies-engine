@@ -216,6 +216,11 @@ module OpenGeographiesPlatform
         status 'own job', get("/core_data/jobs/#{a.job.id}", a.token), '200'
         status 'own site update', patch("/core_data/sites/#{a.site.id}", { site: { name: 'OG Tenancy Probe A (renamed)' } }, a.token), '200'
 
+        projects = ::CoreDataConnector::Project.count
+        res = post('/core_data/atlases', { atlas: { name: 'OG Tenancy Probe, B' } }, a.token)
+        status 'an atlas name already in use is refused', res, '422'
+        check '... as a name problem, with nothing created', body(res).dig('errors', 0, 'name', 0).to_s.include?('already uses this name') && ::CoreDataConnector::Project.count == projects, res.body.to_s[0, 200]
+
         res = patch("/core_data/sites/#{a.site.id}", { site: { content: { pages: [{ slug: 'about', title: 'About', sections: [{ type: 'text', body: 'Hello' }] }] } } }, a.token)
         status 'own pages saved', res, '200'
         res = patch("/core_data/sites/#{a.site.id}", { site: { content: { pages: [{ slug: 'about', title: 'About', sections: [{ type: 'call_to_action', button_url: 'javascript:alert(1)' }] }] } } }, a.token)

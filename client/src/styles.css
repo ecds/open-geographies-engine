@@ -54,6 +54,8 @@ a { color: var(--og-info); }
 .field { display: block; margin: 0 0 16px; min-width: 0; border: 0; padding: 0; }
 .field-label { display: block; font-weight: 600; margin-bottom: 6px; }
 .field-hint { display: block; color: var(--og-muted); font-size: 13px; margin-top: 4px; }
+.field-error { display: block; color: var(--og-negative); font-size: 13px; margin-top: 4px; }
+.field.has-error .input { border-color: var(--og-negative); }
 .required { color: var(--og-negative); }
 .input { width: 100%; padding: 8px 10px; border: 1px solid var(--og-border); border-radius: 6px; font: inherit; background: #fff; color: inherit; }
 .input:focus { outline: 2px solid rgba(10, 58, 77, 0.35); outline-offset: 1px; }

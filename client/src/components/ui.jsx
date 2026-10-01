@@ -29,13 +29,14 @@ export const Button = ({ children, loading, primary, subtle, ...props }) => (
   </button>
 );
 
-export const Field = ({ children, hint, label, required }) => (
-  <label className='field'>
+export const Field = ({ children, error, hint, label, required }) => (
+  <label className={['field', error && 'has-error'].filter(Boolean).join(' ')}>
     <span className='field-label'>
       { label }
       { required && <span className='required' aria-hidden='true'> *</span> }
     </span>
     { children }
+    { error && <span className='field-error'>{ error }</span> }
     { hint && <span className='field-hint'>{ hint }</span> }
   </label>
 );
