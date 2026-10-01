@@ -345,6 +345,7 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
       error,
       fields_created: created,
       filters_added: filters,
+      searched_fields: searched,
       hidden_fields: hidden,
       problems: rowProblems
     } = result.extra || {};
@@ -364,6 +365,7 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
         )}
         { !_.isEmpty(created) && <p className='muted'>New fields: { created.join(', ') }</p> }
         { !_.isEmpty(filters) && <p className='muted'>Added as filters on the atlas: { filters.join(', ') }</p> }
+        { !_.isEmpty(searched) && <p className='muted'>The atlas’s search now also looks in: { searched.join(', ') }</p> }
         { !_.isEmpty(hidden) && <p className='muted'>Hidden on public pages: { hidden.join(', ') } (change in Settings → Detail pages)</p> }
         { !_.isEmpty(rowProblems) && <Message header='Rows to check' list={rowProblems} tone='warning' /> }
         { result.status === JobStatuses.completed && counts.imported > 0 && (

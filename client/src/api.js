@@ -144,6 +144,8 @@ export const fetchSiteFacets = (id) => request('GET', `/core_data/sites/${id}/fa
 
 export const fetchSiteFields = (id) => request('GET', `/core_data/sites/${id}/fields`);
 
+export const fetchSiteSearchFields = (id) => request('GET', `/core_data/sites/${id}/search_fields`);
+
 export const fetchSiteAssets = (id) => request('GET', `/core_data/sites/${id}/assets`);
 
 export const uploadSiteAsset = (id, file) => {

@@ -59,6 +59,15 @@ module CoreDataConnector
     ].freeze
     MAX_ASSET_BYTES = 10.megabytes
 
+    # What every search looks in (the renderer's own default); a search's
+    # `search_fields` are added after these.
+    DEFAULT_SEARCH_ATTRIBUTES = [
+      { 'field' => 'name', 'weight' => 3 },
+      { 'field' => 'names', 'weight' => 2 },
+      'description',
+      'short_description'
+    ].freeze
+
     # Fonts the console offers (must match the set the frontend loads).
     BRANDING_FONTS = [
       'Afacad', 'Baskervville', 'Crimson Text SemiBold', 'DM Sans',
@@ -304,6 +313,14 @@ module CoreDataConnector
       expanded.delete('typesense')
 
       elasticsearch = expanded['elasticsearch'] || {}
+
+      # The text fields the curator chose to search besides the name
+      # ("Address", "Nomination file"), as index paths; a stored
+      # elasticsearch.search_attributes still wins.
+      search_fields = Array(expanded.delete('search_fields')).select { |path| path.is_a?(String) && path.match?(/\A[a-z0-9_.]+\z/) }
+      if search_fields.any? && elasticsearch['search_attributes'].blank?
+        elasticsearch = elasticsearch.merge('search_attributes' => (DEFAULT_SEARCH_ATTRIBUTES + search_fields).uniq)
+      end
 
       # The entry's `facets` (what the console edits) is the source of the
       # facet attributes; a stored elasticsearch.facet_attributes is only a

@@ -37,6 +37,12 @@ module OpenGeographiesPlatform
       end
     end
 
+    SEARCHABLE_TYPES = %w[String Text RichText].freeze
+
+    # Fields every search already looks in (Site::DEFAULT_SEARCH_ATTRIBUTES),
+    # so not offered as a choice.
+    ALWAYS_SEARCHED = %w[description short_description].freeze
+
     ADMINISTRATIVE_AREA = Entry.new(attribute: 'administrative_area.name', label: 'Administrative area', facetable: true).freeze
 
     class << self
@@ -59,6 +65,30 @@ module OpenGeographiesPlatform
         end
 
         entries.uniq(&:attribute)
+      end
+
+      # The text fields a search can look in besides the name, for the
+      # console's "Also search in" list: [{ path:, label: }]. A promoted
+      # field is indexed under its promoted key ("Address" → `address`),
+      # any other under its label ("Nomination file" →
+      # `nomination_file.value`). Pick-lists are left out — they are filters.
+      def search_fields_for_models(project_models)
+        project_models.flat_map do |model|
+          model.user_defined_fields.order(:order).filter_map do |field|
+            next unless SEARCHABLE_TYPES.include?(field.data_type)
+
+            path = search_path(model, field)
+            next if ALWAYS_SEARCHED.include?(path)
+
+            { path:, label: field.column_name }
+          end
+        end.uniq { |entry| entry[:path] }
+      end
+
+      # Where the index holds a field's text.
+      def search_path(model, field)
+        promoted = (promoted_udfs_for[template_model_name_for(model)] || {})[field.column_name]
+        promoted ? promoted.to_s : "#{field.column_name.to_s.parameterize.underscore}.value"
       end
 
       private

@@ -111,6 +111,7 @@ module CoreDataConnector
           'geometry' => @mapping,
           'fields_created' => @fields_created.presence,
           'filters_added' => @filters_added.presence,
+          'searched_fields' => @searched_fields.presence,
           'hidden_fields' => @hidden_fields.presence,
           'problems' => @problems.presence,
           'reindex_job_id' => reindex&.id
@@ -276,6 +277,12 @@ module CoreDataConnector
       hidden = []
       hidden << @fields[@identifier_column].column_name.parameterize.underscore if @identifier_column
 
+      # Text fields become searchable ("Peachtree" finds the addresses).
+      searchable = @fields.except(@identifier_column).values
+                          .select { |field| ::OpenGeographiesPlatform::FacetCatalog::SEARCHABLE_TYPES.include?(field.data_type) }
+                          .to_h { |field| [::OpenGeographiesPlatform::FacetCatalog.search_path(@model, field), field.column_name] }
+      @searched_fields = []
+
       @filters_added = []
       @hidden_fields = []
 
@@ -292,6 +299,14 @@ module CoreDataConnector
 
               facets << { 'name' => name, 'type' => 'list' }
               @filters_added << label
+            end
+
+            fields = (search['search_fields'] ||= [])
+            searchable.each do |path, label|
+              next if fields.include?(path)
+
+              fields << path
+              @searched_fields << label
             end
           end
 
@@ -311,6 +326,7 @@ module CoreDataConnector
 
       @filters_added.uniq!
       @hidden_fields.uniq!
+      @searched_fields.uniq!
     end
 
     # A search with no collection covers the whole project.

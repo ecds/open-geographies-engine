@@ -34,6 +34,21 @@ module CoreDataConnector
       render json: { models: ::OpenGeographiesPlatform::FieldCatalog.for_models(models) }, status: :ok
     end
 
+    # GET /core_data/sites/:id/search_fields
+    #
+    # The text fields this site's searches can look in besides the name, with
+    # where the index holds each (OpenGeographiesPlatform::FacetCatalog
+    # .search_fields_for_models). The console's "Also search in" list,
+    # stored per search as `search_fields`.
+    def search_fields
+      site = Site.find(params[:id])
+      authorize site, :show?
+
+      models = ProjectModel.where(project_id: site.project_id).order(:order)
+
+      render json: { search_fields: ::OpenGeographiesPlatform::FacetCatalog.search_fields_for_models(models) }, status: :ok
+    end
+
     # GET /core_data/sites/:id/config
     #
     # Emits the config.json document for the site: the stored config with the

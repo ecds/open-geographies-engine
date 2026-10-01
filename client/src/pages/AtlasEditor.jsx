@@ -9,6 +9,7 @@ import {
   fetchSiteConfig,
   fetchSiteFacets,
   fetchSiteFields,
+  fetchSiteSearchFields,
   reindexSearchCollection,
   updateSite,
   uploadSiteAsset
@@ -69,6 +70,7 @@ const AtlasEditor = ({ id, navigate }) => {
   const [collections, setCollections] = useState([]);
   const [facets, setFacets] = useState([]);
   const [fieldModels, setFieldModels] = useState([]);
+  const [searchFields, setSearchFields] = useState([]);
   const [tab, setTab] = useState('general');
   const [advancedText, setAdvancedText] = useState('');
   const [advancedError, setAdvancedError] = useState(false);
@@ -89,7 +91,8 @@ const AtlasEditor = ({ id, navigate }) => {
           fetchSiteAssets(id).then((d) => setAssets(d.assets || [])),
           fetchSearchCollections(data.site.project_id).then((d) => setCollections(d.search_collections || [])),
           fetchSiteFacets(id).then((d) => setFacets(d.facets || [])),
-          fetchSiteFields(id).then((d) => setFieldModels(d.models || []))
+          fetchSiteFields(id).then((d) => setFieldModels(d.models || [])),
+          fetchSiteSearchFields(id).then((d) => setSearchFields(d.search_fields || []))
         ]);
       })
       .catch((error) => setErrors(errorMessages(error)));
@@ -434,6 +437,13 @@ const AtlasEditor = ({ id, navigate }) => {
               <input className='input' onChange={(e) => updateSearch(index, { result_limit: e.target.value ? parseInt(e.target.value, 10) : undefined })} type='number' value={entry.result_limit || ''} />
             </Field>
           </div>
+          <Field label='Also search in' hint='The search box always looks at names and descriptions; choose other text fields it should look in, such as an address.'>
+            <MultiSelect
+              onChange={(paths) => updateSearch(index, { search_fields: paths })}
+              options={_.map(searchFields, (f) => ({ value: f.path, text: f.label }))}
+              value={entry.search_fields || []}
+            />
+          </Field>
           <Field label='Facets' hint='In display order. Only attributes the index can facet on are offered.'>
             <MultiSelect
               onChange={(names) => updateSearch(index, {

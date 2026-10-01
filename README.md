@@ -159,8 +159,16 @@ until the curator presses Import. Then:
 - with an identifier column, importing again skips rows whose id is already in the atlas;
   rows of one file that share an id (one listing covering several buildings) are all
   imported, and the preview warns that the column repeats;
-- afterwards the project's atlases get the category and pick-list fields as filters, and
-  the identifier is hidden on public pages (only ever added, never removed).
+- afterwards the project's atlases get the category and pick-list fields as filters, their
+  text fields added to what the search box looks in, and the identifier hidden on public
+  pages (only ever added, never removed);
+- the import panel then follows the reindex and says when the atlas is live — or, in the
+  curator's terms, why the shared index refused it.
+
+Each search's "Also search in" (Settings → Search; `search_fields`, from
+`GET /core_data/sites/:id/search_fields`) lists text fields by where the index holds them —
+a promoted field under its key (`address`), any other as `<label>.value` — and is emitted to
+the renderer as `elasticsearch.search_attributes` after the name and descriptions.
 
 Older .xls, a bare .shp and KML are refused with instructions. Fixtures for each reader,
 written with independent tools (openpyxl, odfpy, GDAL), are in `test/fixtures/datasets/`.

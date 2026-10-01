@@ -51,6 +51,7 @@ module OpenGeographiesPlatform
           get :config, action: :site_config, on: :member
           get :facets, on: :member
           get :fields, on: :member
+          get :search_fields, on: :member
           post :build_tiles, on: :member
 
           # Images uploaded for the atlas (logo, favicon, page images).

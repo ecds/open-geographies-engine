@@ -134,6 +134,7 @@ module OpenGeographiesPlatform
         status 'dataset preview', post("/core_data/projects/#{a.project.id}/dataset_imports/preview", {}), '401'
         status 'dataset import', post("/core_data/projects/#{a.project.id}/dataset_imports", { dataset_import: { columns: [] } }), '401'
         status 'site images', get("/core_data/sites/#{a.site.id}/assets"), '401'
+        status 'search fields', get("/core_data/sites/#{a.site.id}/search_fields"), '401'
         status 'image upload', upload("/core_data/sites/#{a.site.id}/assets", 'x.png', PNG), '401'
         status 'image delete', delete("/core_data/sites/#{a.site.id}/assets/#{a.asset_key}"), '401'
         status 'wizard page itself is public html', request(Net::HTTP::Get, '/wizard', nil, nil, accept: 'text/html'), '200'
@@ -166,6 +167,7 @@ module OpenGeographiesPlatform
         refused 'dataset preview into A', post("/core_data/projects/#{a.project.id}/dataset_imports/preview", {}, b.token)
         refused 'dataset import into A', post("/core_data/projects/#{a.project.id}/dataset_imports", { dataset_import: { columns: [] } }, b.token)
         refused 'list A\'s images', get("/core_data/sites/#{a.site.id}/assets", b.token)
+        refused 'A\'s search fields', get("/core_data/sites/#{a.site.id}/search_fields", b.token)
         refused 'upload an image to A', upload("/core_data/sites/#{a.site.id}/assets", 'x.png', PNG, b.token)
         refused 'delete A\'s image', delete("/core_data/sites/#{a.site.id}/assets/#{a.asset_key}", b.token)
         refused 'delete A\'s image through B\'s own site', delete("/core_data/sites/#{b.site.id}/assets/#{a.asset_key}", b.token)
