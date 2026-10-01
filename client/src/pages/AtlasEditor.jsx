@@ -315,6 +315,12 @@ const AtlasEditor = ({ id, navigate }) => {
         </Field>
       </div>
       <p className='muted'>Each footer link appears only when it has an address. Use /{ locale }/pages/… for a page on this atlas.</p>
+      <Field
+        label='Copyright or rights line'
+        hint='The last line of every page. Leave it empty for none. {year} becomes the current year: “© {year} Emory University”, or “Photographs from the Library of Congress are in the public domain.”'
+      >
+        <input className='input' maxLength={300} onChange={(e) => updateBrandingSection('footer', { copyright: e.target.value })} value={branding.footer?.copyright || ''} />
+      </Field>
       <h4>Partner logos</h4>
       { _.map(footerLogos, (logo, index) => (
         <div className='card' key={index}>

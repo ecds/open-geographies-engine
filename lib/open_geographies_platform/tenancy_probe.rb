@@ -227,6 +227,8 @@ module OpenGeographiesPlatform
         status 'but not a javascript: link', res, %w[400 422]
         res = patch("/core_data/sites/#{a.site.id}", { site: { branding: { primary_color: '#000;}</style><script>' } } }, a.token)
         status 'nor a color that isn\'t one', res, %w[400 422]
+        res = patch("/core_data/sites/#{a.site.id}", { site: { branding: { footer: { copyright: 'x' * 301 } } } }, a.token)
+        status 'nor a 301-character copyright line', res, %w[400 422]
 
         res = upload("/core_data/sites/#{a.site.id}/assets", 'own.png', PNG, a.token)
         status 'own image upload', res, '200'

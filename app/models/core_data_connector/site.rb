@@ -275,6 +275,12 @@ module CoreDataConnector
       capitalization = document['header_capitalization']
       errors.add(:branding, "header capitalization must be one of #{BRANDING_CAPITALIZATION.join(', ')}") if capitalization.present? && !BRANDING_CAPITALIZATION.include?(capitalization)
 
+      # The footer's rights line, shown as written ("© {year} Emory
+      # University", "Photographs: public domain"). None unless set: an
+      # atlas of public-domain records shouldn't claim all rights by default.
+      copyright = footer['copyright']
+      errors.add(:branding, 'the copyright line must be text of at most 300 characters') if copyright.present? && !(copyright.is_a?(String) && copyright.length <= 300)
+
       images = [document['logo'], document['favicon'], document['share_image'], header['logo']]
       links = footer.values_at('terms_url', 'privacy_url', 'accessibility_url')
 
