@@ -17,6 +17,8 @@ module CoreDataConnector
     #   types       a category; each value becomes a term of the atlas's
     #               Types taxonomy (its standard facet). Several values may
     #               be separated by ";" or "|"
+    #   photo       the address of an image of the place, shown on its
+    #               detail page and panel (one column)
     #   field       kept as a field on the place
     #   skip        not imported
     #
@@ -57,6 +59,9 @@ module CoreDataConnector
       # "1983-03-"), links, GUIDs.
       DATE_LIKE = /\A\d{4}-\d{2}(-\d{0,2})?/
       URL_LIKE = %r{\A(https?://|www\.)}i
+      # An address that serves an image (a photo column of links).
+      IMAGE_URL = %r{\Ahttps?://\S+\.(jpe?g|png|gif|webp|avif)(\?\S*)?\z}i
+      PHOTO = /photo|image|picture|thumbnail|illustration|\Aimg\z/i
       GUID = /\A\{?\h{8}-\h{4}-\h{4}-\h{4}-\h{12}\}?\z/
 
       # A GIS export's own bookkeeping.
@@ -81,14 +86,21 @@ module CoreDataConnector
         columns = reader.columns
         geometry = Geometry.detect(reader.format, columns, rows.first(200))
         stats = column_stats(columns, rows)
+        summary = geometry_summary(rows, geometry, name_column(columns, stats))
 
         {
           'format' => reader.format,
           'row_count' => rows.size,
-          'geometry' => geometry.merge(geometry_summary(rows, geometry, name_column(columns, stats))),
+          'geometry' => geometry.merge(summary),
           'columns' => columns.map { |column| describe(column, stats[column], geometry, columns, stats) },
-          'warnings' => warnings(rows, columns, stats)
-        }
+          'warnings' => warnings(rows, columns, stats),
+          # Rows without a location can be looked up from an address; the
+          # columns that seem to make one.
+          'geocoding' => summary['counts']['missing'].positive? && Geocoder.available? ? {
+            'provider' => Geocoder::PROVIDER,
+            'suggested' => Geocoder.suggest(columns)
+          } : nil
+        }.compact
       end
 
       private
@@ -110,6 +122,8 @@ module CoreDataConnector
             not_a_name: values.any? && values.count { |v| v.match?(DATE_LIKE) || v.match?(URL_LIKE) || v.match?(GUID) } * 2 > values.size,
             checkmarks: Values.checkmark_column?(values),
             lowercase: Values.lowercase?(distinct),
+            links: values.any? && values.all? { |v| v.match?(URL_LIKE) },
+            image_links: values.any? && values.count { |v| v.match?(IMAGE_URL) } * 10 >= values.size * 8,
             # How many values each typed choice couldn't take, so the console
             # can warn before an import leaves them empty.
             misfits: TYPED.to_h { |type| [type, Values.misfits(values, type)] }.compact,
@@ -159,6 +173,17 @@ module CoreDataConnector
 
           [score, -index, column]
         end.max&.last
+      end
+
+      # The column of image addresses, if any: links whose header says photo
+      # or image, or links that are mostly to image files. The first one.
+      def photo_column(columns, stats)
+        return @photo_column if defined?(@photo_column)
+
+        @photo_column = columns.find do |column|
+          stat = stats[column]
+          (stat[:links] && column.match?(PHOTO)) || stat[:image_links]
+        end
       end
 
       # Why a column defaults to skip, or nil when it doesn't.
@@ -215,6 +240,7 @@ module CoreDataConnector
         return 'skip' if geometry['mode'] == 'feature' && (column.match?(Geometry::LATITUDE) || column.match?(Geometry::LONGITUDE))
         return 'name' if column == name_column(columns, stats)
         return 'identifier' if column.match?(IDENTIFIER) && stat[:duplicates].zero?
+        return 'photo' if column == photo_column(columns, stats)
         return 'types' if column.match?(TYPES)
         return 'skip' if skip_reason(column, stat)
 

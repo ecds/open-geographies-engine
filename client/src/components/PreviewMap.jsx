@@ -4,6 +4,8 @@ import config from '../config';
 
 const SOURCE = 'preview';
 const COLOR = '#0a3a4d';
+// Places found from their address (they carry the matched address).
+const FOUND_COLOR = '#c2410c';
 
 // Legacy `$type` filters match Multi* geometries too.
 const LAYERS = [
@@ -13,7 +15,12 @@ const LAYERS = [
     id: 'preview-point',
     type: 'circle',
     filter: ['==', '$type', 'Point'],
-    paint: { 'circle-radius': 5, 'circle-color': COLOR, 'circle-stroke-color': '#fff', 'circle-stroke-width': 1 }
+    paint: {
+      'circle-radius': 5,
+      'circle-color': ['case', ['has', 'matched'], FOUND_COLOR, COLOR],
+      'circle-stroke-color': '#fff',
+      'circle-stroke-width': 1
+    }
   }
 ];
 

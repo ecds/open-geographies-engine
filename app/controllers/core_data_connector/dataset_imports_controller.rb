@@ -11,11 +11,15 @@ module CoreDataConnector
   #     proposed role and field type per column, the geometry mapping and a
   #     sample of features, plus `blob_id` to import it by.
   #
+  #   POST /core_data/projects/:project_id/dataset_imports/geocode
+  #     Looks rows without a location up from their address (see #geocode).
+  #
   #   POST /core_data/projects/:project_id/dataset_imports
-  #     { dataset_import: { blob_id:, project_model_id:, columns: [{ name:, role:, label:, data_type:, capitalize: }] } }
+  #     { dataset_import: { blob_id:, project_model_id:, columns: [{ name:, role:, label:, data_type:, capitalize: }],
+  #                         geocode: { street:, city:, state:, zip:, city_value:, state_value:, zip_value: } } }
   #     Queues an import_dataset Job with the file attached (ImportDatasetJob).
   class DatasetImportsController < ApplicationController
-    ROLES = %w[name latitude longitude geometry identifier types field skip].freeze
+    ROLES = %w[name latitude longitude geometry identifier types photo field skip].freeze
     DATA_TYPES = %w[String Text Number Boolean Date FuzzyDate Select].freeze
 
     def preview
@@ -51,6 +55,83 @@ module CoreDataConnector
       render json: { errors: [{ base: e.message }] }, status: :unprocessable_entity
     end
 
+    # POST /core_data/projects/:project_id/dataset_imports/geocode
+    #   { blob_id:, columns: [{ name:, role: }], geocode: { street:, city:, state:, zip:,
+    #     city_value:, state_value:, zip_value: } }
+    #
+    # Looks up the uploaded rows that have no location from their address
+    # (DatasetImports::Geocoder), so the curator sees what will be found
+    # before importing: counts, the found places for the preview map, and
+    # the rows that weren't found. Up to GEOCODE_PREVIEW_LIMIT rows; the
+    # import itself looks up every row.
+    GEOCODE_PREVIEW_LIMIT = 1000
+
+    def geocode
+      project = Project.find(params[:project_id])
+      authorize project, :update?
+
+      blob = ActiveStorage::Blob.find_signed(params[:blob_id].to_s)
+      render json: { errors: [{ base: 'The uploaded file has expired; upload it again.' }] }, status: :unprocessable_entity and return if blob.nil?
+
+      config = geocode_params
+      render json: { errors: [{ base: 'Choose the column that holds the street address.' }] }, status: :unprocessable_entity and return unless DatasetImports::Geocoder.usable?(config)
+
+      columns = Array(params[:columns]).map { |c| c.permit(:name, :role).to_h }
+      name_column = columns.find { |c| c['role'] == 'name' }&.dig('name')
+
+      rows = []
+      blob.open do |file|
+        reader = DatasetImports::Reader.open(file.path, filename: blob.filename.to_s)
+        mapping = DatasetImports::Geometry.mapping_for(reader.format, columns)
+        reader.each_row do |row|
+          geometry, error = DatasetImports::Geometry.resolve(row, mapping)
+          rows << row if geometry.nil? && error.nil?
+        end
+      end
+
+      sample = rows.first(GEOCODE_PREVIEW_LIMIT)
+      addresses = sample.each_with_index.to_h do |row, index|
+        [index, DatasetImports::Geocoder.parts_for(row[:properties], config, name_column && row[:properties][name_column])]
+      end
+      results = DatasetImports::Geocoder.locate(addresses.reject { |_index, parts| parts.first.blank? })
+
+      counts = Hash.new(0)
+      features = []
+      missed = []
+      approximate = []
+
+      sample.each_with_index do |row, index|
+        result = results[index]
+        status = addresses[index].first.blank? ? 'no_address' : (result&.status || 'not_found')
+        counts[status] += 1
+
+        name = name_column && row[:properties][name_column]
+        if result&.found?
+          features << { 'type' => 'Feature', 'geometry' => { 'type' => 'Point', 'coordinates' => [result.longitude, result.latitude] },
+                        'properties' => { 'name' => name, 'matched' => result.matched, 'status' => status } }
+          if status == 'approximate' && approximate.size < 50
+            approximate << { 'name' => name, 'address' => addresses[index].compact_blank.join(', '), 'matched' => result.matched }
+          end
+        elsif missed.size < 50
+          missed << { 'name' => name, 'address' => addresses[index].compact_blank.join(', '), 'status' => status }
+        end
+      end
+
+      render json: {
+        geocode: {
+          'provider' => DatasetImports::Geocoder::PROVIDER,
+          'looked_up' => sample.size,
+          'without_location' => rows.size,
+          'counts' => counts,
+          'features' => { 'type' => 'FeatureCollection', 'features' => features },
+          'approximate' => approximate,
+          'not_found' => missed
+        }
+      }, status: :ok
+    rescue DatasetImports::Geocoder::Unavailable => e
+      render json: { errors: [{ base: "#{e.message} Try again in a moment, or import without looking the addresses up." }] }, status: :service_unavailable
+    end
+
     def create
       project = Project.find(params[:project_id])
       authorize project, :update?
@@ -71,11 +152,15 @@ module CoreDataConnector
       errors = validate_columns(columns)
       render json: { errors: errors.map { |e| { base: e } } }, status: :unprocessable_entity and return if errors.any?
 
+      geocode = geocode_params
+      extra = { 'filename' => blob.filename.to_s, 'project_model_id' => model.id, 'columns' => columns }
+      extra['geocode'] = geocode if DatasetImports::Geocoder.usable?(geocode)
+
       job = Job.new(
         project_id: project.id,
         user_id: current_user.id,
         job_type: Job::JOB_TYPE_IMPORT_DATASET,
-        extra: { 'filename' => blob.filename.to_s, 'project_model_id' => model.id, 'columns' => columns }
+        extra:
       )
       job.file.attach(blob)
       job.save!
@@ -84,6 +169,16 @@ module CoreDataConnector
     end
 
     private
+
+    # Which columns (or typed values) make up an address; blank parts dropped.
+    def geocode_params
+      raw = params[:geocode] || params.dig(:dataset_import, :geocode)
+      return {} unless raw.respond_to?(:permit)
+
+      raw.permit(:exact_only, *DatasetImports::Geocoder::PARTS, *DatasetImports::Geocoder::PARTS.map { |part| :"#{part}_value" })
+         .to_h.transform_values { |value| value.to_s.strip }.compact_blank
+         .then { |config| config['exact_only'] == 'true' ? config.merge('exact_only' => true) : config.except('exact_only') }
+    end
 
     # Marks columns whose label matches a field the model already has, so the
     # import fills that field (and keeps its type) instead of adding a twin.
@@ -119,7 +214,7 @@ module CoreDataConnector
         choice = choice.slice('role', 'label', 'data_type', 'capitalize')
         # Capitalizing applies where this file's categories are lower case.
         choice['capitalize'] &&= column['capitalize'] == true
-        field = %w[field identifier].include?(choice['role']) ? existing_field(model, choice['label'], profile['format']) : nil
+        field = %w[field identifier photo].include?(choice['role']) ? existing_field(model, choice['label'], profile['format']) : nil
         mark_existing!(choice, field) if field
 
         column['previous'] = choice
@@ -170,6 +265,7 @@ module CoreDataConnector
       errors << 'Choose at most one geometry column.' if roles.count('geometry') > 1
       errors << 'Use coordinate columns or a geometry column, not both.' if roles.include?('latitude') && roles.include?('geometry')
       errors << 'Choose at most one identifier column.' if roles.count('identifier') > 1
+      errors << 'Choose at most one photo column.' if roles.count('photo') > 1
 
       columns.each do |column|
         next unless column['role'] == 'field'

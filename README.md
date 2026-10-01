@@ -152,6 +152,19 @@ until the curator presses Import. Then:
 - each row becomes a Place with its name, geometry and typed field values;
 - missing fields are created on the Places model; a column matching an existing field
   (e.g. "Short Description") fills it, so canonical promotions still apply;
+- rows without coordinates can be placed from their address: the preview's "Find locations
+  from addresses" uses the chosen columns (or a city/state typed once) with the U.S. Census
+  Bureau's batch geocoder (`DatasetImports::Geocoder`; free, no key, U.S. only;
+  `OG_GEOCODER=none` turns it off), shows what was found on the preview map (orange), lists the
+  approximate matches to check and the rows not placed (descriptions, intersections, a match in
+  another town), and the import looks every row up the same way (`located_from_address`,
+  `address_not_found` in the job counts). A name that is an address ("621 Ruben Street
+  (House)") stands in for an empty street column. Places still without a location are listed
+  but not mapped, and the preview says how many before import;
+- a **Photo** column (image addresses; suggested from its header or from links to image files)
+  is stored as a field and named the places' photo (`detail_pages.models.places.photo_field`,
+  hidden from the field list): the renderer shows it on the detail page and in the map panel
+  when the place has no media of its own. Columns of links are never added to the search;
 - a category column becomes Types terms on the canonical Places→Types relationship
   (created as the template defines it if the project lacks one) — the atlas's `types` facet;
   values written all in lower case (`building`) are proposed title-cased (`Building`,

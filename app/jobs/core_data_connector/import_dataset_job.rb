@@ -66,6 +66,7 @@ module CoreDataConnector
       @row_label = %w[geojson shapefile].include?(format) ? 'Feature' : 'Row'
       @name_column = role_column('name')
       @identifier_column = role_column('identifier')
+      @photo_column = role_column('photo')
       @counts = Hash.new(0)
       @problems = []
 
@@ -75,9 +76,16 @@ module CoreDataConnector
       @checkmark_columns = @fields.select { |_column, field| field.data_type == 'Boolean' }.keys.select do |column|
         DatasetImports::Values.checkmark_column?(rows.map { |row| row[:properties][column] })
       end
+      # Columns of web addresses (photo links, record links): shown as links,
+      # never searched — "storage" shouldn't match every photo's address.
+      @link_columns = @fields.keys.select do |column|
+        values = rows.filter_map { |row| row[:properties][column].presence }
+        values.any? && values.all? { |value| value.match?(DatasetImports::Profile::URL_LIKE) }
+      end
       @types = ensure_types! if columns.any? { |c| c['role'] == 'types' }
       @known_identifiers = known_identifiers
       @file_identifiers = Set.new
+      @geocoded = geocode_missing(rows, job.extra['geocode'])
 
       last_reported_at = nil
 
@@ -114,6 +122,7 @@ module CoreDataConnector
           'searched_fields' => @searched_fields.presence,
           'hidden_fields' => @hidden_fields.presence,
           'problems' => @problems.presence,
+          'geocode_error' => @geocode_error,
           'reindex_job_id' => reindex&.id
         ).compact
       )
@@ -143,6 +152,7 @@ module CoreDataConnector
 
       geometry, geometry_error = DatasetImports::Geometry.resolve(row, @mapping)
       problem(line, geometry_error) if geometry_error
+      geometry ||= geocoded_geometry(row, line, name) unless geometry_error
 
       # A savepoint per row, so one bad row doesn't undo its batch.
       ActiveRecord::Base.transaction(requires_new: true) do
@@ -204,9 +214,9 @@ module CoreDataConnector
       existing = @model.user_defined_fields.index_by { |field| field.column_name.parameterize }
       order = (@model.user_defined_fields.maximum(:order) || -1) + 1
 
-      @columns.select { |c| %w[field identifier].include?(c['role']) }.to_h do |column|
+      @columns.select { |c| %w[field identifier photo].include?(c['role']) }.to_h do |column|
         label = column['label'].presence || column['name']
-        data_type = column['role'] == 'identifier' ? 'String' : column['data_type']
+        data_type = %w[identifier photo].include?(column['role']) ? 'String' : column['data_type']
         values = rows.filter_map { |row| row[:properties][column['name']] }.uniq
         field = existing[label.parameterize]
 
@@ -266,8 +276,10 @@ module CoreDataConnector
     # Settings: the category and every pick-list field become filters on
     # each search (of each of the project's atlases) that covers this model,
     # and the identifier field — an internal key — is hidden on public
-    # pages. Only adds; never removes a filter or a hidden field a curator
-    # chose.
+    # pages. A photo column becomes the places' photo
+    # (detail_pages.models.places.photo_field), shown as an image rather
+    # than listed as an address. Only adds; never removes a filter or a
+    # hidden field a curator chose, or replaces a photo field.
     def configure_sites!
       filters = {}
       filters['types'] = TYPES if @types
@@ -277,9 +289,13 @@ module CoreDataConnector
 
       hidden = []
       hidden << @fields[@identifier_column].column_name.parameterize.underscore if @identifier_column
+      # The photo shows as the place's image, not as an address in its fields.
+      photo_key = @photo_column && @fields[@photo_column].column_name.parameterize.underscore
+      hidden << photo_key if photo_key
 
-      # Text fields become searchable ("Peachtree" finds the addresses).
-      searchable = @fields.except(@identifier_column).values
+      # Text fields become searchable ("Peachtree" finds the addresses);
+      # columns of web addresses don't.
+      searchable = @fields.except(@identifier_column, *@link_columns).values
                           .select { |field| ::OpenGeographiesPlatform::FacetCatalog::SEARCHABLE_TYPES.include?(field.data_type) }
                           .to_h { |field| [::OpenGeographiesPlatform::FacetCatalog.search_path(@model, field), field.column_name] }
       @searched_fields = []
@@ -309,6 +325,11 @@ module CoreDataConnector
               fields << path
               @searched_fields << label
             end
+          end
+
+          if photo_key
+            places = ((config['detail_pages'] ||= {})['models'] ||= {})['places'] ||= {}
+            places['photo_field'] ||= photo_key
           end
 
           if hidden.any?
@@ -342,6 +363,59 @@ module CoreDataConnector
 
     def role_column(role)
       @columns.find { |c| c['role'] == role }&.dig('name')
+    end
+
+    # --- Addresses -------------------------------------------------------------
+
+    # Looks up, from their address, the rows that have no location of their
+    # own (DatasetImports::Geocoder); { row index => Result }. An unreachable
+    # lookup doesn't fail the import: the places come in without a location
+    # and the job says why.
+    def geocode_missing(rows, config)
+      return {} unless DatasetImports::Geocoder.usable?(config)
+
+      @geocode_config = config
+      addresses = rows.each_with_object({}) do |row, wanted|
+        geometry, error = DatasetImports::Geometry.resolve(row, @mapping)
+        next unless geometry.nil? && error.nil?
+
+        parts = DatasetImports::Geocoder.parts_for(row[:properties], config, row[:properties][@name_column])
+        wanted[row[:index]] = parts if parts.first.present?
+      end
+
+      DatasetImports::Geocoder.locate(addresses)
+    rescue DatasetImports::Geocoder::Unavailable => e
+      @geocode_error = "#{e.message} Places without coordinates were imported without a location."
+      {}
+    end
+
+    def geocoded_geometry(row, line, name)
+      return nil unless @geocode_config
+
+      result = @geocoded[row[:index]]
+
+      if result&.found?(exact_only: @geocode_config['exact_only'] == true)
+        @counts['located_from_address'] += 1
+        @counts['approximate_address'] += 1 if result.status == 'approximate'
+        return { 'type' => 'Point', 'coordinates' => [result.longitude, result.latitude] }
+      end
+
+      parts = DatasetImports::Geocoder.parts_for(row[:properties], @geocode_config, name)
+
+      if parts.first.blank?
+        @counts['no_address'] += 1
+        return nil
+      end
+
+      @counts['address_not_found'] += 1
+      reason = case result&.status
+               when 'tie' then 'the address matches more than one place'
+               when 'other_town' then "the address was found only in another town (#{result.matched})"
+               when 'approximate' then "only an approximate match (#{result.matched}), and exact matches were chosen"
+               else 'the address wasn\'t found'
+               end
+      problem(line, "(#{name}): #{reason}: #{parts.compact_blank.join(', ')}")
+      nil
     end
 
     def fail_row(line, message)

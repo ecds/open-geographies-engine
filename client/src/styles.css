@@ -231,6 +231,10 @@ textarea.input { resize: vertical; }
 .column-actions { margin: 8px 0 12px; }
 .column-note { font-size: 12px; font-style: italic; }
 .column-option { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 12px; cursor: pointer; }
+.address-lookup { margin: 20px 0; padding: 16px; border: 1px solid var(--og-border); border-radius: 8px; }
+.address-lookup h4 { margin-top: 0; }
+.address-parts { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 12px; }
+.address-parts .input + .input { margin-top: 6px; }
 .column-warning { margin-top: 4px; font-size: 12px; color: var(--og-warning); max-width: 260px; }
 .table tr.has-note td { border-bottom: 0; }
 .column-note-row td { padding-top: 0; }

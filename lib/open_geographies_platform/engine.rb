@@ -75,6 +75,7 @@ module OpenGeographiesPlatform
 
         # A curator's own dataset (CSV / GeoJSON): preview, then import.
         post 'projects/:project_id/dataset_imports/preview', to: 'dataset_imports#preview', as: nil
+        post 'projects/:project_id/dataset_imports/geocode', to: 'dataset_imports#geocode', as: nil
         post 'projects/:project_id/dataset_imports', to: 'dataset_imports#create', as: nil
 
         # --- Public V1 API (→ /core_data/public/v1/...) ---

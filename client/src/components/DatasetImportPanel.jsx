@@ -11,6 +11,7 @@ import _ from 'underscore';
 import { createDatasetImport, errorMessages, previewDatasetImport } from '../api';
 import useJobPolling from '../hooks/useJobPolling';
 import { isTerminal, JobStatuses } from '../jobs';
+import AddressLookup from './AddressLookup';
 import JobStatus from './JobStatus';
 import ReindexStatus from './ReindexStatus';
 import {
@@ -35,12 +36,13 @@ const ROLES = [
   { value: 'longitude', text: 'Longitude' },
   { value: 'geometry', text: 'Geometry' },
   { value: 'identifier', text: 'Identifier' },
+  { value: 'photo', text: 'Photo (image address)' },
   { value: 'skip', text: 'Don\u2019t import' }
 ];
 
 // Roles a file can have at most one of; choosing one moves it off the
 // column that had it.
-const SINGLE_ROLES = ['name', 'latitude', 'longitude', 'geometry', 'identifier'];
+const SINGLE_ROLES = ['name', 'latitude', 'longitude', 'geometry', 'identifier', 'photo'];
 
 const TYPES = [
   { value: 'String', text: 'Short text' },
@@ -148,6 +150,9 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
   const [jobId, setJobId] = useState(null);
   const [result, setResult] = useState(null);
   const [errors, setErrors] = useState([]);
+  const [geocodeConfig, setGeocodeConfig] = useState({});
+  const [geocodeResult, setGeocodeResult] = useState(null);
+  const [useGeocode, setUseGeocode] = useState(false);
 
   const job = useJobPolling(jobId);
   const importing = !!jobId;
@@ -166,9 +171,13 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
     setErrors([]);
     setResult(null);
 
+    setGeocodeResult(null);
+    setUseGeocode(false);
+
     previewDatasetImport(projectId, file)
       .then((data) => {
         setPreview(data.dataset_import);
+        setGeocodeConfig({ ...(data.dataset_import.geocoding?.suggested || {}) });
         setColumns(data.dataset_import.previous_import
           ? withPreviousChoices(data.dataset_import.columns)
           : _.map(data.dataset_import.columns, (column) => ({ ...column })));
@@ -219,11 +228,12 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
     createDatasetImport(projectId, {
       blob_id: preview.blob_id,
       project_model_id: preview.project_model_id,
-      columns: _.map(columns, (c) => _.pick(c, 'name', 'role', 'label', 'data_type', 'capitalize'))
+      columns: _.map(columns, (c) => _.pick(c, 'name', 'role', 'label', 'data_type', 'capitalize')),
+      geocode: useGeocode && geocodeResult ? _.pick(geocodeConfig, (value) => value === true || (_.isString(value) && value !== '')) : undefined
     })
       .then((data) => setJobId(data.job.id))
       .catch((error) => setErrors(errorMessages(error)));
-  }, [columns, preview, projectId]);
+  }, [columns, geocodeConfig, geocodeResult, preview, projectId, useGeocode]);
 
   useEffect(() => {
     if (!job || !isTerminal(job.status)) {
@@ -240,6 +250,30 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
 
   const geometryCounts = preview?.geometry?.counts || {};
   const located = _.reduce(_.omit(geometryCounts, 'missing', 'invalid'), (sum, n) => sum + n, 0);
+
+  // Places found from their address join the preview map, and count as
+  // placed in the warning before import.
+  const lookupFeatures = useMemo(() => {
+    if (!useGeocode || !geocodeResult) {
+      return [];
+    }
+
+    const features = geocodeResult.features.features;
+    return geocodeConfig.exact_only ? _.filter(features, (f) => f.properties.status === 'exact') : features;
+  }, [geocodeConfig.exact_only, geocodeResult, useGeocode]);
+  const mapData = useMemo(() => preview && ({
+    type: 'FeatureCollection',
+    features: [...(preview.geometry?.features?.features || []), ...lookupFeatures]
+  }), [preview, lookupFeatures]);
+  const mapBbox = useMemo(() => {
+    const points = _.flatten(_.map(lookupFeatures, (f) => [f.geometry.coordinates]), true);
+    const base = preview?.geometry?.bbox;
+
+    return _.reduce(points, (box, [lon, lat]) => (box
+      ? [Math.min(box[0], lon), Math.min(box[1], lat), Math.max(box[2], lon), Math.max(box[3], lat)]
+      : [lon, lat, lon, lat]), base);
+  }, [preview, lookupFeatures]);
+  const unplaced = (geometryCounts.missing || 0) - lookupFeatures.length;
 
   // Bulk choices for wide files (a GIS export can have dozens of columns):
   // skip every column still set to Field, then turn on the ones wanted; or
@@ -280,7 +314,7 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
   };
 
   const renderColumn = (column) => {
-    const keeps = column.role === 'field' || column.role === 'identifier';
+    const keeps = column.role === 'field' || column.role === 'identifier' || column.role === 'photo';
 
     const typeNote = column.role === 'field' ? renderTypeNote(column) : null;
 
@@ -357,7 +391,8 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
       filters_added: filters,
       searched_fields: searched,
       hidden_fields: hidden,
-      problems: rowProblems
+      problems: rowProblems,
+      geocode_error: geocodeError
     } = result.extra || {};
 
     return (
@@ -369,10 +404,12 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
             <Stat label='Imported' tone='positive' value={counts.imported || 0} />
             { counts.skipped > 0 && <Stat label='Already in the atlas' value={counts.skipped} /> }
             { counts.shared_identifier > 0 && <Stat label='Shared an identifier' value={counts.shared_identifier} /> }
+            { counts.located_from_address > 0 && <Stat label='Placed from an address' value={counts.located_from_address} /> }
             { counts.without_geometry > 0 && <Stat label='No location' value={counts.without_geometry} /> }
             { counts.failed > 0 && <Stat label='Failed' tone='negative' value={counts.failed} /> }
           </div>
         )}
+        { geocodeError && <Message tone='warning'>{ geocodeError }</Message> }
         { !_.isEmpty(created) && <p className='muted'>New fields: { created.join(', ') }</p> }
         { !_.isEmpty(filters) && <p className='muted'>Added as filters on the atlas: { filters.join(', ') }</p> }
         { !_.isEmpty(searched) && <p className='muted'>The atlas’s search now also looks in: { searched.join(', ') }</p> }
@@ -419,27 +456,44 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
             <Message header='Rows whose location can’t be used (they import without one)' list={preview.geometry.problems} tone='warning' />
           )}
 
-          { located > 0 && (
+          { located + lookupFeatures.length > 0 && (
             <>
               <p className='muted'>
                 Showing { preview.geometry.features.features.length } of { located } located rows
+                { lookupFeatures.length > 0 && <>, and { lookupFeatures.length } found from their address (orange)</> }
               </p>
               <Suspense fallback={<div className='preview-map muted' style={{ height: 420 }}>Loading map…</div>}>
-                <PreviewMap bbox={preview.geometry.bbox} data={preview.geometry.features} />
+                <PreviewMap bbox={mapBbox} data={mapData} />
               </Suspense>
             </>
           )}
-          { located === 0 && (
+          { located === 0 && !preview.geocoding && (
             <Message tone='warning'>
               No column was recognized as a location. Set a latitude and a longitude column, or a geometry column, below.
             </Message>
+          )}
+          { preview.geocoding && (
+            <AddressLookup
+              blobId={preview.blob_id}
+              columns={columns}
+              config={geocodeConfig}
+              missing={geometryCounts.missing}
+              onConfigChange={setGeocodeConfig}
+              onResult={setGeocodeResult}
+              onUseChange={setUseGeocode}
+              projectId={projectId}
+              provider={preview.geocoding.provider}
+              result={geocodeResult}
+              use={useGeocode}
+            />
           )}
 
           <h4>Columns</h4>
           <p className='muted'>
             Each row becomes a place in { preview.project_model_name }. A <strong>Category</strong> column becomes the
             atlas’s place-type filter (separate several values with “;”). An <strong>Identifier</strong> is a unique id
-            from your source: importing again later skips rows whose id is already in the atlas.
+            from your source: importing again later skips rows whose id is already in the atlas. A <strong>Photo</strong>
+            column of image addresses is shown as each place’s picture.
             A <strong>Geometry</strong> column holds WKT or GeoJSON shapes. Columns that look like file bookkeeping start as “Don’t import”.
           </p>
           { previousImport && (
@@ -472,6 +526,12 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
           </div>
 
           { !_.isEmpty(problems) && <Message list={problems} tone='warning' /> }
+          { unplaced > 0 && (
+            <Message tone='warning'>
+              { unplaced } { unplaced === 1 ? 'place' : 'places' } will have no location: listed and searchable on the
+              atlas, but not on the map.
+            </Message>
+          )}
 
           <div className='actions'>
             <Button disabled={!_.isEmpty(problems) || importing} loading={importing} onClick={onImport} primary>

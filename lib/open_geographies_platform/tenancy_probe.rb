@@ -133,6 +133,7 @@ module OpenGeographiesPlatform
         status 'atlas create', post('/core_data/atlases', { atlas: { name: 'x' } }), '401'
         status 'dataset preview', post("/core_data/projects/#{a.project.id}/dataset_imports/preview", {}), '401'
         status 'dataset import', post("/core_data/projects/#{a.project.id}/dataset_imports", { dataset_import: { columns: [] } }), '401'
+        status 'address lookup', post("/core_data/projects/#{a.project.id}/dataset_imports/geocode", { geocode: { street: 'Address' } }), '401'
         status 'site images', get("/core_data/sites/#{a.site.id}/assets"), '401'
         status 'search fields', get("/core_data/sites/#{a.site.id}/search_fields"), '401'
         status 'image upload', upload("/core_data/sites/#{a.site.id}/assets", 'x.png', PNG), '401'
@@ -166,6 +167,7 @@ module OpenGeographiesPlatform
         refused 'admin_children scoped to project', get("/core_data/projects/#{a.project.id}/place_imports/admin_children?geoname_id=6295630", b.token)
         refused 'dataset preview into A', post("/core_data/projects/#{a.project.id}/dataset_imports/preview", {}, b.token)
         refused 'dataset import into A', post("/core_data/projects/#{a.project.id}/dataset_imports", { dataset_import: { columns: [] } }, b.token)
+        refused 'address lookup in A', post("/core_data/projects/#{a.project.id}/dataset_imports/geocode", { geocode: { street: 'Address' } }, b.token)
         refused 'list A\'s images', get("/core_data/sites/#{a.site.id}/assets", b.token)
         refused 'A\'s search fields', get("/core_data/sites/#{a.site.id}/search_fields", b.token)
         refused 'upload an image to A', upload("/core_data/sites/#{a.site.id}/assets", 'x.png', PNG, b.token)

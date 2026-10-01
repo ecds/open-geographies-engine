@@ -176,6 +176,13 @@ export const previewDatasetImport = (projectId, file) => {
   return request('POST', `/core_data/projects/${projectId}/dataset_imports/preview`, { form });
 };
 
+// Looks rows without coordinates up from their address (preview only).
+export const geocodeDatasetImport = (projectId, body) => request(
+  'POST',
+  `/core_data/projects/${projectId}/dataset_imports/geocode`,
+  { body }
+);
+
 export const createDatasetImport = (projectId, datasetImport) => request(
   'POST',
   `/core_data/projects/${projectId}/dataset_imports`,
