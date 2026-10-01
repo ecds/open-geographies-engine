@@ -1,4 +1,5 @@
 import {
+  Fragment,
   lazy,
   Suspense,
   useCallback,
@@ -46,8 +47,17 @@ const TYPES = [
   { value: 'Select', text: 'Pick-list (filterable)' },
   { value: 'Number', text: 'Number' },
   { value: 'Boolean', text: 'Yes / No' },
-  { value: 'Date', text: 'Date (YYYY-MM-DD)' }
+  { value: 'FuzzyDate', text: 'Date (a year, month or day)' },
+  { value: 'Date', text: 'Exact date (YYYY-MM-DD)' }
 ];
+
+// How the misfit warning names each type's values.
+const TYPE_VALUES = {
+  Number: 'numbers',
+  Boolean: 'yes/no values',
+  FuzzyDate: 'dates',
+  Date: 'exact dates (YYYY-MM-DD)'
+};
 
 const GEOMETRY_LABELS = {
   Point: 'Points',
@@ -189,55 +199,88 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
   const restoreSuggestions = () => setColumns(_.map(preview.columns, (c) => ({ ...c })));
   const fieldCount = _.filter(columns, (c) => c.role === 'field').length;
 
+  /**
+   * What the chosen type will do with this column's values: a warning when
+   * some can't be read as that type (they'd be left empty), or how a
+   * checkmark column reads.
+   */
+  const renderTypeNote = (column) => {
+    const misfit = column.misfits?.[column.data_type];
+
+    if (misfit) {
+      const kind = TYPE_VALUES[column.data_type];
+      const message = misfit.count >= column.filled
+        ? `None of these values are ${kind} (e.g. “${misfit.example}”), so they would all be left empty.`
+        : `${misfit.count} of ${column.filled} values aren’t ${kind} (e.g. “${misfit.example}”) and would be left empty.`;
+
+      return <div className='column-warning'>{ message } Try another type, or Short text.</div>;
+    }
+
+    if (column.data_type === 'Boolean' && column.checkmarks) {
+      return <div className='muted column-note'>Marked rows are Yes; blank rows are No.</div>;
+    }
+
+    return null;
+  };
+
   const renderColumn = (column) => {
     const keeps = column.role === 'field' || column.role === 'identifier';
 
+    const typeNote = column.role === 'field' ? renderTypeNote(column) : null;
+
     return (
-      <tr key={column.name}>
-        <td>
-          <strong>{ column.name }</strong>
-          <div className='muted'>{ column.filled } of { preview.row_count } filled</div>
-          { column.note && column.role === 'skip' && <div className='muted column-note'>{ column.note }</div> }
-          { column.role === 'identifier' && column.duplicates > 0 && (
-            <div className='column-warning'>
-              { column.duplicates } { column.duplicates === 1 ? 'row repeats' : 'rows repeat' } another row’s value.
-              They’re all imported, but a later import treats any row with one of these values as already imported.
-            </div>
-          )}
-        </td>
-        <td className='muted'>{ _.map(column.samples, (sample) => sample.length > 60 ? `${sample.slice(0, 60)}…` : sample).join(' · ') }</td>
-        <td>
-          <Select
-            onChange={(role) => updateColumn(column.name, { role })}
-            options={ROLES}
-            placeholder='Choose…'
-            value={column.role}
-          />
-        </td>
-        <td>
-          { keeps && (
-            <input
-              aria-label={`Field name for ${column.name}`}
-              className='input'
-              disabled={column.existing}
-              onChange={(e) => updateColumn(column.name, { label: e.target.value })}
-              value={column.label || ''}
-            />
-          )}
-          { keeps && column.existing && <div className='muted'>Fills the existing field</div> }
-        </td>
-        <td>
-          { column.role === 'field' && (
+      <Fragment key={column.name}>
+        <tr className={typeNote ? 'has-note' : undefined}>
+          <td>
+            <strong>{ column.name }</strong>
+            <div className='muted'>{ column.filled } of { preview.row_count } filled</div>
+            { column.note && column.role === 'skip' && <div className='muted column-note'>{ column.note }</div> }
+            { column.role === 'identifier' && column.duplicates > 0 && (
+              <div className='column-warning'>
+                { column.duplicates } { column.duplicates === 1 ? 'row repeats' : 'rows repeat' } another row’s value.
+                They’re all imported, but a later import treats any row with one of these values as already imported.
+              </div>
+            )}
+          </td>
+          <td className='muted'>{ _.map(column.samples, (sample) => sample.length > 60 ? `${sample.slice(0, 60)}…` : sample).join(' · ') }</td>
+          <td>
             <Select
-              disabled={column.existing}
-              onChange={(data_type) => updateColumn(column.name, { data_type })}
-              options={TYPES}
+              onChange={(role) => updateColumn(column.name, { role })}
+              options={ROLES}
               placeholder='Choose…'
-              value={column.data_type}
+              value={column.role}
             />
-          )}
-        </td>
-      </tr>
+          </td>
+          <td>
+            { keeps && (
+              <input
+                aria-label={`Field name for ${column.name}`}
+                className='input'
+                disabled={column.existing}
+                onChange={(e) => updateColumn(column.name, { label: e.target.value })}
+                value={column.label || ''}
+              />
+            )}
+            { keeps && column.existing && <div className='muted'>Fills the existing field</div> }
+          </td>
+          <td>
+            { column.role === 'field' && (
+              <Select
+                disabled={column.existing}
+                onChange={(data_type) => updateColumn(column.name, { data_type })}
+                options={TYPES}
+                placeholder='Choose…'
+                value={column.data_type}
+              />
+            )}
+          </td>
+        </tr>
+        { typeNote && (
+          <tr className='column-note-row'>
+            <td colSpan={5}>{ typeNote }</td>
+          </tr>
+        )}
+      </Fragment>
     );
   };
 
@@ -327,8 +370,8 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
           <p className='muted'>
             Each row becomes a place in { preview.project_model_name }. A <strong>Category</strong> column becomes the
             atlas’s place-type filter (separate several values with “;”). An <strong>Identifier</strong> is a unique id
-            from your source: importing again later skips rows whose id is already in the atlas. A <strong>Geometry</strong>
-            column holds WKT or GeoJSON shapes. Columns that look like file bookkeeping start as “Don’t import”.
+            from your source: importing again later skips rows whose id is already in the atlas.
+            A <strong>Geometry</strong> column holds WKT or GeoJSON shapes. Columns that look like file bookkeeping start as “Don’t import”.
           </p>
           <div className='row column-actions'>
             <Button disabled={fieldCount === 0} onClick={skipAllFields} subtle>Skip all fields ({ fieldCount })</Button>

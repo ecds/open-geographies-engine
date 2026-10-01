@@ -16,7 +16,7 @@ module CoreDataConnector
   #     Queues an import_dataset Job with the file attached (ImportDatasetJob).
   class DatasetImportsController < ApplicationController
     ROLES = %w[name latitude longitude geometry identifier types field skip].freeze
-    DATA_TYPES = %w[String Text Number Boolean Date Select].freeze
+    DATA_TYPES = %w[String Text Number Boolean Date FuzzyDate Select].freeze
 
     def preview
       project = Project.find(params[:project_id])

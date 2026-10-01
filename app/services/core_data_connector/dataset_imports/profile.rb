@@ -45,6 +45,9 @@ module CoreDataConnector
       TYPES = /\A(type|types|category|categories|kind|classification|place_?type|site_?type)\z/i
 
       BOOLEAN_VALUES = %w[true false yes no].freeze
+
+      # The types whose values can fail to read.
+      TYPED = %w[Number Boolean Date FuzzyDate].freeze
       NUMBER = /\A-?\d+(\.\d+)?\z/
       # "007", "00000741": codes, whose leading zeros a number would drop.
       LEADING_ZERO = /\A-?0\d/
@@ -105,6 +108,10 @@ module CoreDataConnector
             guid: values.any? && values.all? { |v| v.match?(GUID) },
             epoch_ms: values.any? && values.all? { |v| v.match?(EPOCH_MS_DIGITS) && EPOCH_MS.cover?(v.to_i) },
             not_a_name: values.any? && values.count { |v| v.match?(DATE_LIKE) || v.match?(URL_LIKE) || v.match?(GUID) } * 2 > values.size,
+            checkmarks: Values.checkmark_column?(values),
+            # How many values each typed choice couldn't take, so the console
+            # can warn before an import leaves them empty.
+            misfits: TYPED.to_h { |type| [type, Values.misfits(values, type)] }.compact,
             samples: distinct.first(SAMPLES_PER_COLUMN),
             max_length: values.map(&:length).max || 0,
             data_type: infer_type(values, distinct),
@@ -115,9 +122,10 @@ module CoreDataConnector
 
       def infer_type(values, distinct)
         return 'String' if values.empty?
-        return 'Boolean' if values.all? { |v| BOOLEAN_VALUES.include?(v.downcase) }
+        return 'Boolean' if values.all? { |v| BOOLEAN_VALUES.include?(v.downcase) } || Values.checkmark_column?(values)
         return 'Number' if values.all? { |v| v.match?(NUMBER) } && values.none? { |v| v.match?(LEADING_ZERO) }
         return 'Date' if values.all? { |v| v.match?(ISO_DATE) }
+        return 'FuzzyDate' if values.all? { |v| Values.fuzzy_date(v.strip) != :invalid }
         return 'Text' if values.any? { |v| v.length > 255 }
 
         if distinct.size <= SELECT_MAX_DISTINCT && distinct.size * 2 <= values.size &&
@@ -178,6 +186,8 @@ module CoreDataConnector
           'duplicates' => stat[:duplicates].positive? ? stat[:duplicates] : nil,
           'samples' => stat[:samples],
           'options' => stat[:options],
+          'misfits' => stat[:misfits].presence,
+          'checkmarks' => stat[:checkmarks] || nil,
           'note' => role == 'skip' ? skip_reason(column, stat) : nil
         }.compact
       end

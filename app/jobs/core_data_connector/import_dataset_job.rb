@@ -33,8 +33,6 @@ module CoreDataConnector
     SAMPLE_LIMIT = 20
     CATEGORY_SEPARATOR = /\s*[;|]\s*/
     TYPES = 'Types'.freeze
-    TRUE_VALUES = %w[true yes y 1].freeze
-    FALSE_VALUES = %w[false no n 0].freeze
 
     def perform(job_id)
       job = Job.find(job_id)
@@ -72,6 +70,11 @@ module CoreDataConnector
       @problems = []
 
       @fields = ensure_fields!(rows)
+
+      # Yes/No columns of marks and blanks ("X" on 7 rows): blanks are No.
+      @checkmark_columns = @fields.select { |_column, field| field.data_type == 'Boolean' }.keys.select do |column|
+        DatasetImports::Values.checkmark_column?(rows.map { |row| row[:properties][column] })
+      end
       @types = ensure_types! if columns.any? { |c| c['role'] == 'types' }
       @known_identifiers = known_identifiers
       @file_identifiers = Set.new
@@ -154,34 +157,21 @@ module CoreDataConnector
       fail_row(line, e.message)
     end
 
+    TYPE_NAMES = {
+      'Number' => 'number', 'Boolean' => 'yes/no value', 'Date' => 'full date (YYYY-MM-DD)',
+      'FuzzyDate' => 'date', 'Select' => 'value', 'String' => 'text', 'Text' => 'text'
+    }.freeze
+
     def user_defined_for(properties, line)
       @fields.each_with_object({}) do |(column, field), values|
-        value = cast(properties[column], field.data_type)
+        value = DatasetImports::Values.cast(properties[column], field.data_type, checkmarks: @checkmark_columns.include?(column))
 
         if value == :invalid
-          problem(line, "#{column}: \"#{properties[column].to_s.truncate(30)}\" is not a #{field.data_type.downcase}; left empty")
+          problem(line, "#{column}: \"#{properties[column].to_s.truncate(30)}\" is not a #{TYPE_NAMES.fetch(field.data_type, field.data_type.downcase)}; left empty")
           next
         end
 
         values[field.uuid] = value unless value.nil?
-      end
-    end
-
-    def cast(value, data_type)
-      return nil if value.nil?
-
-      case data_type
-      when 'Number'
-        return value.to_i if value.match?(/\A-?\d+\z/)
-
-        Float(value.tr(',', '.')) rescue :invalid
-      when 'Boolean'
-        return true if TRUE_VALUES.include?(value.downcase)
-        return false if FALSE_VALUES.include?(value.downcase)
-
-        :invalid
-      else
-        value
       end
     end
 

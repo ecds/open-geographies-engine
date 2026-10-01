@@ -140,8 +140,14 @@ not dates/links/ids), so `RESNAME` beats a first column of dates. Columns that c
 visitor would read start as *Don't import* with the reason shown — the same value in every
 row, GUIDs, GIS bookkeeping (`Shape_Length`, created/edited stamps), millisecond timestamps —
 and "Skip all fields" clears the rest of a wide export so the curator turns on only what they
-want. Numbers with leading zeros are offered as text. Nothing is written until the curator
-presses Import. Then:
+want. Numbers with leading zeros are offered as text. Dates as historical data has them — a
+year, a month (`1983-03`, NPS's `1983-03-`), a decade, a range, *circa* — are offered as a
+partial date (Core Data's fuzzy date, shown as "1911" or "March 1983", never with an invented
+day); *Exact date* takes only full YYYY-MM-DD. A column of marks and blanks ("X" on 7 rows)
+reads as Yes/No. For each type a column could take, the preview counts the values it couldn't
+read, and the console warns under the column before anything is left empty
+(`DatasetImports::Values` does the reading for both preview and import). Nothing is written
+until the curator presses Import. Then:
 
 - each row becomes a Place with its name, geometry and typed field values;
 - missing fields are created on the Places model; a column matching an existing field
