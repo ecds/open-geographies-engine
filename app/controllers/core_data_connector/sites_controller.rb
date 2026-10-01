@@ -108,8 +108,8 @@ module CoreDataConnector
     #
     # Uploads an image for the atlas. The type is read from the file's
     # contents, not the browser's claim, and must be one of
-    # Site::ASSET_CONTENT_TYPES; raster images get web-sized copies
-    # (SiteImages). Answers with the asset, including the public path the
+    # Site::ASSET_CONTENT_TYPES, or a TIFF, which is stored as a JPEG;
+    # raster images get web-sized copies (SiteImages). Answers with the asset, including the public path the
     # pages and branding reference it by.
     def upload_asset
       site = Site.find(params[:id])
@@ -119,12 +119,21 @@ module CoreDataConnector
       filename = File.basename(upload.original_filename.to_s).presence || 'image'
       content_type = Marcel::MimeType.for(Pathname.new(upload.tempfile.path), name: filename)
 
-      unless Site::ASSET_CONTENT_TYPES.include?(content_type)
-        render json: { errors: [{ base: 'Upload a PNG, JPEG, GIF, WebP, AVIF, SVG or ICO image.' }] }, status: :unprocessable_entity and return
+      tiff = content_type == SiteImages::TIFF
+
+      unless Site::ASSET_CONTENT_TYPES.include?(content_type) || tiff
+        render json: { errors: [{ base: 'Upload a PNG, JPEG, GIF, WebP, AVIF, SVG, ICO or TIFF image.' }] }, status: :unprocessable_entity and return
       end
 
-      if upload.size > Site::MAX_ASSET_BYTES
-        render json: { errors: [{ base: "Images can be at most #{Site::MAX_ASSET_BYTES / 1.megabyte} MB." }] }, status: :unprocessable_entity and return
+      if tiff && !SiteImages.converts_tiff?
+        render json: { errors: [{ base: SiteImages::TIFF_UNSUPPORTED }] }, status: :unprocessable_entity and return
+      end
+
+      # TIFFs (archival scans) run larger; they're stored as a JPEG.
+      limit = tiff ? SiteImages::MAX_TIFF_BYTES : Site::MAX_ASSET_BYTES
+      if upload.size > limit
+        kind = tiff ? 'TIFF images' : 'Images'
+        render json: { errors: [{ base: "#{kind} can be at most #{limit / 1.megabyte} MB." }] }, status: :unprocessable_entity and return
       end
 
       blob = SiteImages.upload(site, upload.tempfile.path, filename:, content_type:)

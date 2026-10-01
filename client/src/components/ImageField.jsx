@@ -3,7 +3,7 @@ import _ from 'underscore';
 import { errorMessages } from '../api';
 import { Button, Field, Message } from './ui';
 
-const ACCEPT = 'image/png,image/jpeg,image/gif,image/webp,image/avif,image/svg+xml,image/x-icon,.ico';
+const ACCEPT = 'image/png,image/jpeg,image/gif,image/webp,image/avif,image/svg+xml,image/x-icon,.ico,image/tiff,.tif,.tiff';
 
 /**
  * The atlas's uploaded images as a grid to pick from, plus an https://
@@ -39,7 +39,7 @@ export const AssetPicker = ({ assets, onCancel, onPick, onUpload }) => {
       <div className='row'>
         <Button loading={uploading} onClick={() => input.current?.click()}>Upload an image…</Button>
         <input accept={ACCEPT} hidden onChange={onFile} ref={input} type='file' />
-        <span className='muted'>PNG, JPEG, GIF, WebP, AVIF, SVG or ICO, up to 10 MB. Large photos are fine: visitors get a copy sized for their screen.</span>
+        <span className='muted'>PNG, JPEG, GIF, WebP, AVIF, SVG or ICO, up to 10 MB; TIFF up to 100 MB (stored as a JPEG). Large photos are fine: visitors get a copy sized for their screen.</span>
       </div>
       { !_.isEmpty(assets) && (
         <>

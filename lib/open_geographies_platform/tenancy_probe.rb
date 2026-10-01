@@ -284,6 +284,28 @@ module OpenGeographiesPlatform
 
       status 'deleting the photo', delete("/core_data/sites/#{a.site.id}/assets/#{asset['key']}", a.token), '204'
       status 'deletes its copies', get(largest['path'].to_s), '404'
+
+      tiff_copies(a, photo)
+    end
+
+    # A 16-bit TIFF scan (what archives hand out) is stored as a JPEG.
+    def tiff_copies(a, photo)
+      unless ::CoreDataConnector::SiteImages.converts_tiff?
+        status 'a TIFF is refused when it can\'t be converted', upload("/core_data/sites/#{a.site.id}/assets", 'scan.tif', 'II*' + "\0" * 64, a.token), '422'
+        return
+      end
+
+      scan = Vips::Image.new_from_buffer(photo, '').colourspace(:rgb16).tiffsave_buffer
+      res = upload("/core_data/sites/#{a.site.id}/assets", 'scan.tif', scan, a.token)
+      status 'a 16-bit TIFF scan uploads', res, '200'
+      asset = body(res)['asset'] || {}
+      check 'stored as a JPEG named for it, at full size',
+            asset['content_type'] == 'image/jpeg' && asset['filename'] == 'scan.jpg' && asset['width'] == 2400,
+            asset.slice('content_type', 'filename', 'width').inspect
+      res = get(asset['path'].to_s)
+      check 'served as an 8-bit JPEG', res['Content-Type'] == 'image/jpeg' && Vips::Image.new_from_buffer(res.body, '').format == :uchar, res['Content-Type']
+      status 'a damaged TIFF is refused', upload("/core_data/sites/#{a.site.id}/assets", 'cut.tif', scan[0, scan.bytesize / 3], a.token), '422'
+      delete("/core_data/sites/#{a.site.id}/assets/#{asset['key']}", a.token) if asset['key']
     end
 
     def group(title)

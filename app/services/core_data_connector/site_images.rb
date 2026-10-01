@@ -24,13 +24,25 @@ module CoreDataConnector
   # When re-encoding a JPEG or PNG at its own size saves nothing, the
   # original stands in for that largest copy.
   #
+  # TIFF — what archives and scanners hand out (the Library of Congress's
+  # best copy of a HABS photograph is a 17.9 MB TIFF) — can't be shown by a
+  # browser. It's converted at upload into a full-size JPEG (WebP when it's
+  # actually transparent): first page, upright, 8-bit sRGB (16-bit and CMYK
+  # scans included). The converted file is stored as the original and gets
+  # copies like any upload; the TIFF itself isn't kept. TIFFs may be larger
+  # than other uploads (MAX_TIFF_BYTES); the pixel limit is the same.
+  #
   # Uses libvips (FairData's Dockerfile installs it) through ruby-vips. Where
   # libvips can't be loaded, images are stored and served as uploaded, and
-  # the renderer falls back to a plain src.
+  # the renderer falls back to a plain src; TIFF is then refused with steps
+  # for exporting a JPEG.
   module SiteImages
     WIDTHS = [160, 320, 640, 1024, 1440, 2000].freeze
     RESIZABLE_TYPES = %w[image/png image/jpeg image/webp image/avif].freeze
     STAND_IN_TYPES = %w[image/png image/jpeg].freeze
+
+    TIFF = 'image/tiff'
+    MAX_TIFF_BYTES = 100.megabytes
 
     # A 10 MB upload can still decode to an enormous canvas (a flat-color
     # PNG); this bounds the work and memory one upload can cause.
@@ -63,6 +75,13 @@ module CoreDataConnector
     # original's blob. Raises Unreadable or TooLarge (with a message for the
     # curator) for an image it can't use; nothing is stored then.
     def self.upload(site, path, filename:, content_type:)
+      if content_type == TIFF
+        converted = convert_tiff(path)
+        path = converted[:file].path
+        filename = "#{File.basename(filename.to_s, '.*').presence || 'image'}.#{converted[:extension]}"
+        content_type = converted[:content_type]
+      end
+
       built = build(path, content_type, File.size(path))
 
       blob = ActiveStorage::Blob.create_and_upload!(
@@ -79,7 +98,53 @@ module CoreDataConnector
       store(site, blob, built) if built
 
       blob
+    ensure
+      converted&.dig(:file)&.close!
     end
+
+    # True when TIFF uploads can be converted here.
+    def self.converts_tiff?
+      return @converts_tiff unless @converts_tiff.nil?
+
+      @converts_tiff = available? && Vips.get_suffixes.include?('.tif')
+    end
+
+    # The TIFF at `path` as a full-size web image in a tempfile:
+    # { file:, content_type:, extension: }. Raises Unreadable or TooLarge.
+    def self.convert_tiff(path)
+      raise Unreadable, TIFF_UNSUPPORTED unless converts_tiff?
+
+      header = Vips::Image.new_from_file(path, access: :sequential, fail_on: :error)
+      check_pixels!(header)
+
+      # Streamed, never held whole in memory (a 100-megapixel 16-bit scan
+      # would be 600 MB): transparency is judged on a small preview, then
+      # the full-size image is written in one pass.
+      width, = upright_size(header)
+      transparent = header.has_alpha? && transparent?(upright_srgb(path, 512))
+      image = Vips::Image.thumbnail(path, width, height: UNBOUNDED, size: :down, export_profile: 'srgb').colourspace(:srgb)
+      image = image.cast(:uchar) unless image.format == :uchar
+      image = image.extract_band(0, n: image.bands - 1) if image.has_alpha? && !transparent
+
+      keep = Vips.at_least_libvips?(8, 15) ? { keep: :none } : { strip: true }
+      file = Tempfile.new(['og-tiff', transparent ? '.webp' : '.jpg'], binmode: true)
+
+      if transparent
+        image.webpsave(file.path, Q: 92, effort: 4, **keep)
+        { file:, content_type: 'image/webp', extension: 'webp' }
+      else
+        image.jpegsave(file.path, Q: 92, optimize_coding: true, interlace: true, **keep)
+        { file:, content_type: 'image/jpeg', extension: 'jpg' }
+      end
+    rescue Vips::Error => e
+      file&.close!
+      Rails.logger.info("[open_geographies] unreadable TIFF upload: #{e.message.lines.first&.strip}")
+      raise Unreadable, 'This TIFF couldn\'t be read. Open it in an image editor, export it as a JPEG, and upload that.'
+    end
+
+    TIFF_UNSUPPORTED = 'TIFF images can\'t be shown on the web, and this server can\'t convert them. ' \
+                       'Export a JPEG and upload that: in Preview, File → Export… → Format: JPEG; ' \
+                       'in Photoshop, File → Save a Copy… → JPEG.'
 
     # Removes an asset and its copies.
     def self.purge(site, attachment)
@@ -151,13 +216,7 @@ module CoreDataConnector
       return nil unless RESIZABLE_TYPES.include?(content_type) && available?
 
       header = Vips::Image.new_from_file(path, access: :sequential, fail_on: :error)
-      pixels = header.width * header.height
-
-      if pixels > MAX_PIXELS
-        raise TooLarge, "This image is #{header.width.to_fs(:delimited)} × #{header.height.to_fs(:delimited)} pixels " \
-                        "(#{pixels / 1_000_000} megapixels); images can be at most #{MAX_PIXELS / 1_000_000} megapixels. " \
-                        'Save a smaller copy and upload that.'
-      end
+      check_pixels!(header)
 
       # Decode it all once, strictly: thumbnail's fast path (shrink-on-load)
       # only warns about a truncated file, and would make copies of a
@@ -219,6 +278,15 @@ module CoreDataConnector
         'height' => built[:height],
         'og_variants' => entries
       ))
+    end
+
+    def self.check_pixels!(header)
+      pixels = header.width * header.height
+      return if pixels <= MAX_PIXELS
+
+      raise TooLarge, "This image is #{header.width.to_fs(:delimited)} × #{header.height.to_fs(:delimited)} pixels " \
+                      "(#{pixels / 1_000_000} megapixels); images can be at most #{MAX_PIXELS / 1_000_000} megapixels. " \
+                      'Save a smaller copy and upload that.'
     end
 
     # The size the image displays at: EXIF orientations 5–8 turn it a
