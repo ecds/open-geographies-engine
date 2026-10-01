@@ -32,9 +32,12 @@ WORKDIR /renderer
 COPY --from=build /renderer/dist ./dist
 COPY --from=build /renderer/node_modules ./node_modules
 COPY --from=build /renderer/package.json ./package.json
+COPY --from=build /renderer/scripts ./scripts
 
 ENV HOST=0.0.0.0
 ENV PORT=4321
 EXPOSE 4321
 
-CMD ["node", "dist/server/entry.mjs"]
+# scripts/serve.mjs (renderer 78af5ad on) serves the Brotli/gzip copies the
+# build writes; older renderer commits only have Astro's own entry.
+CMD ["sh", "-c", "if [ -f scripts/serve.mjs ]; then exec node scripts/serve.mjs; else exec node dist/server/entry.mjs; fi"]
