@@ -143,9 +143,11 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
         return { ...column, ...changes };
       }
 
-      // A single-use role moves off whichever column had it.
+      // A single-use role moves off whichever column had it: a former name
+      // column is still data (a field); a former identifier or coordinate
+      // column isn't worth showing, so it isn't imported.
       if (changes.role && _.contains(SINGLE_ROLES, changes.role) && column.role === changes.role) {
-        return { ...column, role: 'field' };
+        return { ...column, role: changes.role === 'name' ? 'field' : 'skip' };
       }
 
       return column;
@@ -180,6 +182,13 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
   const geometryCounts = preview?.geometry?.counts || {};
   const located = _.reduce(_.omit(geometryCounts, 'missing', 'invalid'), (sum, n) => sum + n, 0);
 
+  // Bulk choices for wide files (a GIS export can have dozens of columns):
+  // skip every column still set to Field, then turn on the ones wanted; or
+  // go back to the preview's suggestions.
+  const skipAllFields = () => setColumns((prev) => _.map(prev, (c) => (c.role === 'field' ? { ...c, role: 'skip' } : c)));
+  const restoreSuggestions = () => setColumns(_.map(preview.columns, (c) => ({ ...c })));
+  const fieldCount = _.filter(columns, (c) => c.role === 'field').length;
+
   const renderColumn = (column) => {
     const keeps = column.role === 'field' || column.role === 'identifier';
 
@@ -188,6 +197,13 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
         <td>
           <strong>{ column.name }</strong>
           <div className='muted'>{ column.filled } of { preview.row_count } filled</div>
+          { column.note && column.role === 'skip' && <div className='muted column-note'>{ column.note }</div> }
+          { column.role === 'identifier' && column.duplicates > 0 && (
+            <div className='column-warning'>
+              { column.duplicates } { column.duplicates === 1 ? 'row repeats' : 'rows repeat' } another row’s value.
+              They’re all imported, but a later import treats any row with one of these values as already imported.
+            </div>
+          )}
         </td>
         <td className='muted'>{ _.map(column.samples, (sample) => sample.length > 60 ? `${sample.slice(0, 60)}…` : sample).join(' · ') }</td>
         <td>
@@ -242,7 +258,8 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
         { result.status === JobStatuses.completed && (
           <div className='stats'>
             <Stat label='Imported' tone='positive' value={counts.imported || 0} />
-            { counts.skipped > 0 && <Stat label='Already imported' value={counts.skipped} /> }
+            { counts.skipped > 0 && <Stat label='Already in the atlas' value={counts.skipped} /> }
+            { counts.shared_identifier > 0 && <Stat label='Shared an identifier' value={counts.shared_identifier} /> }
             { counts.without_geometry > 0 && <Stat label='No location' value={counts.without_geometry} /> }
             { counts.failed > 0 && <Stat label='Failed' tone='negative' value={counts.failed} /> }
           </div>
@@ -310,9 +327,14 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
           <p className='muted'>
             Each row becomes a place in { preview.project_model_name }. A <strong>Category</strong> column becomes the
             atlas’s place-type filter (separate several values with “;”). An <strong>Identifier</strong> is a unique id
-            from your source: re-importing the file later skips rows already imported. A <strong>Geometry</strong> column
-            holds WKT or GeoJSON shapes.
+            from your source: importing again later skips rows whose id is already in the atlas. A <strong>Geometry</strong>
+            column holds WKT or GeoJSON shapes. Columns that look like file bookkeeping start as “Don’t import”.
           </p>
+          <div className='row column-actions'>
+            <Button disabled={fieldCount === 0} onClick={skipAllFields} subtle>Skip all fields ({ fieldCount })</Button>
+            <Button onClick={restoreSuggestions} subtle>Restore suggestions</Button>
+            <span className='muted'>Then set the columns you want back to Field.</span>
+          </div>
           <div className='scroll-x'>
             <table className='table'>
               <thead>

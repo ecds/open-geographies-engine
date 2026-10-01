@@ -135,7 +135,13 @@ Workbooks use roo and shapefiles rubyzip, both already in core-data-cloud's bund
 shapefile reader needs no GIS library. The preview proposes a role per
 column (place name, field, category, latitude, longitude, geometry, identifier, skip) and a
 field type, shows the rows on a map, and lists rows whose location can't be used (e.g. a
-projected CRS). Nothing is written until the curator presses Import. Then:
+projected CRS). The place-name suggestion is scored (a name-like header, filled, nearly unique,
+not dates/links/ids), so `RESNAME` beats a first column of dates. Columns that carry nothing a
+visitor would read start as *Don't import* with the reason shown — the same value in every
+row, GUIDs, GIS bookkeeping (`Shape_Length`, created/edited stamps), millisecond timestamps —
+and "Skip all fields" clears the rest of a wide export so the curator turns on only what they
+want. Numbers with leading zeros are offered as text. Nothing is written until the curator
+presses Import. Then:
 
 - each row becomes a Place with its name, geometry and typed field values;
 - missing fields are created on the Places model; a column matching an existing field
@@ -144,7 +150,9 @@ projected CRS). Nothing is written until the curator presses Import. Then:
   (created as the template defines it if the project lacks one) — the atlas's `types` facet;
 - short, repetitive text columns default to pick-list (Select) fields, which the index
   turns into `*_facet` keywords;
-- with an identifier column, re-importing the file skips rows already imported;
+- with an identifier column, importing again skips rows whose id is already in the atlas;
+  rows of one file that share an id (one listing covering several buildings) are all
+  imported, and the preview warns that the column repeats;
 - afterwards the project's atlases get the category and pick-list fields as filters, and
   the identifier is hidden on public pages (only ever added, never removed).
 

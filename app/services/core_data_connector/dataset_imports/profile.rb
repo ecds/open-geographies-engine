@@ -19,6 +19,11 @@ module CoreDataConnector
     #               be separated by ";" or "|"
     #   field       kept as a field on the place
     #   skip        not imported
+    #
+    # Columns that carry nothing a visitor would read — the same value in
+    # every row, GUIDs, a GIS export's bookkeeping (Shape_Length, created/
+    # edited stamps, millisecond timestamps) — default to skip, with a `note`
+    # saying why, so a 38-column export doesn't propose 36 fields.
     class Profile
       SAMPLE_FEATURES = 500
       SAMPLES_PER_COLUMN = 3
@@ -30,12 +35,35 @@ module CoreDataConnector
       SELECT_MAX_LENGTH = 60
 
       NAME = /\A(name|title|label|place|place_?name|site|site_?name|full_?name|display_?name)\z/i
+      # Headers that say "name" without being exactly that: RESNAME, PROP_NAME,
+      # Name_1, SiteName, Title (EN).
+      NAMEISH = /name|title/i
+      # Columns that look like names but aren't the place's: "Multiple
+      # resource name", "county name", "owner name", ...
+      NOT_A_PLACE_NAME = /multi|county|state|city|owner|architect|builder|file|layer|user|author|creator|editor/i
       IDENTIFIER = /\A(id|identifier|source_?id|record_?id|uuid|objectid|fid|gid|ref|reference)\z/i
       TYPES = /\A(type|types|category|categories|kind|classification|place_?type|site_?type)\z/i
 
       BOOLEAN_VALUES = %w[true false yes no].freeze
       NUMBER = /\A-?\d+(\.\d+)?\z/
+      # "007", "00000741": codes, whose leading zeros a number would drop.
+      LEADING_ZERO = /\A-?0\d/
       ISO_DATE = /\A\d{4}-\d{2}-\d{2}\z/
+
+      # Values that are something other than a name: dates (also partial,
+      # "1983-03-"), links, GUIDs.
+      DATE_LIKE = /\A\d{4}-\d{2}(-\d{0,2})?/
+      URL_LIKE = %r{\A(https?://|www\.)}i
+      GUID = /\A\{?\h{8}-\h{4}-\h{4}-\h{4}-\h{12}\}?\z/
+
+      # A GIS export's own bookkeeping.
+      GIS_BOOKKEEPING = /\A(shape_?(length|leng|len|area)|st_?(length|area)\(?.*|globalid|created_?(user|date)|last_?edited_?(user|date)|create_?date|edit_?date|creation_?date|editor|creator|edit_?user)\z/i
+
+      # Integers that read as epoch milliseconds between 1900 and 2100 (and
+      # not within four months of 1970, where small counts would match): how
+      # ArcGIS writes dates into GeoJSON. Negative before 1970.
+      EPOCH_MS = (-2_208_988_800_000)..(4_102_444_800_000)
+      EPOCH_MS_DIGITS = /\A-?\d{11,13}\z/
 
       attr_reader :reader
 
@@ -68,8 +96,15 @@ module CoreDataConnector
           distinct = values.uniq
 
           [column, {
+            rows: rows.size,
             filled: values.size,
             distinct: distinct.first(DISTINCT_CAP).size,
+            # Rows whose value an earlier row already has.
+            duplicates: values.size - distinct.size,
+            all_distinct: distinct.size,
+            guid: values.any? && values.all? { |v| v.match?(GUID) },
+            epoch_ms: values.any? && values.all? { |v| v.match?(EPOCH_MS_DIGITS) && EPOCH_MS.cover?(v.to_i) },
+            not_a_name: values.any? && values.count { |v| v.match?(DATE_LIKE) || v.match?(URL_LIKE) || v.match?(GUID) } * 2 > values.size,
             samples: distinct.first(SAMPLES_PER_COLUMN),
             max_length: values.map(&:length).max || 0,
             data_type: infer_type(values, distinct),
@@ -81,7 +116,7 @@ module CoreDataConnector
       def infer_type(values, distinct)
         return 'String' if values.empty?
         return 'Boolean' if values.all? { |v| BOOLEAN_VALUES.include?(v.downcase) }
-        return 'Number' if values.all? { |v| v.match?(NUMBER) }
+        return 'Number' if values.all? { |v| v.match?(NUMBER) } && values.none? { |v| v.match?(LEADING_ZERO) }
         return 'Date' if values.all? { |v| v.match?(ISO_DATE) }
         return 'Text' if values.any? { |v| v.length > 255 }
 
@@ -93,9 +128,38 @@ module CoreDataConnector
         'String'
       end
 
+      # The column most likely to be the place's name: scored on the header
+      # (exactly "name"/"title"/..., or one that contains name/title and isn't
+      # a county/owner/multiple-listing name), on being filled in nearly every
+      # row and on being nearly unique. Text only, and not mostly dates,
+      # links or GUIDs. Ties go to the leftmost column. Memoized: called per
+      # column.
       def name_column(columns, stats)
-        columns.find { |c| c.match?(NAME) && stats[c][:filled].positive? } ||
-          columns.find { |c| %w[String Text].include?(stats[c][:data_type]) && stats[c][:filled].positive? }
+        @name_column ||= columns.each_with_index.filter_map do |column, index|
+          stat = stats[column]
+          next unless stat[:filled].positive? && %w[String Text Select].include?(stat[:data_type]) && !stat[:not_a_name]
+
+          header = if column.match?(NAME) then 3
+                   elsif column.match?(NAMEISH) && !column.match?(NOT_A_PLACE_NAME) then 2
+                   else 0
+                   end
+
+          fill = stat[:filled].fdiv(stat[:rows])
+          unique = stat[:all_distinct].fdiv(stat[:filled])
+          score = header + (fill >= 0.9 ? 1 : fill) + (unique >= 0.9 ? 1 : unique)
+
+          [score, -index, column]
+        end.max&.last
+      end
+
+      # Why a column defaults to skip, or nil when it doesn't.
+      def skip_reason(column, stat)
+        return 'Same value in every row' if stat[:rows] > 1 && stat[:filled] == stat[:rows] && stat[:all_distinct] == 1
+        return 'Looks like GIS bookkeeping' if column.match?(GIS_BOOKKEEPING)
+        return 'Internal ids (GUIDs)' if stat[:guid]
+        return 'Timestamps in milliseconds' if stat[:epoch_ms]
+
+        nil
       end
 
       # A bare "id"-style header makes a poor field name; call it what it is.
@@ -111,8 +175,10 @@ module CoreDataConnector
           'label' => role == 'identifier' && column.match?(GENERIC_IDENTIFIER) ? 'Source ID' : column,
           'filled' => stat[:filled],
           'distinct' => stat[:distinct],
+          'duplicates' => stat[:duplicates].positive? ? stat[:duplicates] : nil,
           'samples' => stat[:samples],
-          'options' => stat[:options]
+          'options' => stat[:options],
+          'note' => role == 'skip' ? skip_reason(column, stat) : nil
         }.compact
       end
 
@@ -124,8 +190,9 @@ module CoreDataConnector
         # The features carry their own geometry; coordinate columns are copies.
         return 'skip' if geometry['mode'] == 'feature' && (column.match?(Geometry::LATITUDE) || column.match?(Geometry::LONGITUDE))
         return 'name' if column == name_column(columns, stats)
-        return 'identifier' if column.match?(IDENTIFIER) && stat[:distinct] == stat[:filled] && stat[:distinct] < DISTINCT_CAP
+        return 'identifier' if column.match?(IDENTIFIER) && stat[:duplicates].zero?
         return 'types' if column.match?(TYPES)
+        return 'skip' if skip_reason(column, stat)
 
         'field'
       end

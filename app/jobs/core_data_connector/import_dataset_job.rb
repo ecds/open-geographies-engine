@@ -18,8 +18,11 @@ module CoreDataConnector
   # filters, and the identifier field is hidden on public pages.
   #
   # Re-runs are safe when an identifier column is mapped: rows whose
-  # identifier is already on a place in the model are skipped. Without one,
-  # a re-run imports the rows again.
+  # identifier was already on a place in the model before this run are
+  # skipped. Rows of the same file that share an identifier are all imported
+  # (real data does this: one National Register listing covering eight
+  # buildings) and counted as `shared_identifier`; a re-run skips them all.
+  # Without an identifier, a re-run imports the rows again.
   #
   # Per-record indexing is suspended for the duration; one scoped reindex of
   # the touched models is queued at the end (ImportPlacesJob pattern).
@@ -71,6 +74,7 @@ module CoreDataConnector
       @fields = ensure_fields!(rows)
       @types = ensure_types! if columns.any? { |c| c['role'] == 'types' }
       @known_identifiers = known_identifiers
+      @file_identifiers = Set.new
 
       last_reported_at = nil
 
@@ -126,6 +130,10 @@ module CoreDataConnector
         return
       end
 
+      if identifier && @file_identifiers.include?(identifier)
+        @counts['shared_identifier'] += 1
+      end
+
       geometry, geometry_error = DatasetImports::Geometry.resolve(row, @mapping)
       problem(line, geometry_error) if geometry_error
 
@@ -139,7 +147,7 @@ module CoreDataConnector
         link_categories!(place, properties)
       end
 
-      @known_identifiers << identifier if identifier
+      @file_identifiers << identifier if identifier
       @counts['imported'] += 1
       @counts['without_geometry'] += 1 unless geometry
     rescue StandardError => e
