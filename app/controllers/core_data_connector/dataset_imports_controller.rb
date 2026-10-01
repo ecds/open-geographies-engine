@@ -28,6 +28,7 @@ module CoreDataConnector
       reader = DatasetImports::Reader.open(upload.tempfile.path, filename: upload.original_filename)
       profile = DatasetImports::Profile.new(reader).to_h
       annotate_existing_fields!(profile, model)
+      attach_previous_choices!(profile, model)
 
       blob = ActiveStorage::Blob.create_and_upload!(
         io: File.open(upload.tempfile.path),
@@ -40,7 +41,10 @@ module CoreDataConnector
           'blob_id' => blob.signed_id,
           'filename' => upload.original_filename,
           'project_model_id' => model.id,
-          'project_model_name' => model.name
+          'project_model_name' => model.name,
+          # So the console can tell, as the curator renames a column, whether
+          # the name fills an existing field (and takes its type).
+          'existing_fields' => model.user_defined_fields.map { |f| { 'label' => f.column_name, 'data_type' => f.data_type, 'uuid' => f.uuid } }
         )
       }, status: :ok
     rescue DatasetImports::Reader::UnsupportedFormat, DatasetImports::Reader::Invalid => e
@@ -80,18 +84,60 @@ module CoreDataConnector
     # Matching ignores case and punctuation: "short description" fills the
     # canonical "Short Description", which the index promotes.
     def annotate_existing_fields!(profile, model)
-      fields = model.user_defined_fields.to_a
-      existing = fields.index_by { |field| field.column_name.parameterize }
+      profile['columns'].each do |column|
+        field = existing_field(model, column['label'], profile['format'])
+        mark_existing!(column, field) if field
+      end
+    end
+
+    # The choices from the last upload into this model, by column name, so a
+    # second file of the same shape (the polygons after the points, next
+    # month's export) starts where the curator left off: each matching
+    # column gets `previous` (role, label, type — and the existing field its
+    # label now fills), and the profile says which upload they came from.
+    # The console applies them; "Restore suggestions" starts over.
+    def attach_previous_choices!(profile, model)
+      job = Job.where(project_id: model.project_id, job_type: Job::JOB_TYPE_IMPORT_DATASET, status: Job::JOB_STATUS_COMPLETED)
+               .where("extra->>'project_model_id' = ?", model.id.to_s)
+               .order(created_at: :desc)
+               .first
+      return unless job
+
+      previous = Array(job.extra['columns']).index_by { |column| column['name'] }
+      matched = 0
 
       profile['columns'].each do |column|
-        field = existing[column['label'].to_s.parameterize] || truncated_match(column['label'], fields, profile['format'])
-        next unless field
+        choice = previous[column['name']]
+        next unless choice
 
-        column['label'] = field.column_name
-        column['field_uuid'] = field.uuid
-        column['data_type'] = field.data_type if DATA_TYPES.include?(field.data_type)
-        column['existing'] = true
+        choice = choice.slice('role', 'label', 'data_type')
+        field = %w[field identifier].include?(choice['role']) ? existing_field(model, choice['label'], profile['format']) : nil
+        mark_existing!(choice, field) if field
+
+        column['previous'] = choice
+        matched += 1
       end
+
+      return if matched.zero?
+
+      profile['previous_import'] = {
+        'filename' => job.extra['filename'],
+        'imported_at' => job.created_at.iso8601,
+        'matched' => matched
+      }
+    end
+
+    def existing_field(model, label, format)
+      @fields ||= model.user_defined_fields.to_a
+      @fields.find { |field| field.column_name.parameterize == label.to_s.parameterize } ||
+        truncated_match(label, @fields, format)
+    end
+
+    def mark_existing!(column, field)
+      column['label'] = field.column_name
+      column['field_uuid'] = field.uuid
+      column['data_type'] = field.data_type if DATA_TYPES.include?(field.data_type)
+      column['existing'] = true
     end
 
     # A shapefile's .dbf cuts field names to 10 characters ("Short Desc");

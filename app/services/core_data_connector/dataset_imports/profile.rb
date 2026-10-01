@@ -180,6 +180,9 @@ module CoreDataConnector
           'name' => column,
           'role' => role,
           'data_type' => stat[:data_type],
+          # What the values suggest, kept when an existing field's type
+          # replaces data_type, so renaming away from that field restores it.
+          'inferred_type' => stat[:data_type],
           'label' => role == 'identifier' && column.match?(GENERIC_IDENTIFIER) ? 'Source ID' : column,
           'filled' => stat[:filled],
           'distinct' => stat[:distinct],

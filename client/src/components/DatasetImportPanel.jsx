@@ -71,6 +71,36 @@ const GEOMETRY_LABELS = {
 };
 
 /**
+ * The preview's columns with the curator's choices from the last upload into
+ * this model applied where the column names match (`column.previous`). A
+ * one-per-file role taken from the last upload moves off any other column
+ * the suggestions had given it.
+ */
+const withPreviousChoices = (columns) => {
+  const taken = _.chain(columns).pluck('previous').compact().pluck('role').intersection(SINGLE_ROLES).value();
+
+  return _.map(columns, (column) => {
+    if (column.previous) {
+      return { ..._.omit(column, 'existing', 'field_uuid'), ...column.previous };
+    }
+
+    if (_.contains(taken, column.role)) {
+      return { ...column, role: column.role === 'name' ? 'field' : 'skip' };
+    }
+
+    return { ...column };
+  });
+};
+
+// Field names match the way the server matches them (Rails' parameterize).
+const fieldKey = (label) => (label || '')
+  .toLowerCase()
+  .normalize('NFKD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/[^a-z0-9]+/g, '-')
+  .replace(/^-+|-+$/g, '');
+
+/**
  * Mirrors the server's checks so the curator sees what to fix before
  * pressing Import.
  */
@@ -139,7 +169,9 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
     previewDatasetImport(projectId, file)
       .then((data) => {
         setPreview(data.dataset_import);
-        setColumns(_.map(data.dataset_import.columns, (column) => ({ ...column })));
+        setColumns(data.dataset_import.previous_import
+          ? withPreviousChoices(data.dataset_import.columns)
+          : _.map(data.dataset_import.columns, (column) => ({ ...column })));
       })
       .catch((error) => {
         setPreview(null);
@@ -151,6 +183,22 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
   const updateColumn = useCallback((name, changes) => {
     setColumns((prev) => _.map(prev, (column) => {
       if (column.name === name) {
+        // Renaming re-checks whether the name fills an existing field (and
+        // so takes its type) or makes a new one.
+        if ('label' in changes) {
+          const field = _.find(preview?.existing_fields, (f) => fieldKey(f.label) === fieldKey(changes.label));
+          const base = _.omit(column, 'existing', 'field_uuid');
+
+          if (field) {
+            return { ...base, ...changes, existing: true, field_uuid: field.uuid, data_type: field.data_type };
+          }
+
+          // Leaving an existing field: back to the type the values suggest.
+          return column.existing
+            ? { ...base, ...changes, data_type: column.inferred_type || column.data_type }
+            : { ...base, ...changes };
+        }
+
         return { ...column, ...changes };
       }
 
@@ -163,7 +211,7 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
 
       return column;
     }));
-  }, []);
+  }, [preview]);
 
   const onImport = useCallback(() => {
     setErrors([]);
@@ -198,6 +246,8 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
   // go back to the preview's suggestions.
   const skipAllFields = () => setColumns((prev) => _.map(prev, (c) => (c.role === 'field' ? { ...c, role: 'skip' } : c)));
   const restoreSuggestions = () => setColumns(_.map(preview.columns, (c) => ({ ...c })));
+  const usePreviousChoices = () => setColumns(withPreviousChoices(preview.columns));
+  const previousImport = preview?.previous_import;
   const fieldCount = _.filter(columns, (c) => c.role === 'field').length;
 
   /**
@@ -214,7 +264,12 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
         ? `None of these values are ${kind} (e.g. “${misfit.example}”), so they would all be left empty.`
         : `${misfit.count} of ${column.filled} values aren’t ${kind} (e.g. “${misfit.example}”) and would be left empty.`;
 
-      return <div className='column-warning'>{ message } Try another type, or Short text.</div>;
+      // An existing field's type is fixed here; the way out is a new field.
+      const advice = column.existing
+        ? `“${column.label}” is an existing field of that type: give the column a new field name to make a new field instead.`
+        : 'Try another type, or Short text.';
+
+      return <div className='column-warning'>{ message } { advice }</div>;
     }
 
     if (column.data_type === 'Boolean' && column.checkmarks) {
@@ -257,7 +312,6 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
               <input
                 aria-label={`Field name for ${column.name}`}
                 className='input'
-                disabled={column.existing}
                 onChange={(e) => updateColumn(column.name, { label: e.target.value })}
                 value={column.label || ''}
               />
@@ -376,9 +430,16 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
             from your source: importing again later skips rows whose id is already in the atlas.
             A <strong>Geometry</strong> column holds WKT or GeoJSON shapes. Columns that look like file bookkeeping start as “Don’t import”.
           </p>
+          { previousImport && (
+            <Message tone='info'>
+              Using your choices from the last upload, { previousImport.filename } ({ new Date(previousImport.imported_at).toLocaleDateString() }),
+              for the { previousImport.matched } { previousImport.matched === 1 ? 'column' : 'columns' } this file shares with it.
+            </Message>
+          )}
           <div className='row column-actions'>
             <Button disabled={fieldCount === 0} onClick={skipAllFields} subtle>Skip all fields ({ fieldCount })</Button>
             <Button onClick={restoreSuggestions} subtle>Restore suggestions</Button>
+            { previousImport && <Button onClick={usePreviousChoices} subtle>Use last upload’s choices</Button> }
             <span className='muted'>Then set the columns you want back to Field.</span>
           </div>
           <div className='scroll-x'>
