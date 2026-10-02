@@ -21,7 +21,7 @@ where they meet these. Today's reference deployment is the demo stack in [`demo/
   | `OG_CONSOLE_URL` | The FairData host, as the renderer reaches it. With the host's `PRIMARY_DOMAIN` set, use exactly that domain; any other name gets a 301. |
   | `OG_CORE_DATA_INTERNAL_URL` | Only if the browser-facing Core Data URL doesn't resolve from the renderer (e.g. a container network). |
   | `OG_BASE_DOMAIN` | **Required.** The domain atlases live under (`atlas.example.edu` → `<slug>.atlas.example.edu`). Without it, every atlas address 404s. |
-  | `OG_ELASTICSEARCH_URL`, `OG_ELASTICSEARCH_API_KEY` | The shared index. The renderer only searches, so give it a **read-only** API key limited to `open_geographies_v1`. |
+  | `OG_ELASTICSEARCH_URL`, `OG_ELASTICSEARCH_API_KEY` | The search index. The renderer only searches, so give it a **read-only** API key limited to `open_geographies_v1` (and `open_geographies_v1_project_*` once each atlas has its own index, §8). |
   | `OG_SITE_SLUG` | **Unset** (it pins one atlas). |
   | `OG_TRUST_ATLAS_SLUG_HEADER` | **Unset**, unless a proxy sets `X-Atlas-Slug` itself and strips the client's. |
   | Optional | `OG_ATLAS_CACHE_TTL_MS` (30 s), `OG_ATLAS_ERROR_TTL_MS` (5 s), `OG_ATLAS_FETCH_TIMEOUT_MS` (5 s), `OG_ATLAS_CACHE_MAX_ENTRIES` (1,000), `OG_WORDPRESS_TIMEOUT_MS`. |
@@ -162,6 +162,11 @@ An open item with the indexing engine (the index-mapping proposal of 2026-09-30)
   copy runs with 3,000), watch the field count, and treat a failed reindex mentioning
   "Limit of total fields" or `mapper_parsing_exception` as this. The fix itself (one index
   per atlas, or mapping changes) belongs to the indexing engine.
+- [ ] One index per atlas is proposed to the indexing engine (`OpenGeographies::V1::Indexes`,
+  switched by `OG_INDEX_LAYOUT=shared|both|per_project`, with `og_indexes:build`, `report` and
+  `drop_shared` for the move). This engine is ready for it: when the indexing engine provides
+  it, each atlas's config names its own index and the console's Reindex rebuilds that index
+  with no downtime. Without it, or with `shared`, nothing changes.
 
 ## 9. Before the first atlas goes public
 
