@@ -114,6 +114,7 @@ module CoreDataConnector
     validate :validate_branding
     validate :validate_navigation
     validate :validate_domain
+    validate :validate_locales, if: :will_save_change_to_config?
 
     before_save :normalize_content
 
@@ -227,18 +228,42 @@ module CoreDataConnector
       document
     end
 
-    # The navbar document served to the renderer: the stored items, or a
-    # default (Explore, then each page) when none are stored. Items that point
-    # at a page ({ _template: 'Page', page: <slug> }) become links to it,
-    # labelled with its title unless the item has its own label; an item
-    # whose page no longer exists is dropped.
-    def to_navigation(default_locale = 'en')
-      pages = to_content['pages'].index_by { |page| page['slug'] }
+    # "Explore", the starter menu's link into the map, in each language.
+    EXPLORE_LABELS = { 'en' => 'Explore', 'es' => 'Explorar', 'fr' => 'Explorer', 'de' => 'Erkunden', 'it' => 'Esplora', 'pt' => 'Explorar' }.freeze
+
+    # The navbar document served to the renderer, in `locale` (one of the
+    # atlas's languages): the stored items, or a default (Explore, then each
+    # page) when none are stored. Items that point at a page ({ _template:
+    # 'Page', page: <slug> }) become links to it, labelled with its title (the
+    # translated one) unless the item has its own label; an item whose page
+    # no longer exists is dropped. An item's `labels` ({ es: 'Inicio' }) name
+    # it per language, and site links move to the language's prefix.
+    def to_navigation(locale = default_locale)
+      locale = locale.to_s
+      content = to_content
+      pages = localized_pages(content, locale).index_by { |page| page['slug'] }
+      translated = locale == default_locale ? pages.keys : Array(content.dig('translations', locale, 'pages')).pluck('slug')
       items = (navigation || {}).deep_stringify_keys['items']
 
-      items = default_navigation_items(default_locale, pages.values) if items.blank?
+      items = default_navigation_items(locale, pages.values) if items.blank?
 
-      { 'items' => items.filter_map { |item| resolve_navigation_item(item, pages, default_locale) } }
+      { 'items' => items.filter_map { |item| resolve_navigation_item(item, pages, locale, translated) } }
+    end
+
+    # The navbar in each of the atlas's languages.
+    def to_navigations
+      locales.index_with { |locale| to_navigation(locale) }
+    end
+
+    # The atlas's languages (config.i18n.locales), default first, limited to
+    # the ones the renderer routes (SiteContent::LOCALES).
+    def locales
+      listed = Array((config || {}).dig('i18n', 'locales')).map(&:to_s) & SiteContent::LOCALES.keys
+      ([default_locale] + listed).uniq
+    end
+
+    def default_locale
+      (config || {}).dig('i18n', 'default_locale').presence || 'en'
     end
 
     # The atlas's pages (see SiteContent), normalized, with a starter home
@@ -285,8 +310,14 @@ module CoreDataConnector
 
     private
 
-    def default_locale
-      (config || {}).dig('i18n', 'default_locale').presence || 'en'
+    # The atlas's pages in `locale`: each page's translation, where it has
+    # one (SiteContent translations), else the page as written.
+    def localized_pages(content, locale)
+      pages = content['pages']
+      return pages if locale == default_locale
+
+      translated = Array(content.dig('translations', locale, 'pages')).index_by { |page| page['slug'] }
+      pages.map { |page| translated[page['slug']]&.merge('slug' => page['slug']) || page }
     end
 
     # The first search app's page, e.g. /en/search/places.
@@ -297,26 +328,44 @@ module CoreDataConnector
 
     # The starter navbar for a site that hasn't customized navigation:
     # Explore (the first search) and then every page, in order.
-    def default_navigation_items(default_locale, pages)
-      explore = default_search_href(default_locale)
+    def default_navigation_items(locale, pages)
+      explore = default_search_href(locale)
 
       [
-        (explore && { '_template' => 'URL', 'label' => 'Explore', 'href' => explore }),
+        (explore && { '_template' => 'URL', 'label' => EXPLORE_LABELS[locale] || 'Explore', 'href' => explore }),
         *pages.map { |page| { '_template' => 'Page', 'page' => page['slug'] } }
       ].compact
     end
 
-    def resolve_navigation_item(item, pages, locale)
-      return item unless item.is_a?(Hash) && item['_template'] == 'Page'
+    def resolve_navigation_item(item, pages, locale, translated)
+      return item unless item.is_a?(Hash)
+      return localize_navigation_item(item, locale) unless item['_template'] == 'Page'
 
       page = pages[item['page']]
       return nil unless page
 
-      {
-        '_template' => 'URL',
-        'label' => item['label'].presence || page['title'],
-        'href' => "/#{locale}/pages/#{page['slug']}"
-      }
+      own = item_label(item, locale)
+      label = own || (translated.include?(page['slug']) && locale != default_locale ? page['title'] : item['label'].presence || page['title'])
+
+      { '_template' => 'URL', 'label' => label, 'href' => "/#{locale}/pages/#{page['slug']}" }
+    end
+
+    # A link item (and its dropdown options) in `locale`: its label for the
+    # language, and a site link under the default language's prefix moved to
+    # this one's (/en/search/places → /es/search/places).
+    def localize_navigation_item(item, locale)
+      localized = item.except('labels')
+      localized['label'] = item_label(item, locale) || item['label']
+      localized['href'] = item['href'].sub(%r{\A/#{Regexp.escape(default_locale)}(?=/|\z)}, "/#{locale}") if item['href'].is_a?(String)
+      localized['options'] = item['options'].map { |option| option.is_a?(Hash) ? localize_navigation_item(option, locale) : option } if item['options'].is_a?(Array)
+      localized.compact
+    end
+
+    # The item's own label in `locale`: its labels entry, or (in the default
+    # language) its label.
+    def item_label(item, locale)
+      labels = item['labels']
+      (labels.is_a?(Hash) && labels[locale].presence) || (locale == default_locale ? item['label'].presence : nil)
     end
 
     def validate_content
@@ -325,6 +374,20 @@ module CoreDataConnector
 
     def normalize_content
       self.content = SiteContent.new(content).to_h if will_save_change_to_content?
+    end
+
+    # The atlas's languages must be ones the renderer routes, and include the
+    # default.
+    def validate_locales
+      i18n = (config || {})['i18n']
+      return unless i18n.is_a?(Hash)
+
+      listed = Array(i18n['locales']).map(&:to_s)
+      unknown = listed - SiteContent::LOCALES.keys
+      errors.add(:config, "An atlas's languages can be #{SiteContent::LOCALES.values.join(', ')} (not #{unknown.join(', ')})") if unknown.any?
+
+      default = i18n['default_locale'].to_s
+      errors.add(:config, "The default language must be one of the atlas's languages.") if default.present? && listed.any? && !listed.include?(default)
     end
 
     def validate_domain
@@ -411,6 +474,14 @@ module CoreDataConnector
       end
 
       errors.add(:navigation, 'links must start with /, https://, http:// or mailto:') unless hrefs.all? { |href| SiteContent.safe_link?(href) }
+
+      # Per-language labels: { es: 'Inicio' }, short text, known languages.
+      labelled = items.flat_map { |item| item.is_a?(Hash) ? [item, *Array(item['options']).grep(Hash)] : [] }
+      labels_ok = labelled.all? do |item|
+        labels = item['labels']
+        labels.nil? || (labels.is_a?(Hash) && labels.all? { |locale, label| SiteContent::LOCALES.key?(locale.to_s) && (label.nil? || (label.is_a?(String) && label.length <= 200)) })
+      end
+      errors.add(:navigation, "menu labels per language must be short text, in #{SiteContent::LOCALES.values.join(', ')}") unless labels_ok
     end
 
     # Expands a stored search entry for the renderer: the search_collection_id

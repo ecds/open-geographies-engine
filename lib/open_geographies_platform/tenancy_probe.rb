@@ -294,6 +294,10 @@ module OpenGeographiesPlatform
         status 'own image delete', delete("/core_data/sites/#{a.site.id}/assets/#{own_key}", a.token), '204'
       end
 
+      group 'an atlas in more than one language' do
+        languages(a)
+      end
+
       group 'an editor edits the content; owners manage the atlas' do
         editor(a, b)
       end
@@ -378,6 +382,34 @@ module OpenGeographiesPlatform
 
     # A 2400 x 1600 photo through upload, the public bundle, the public route
     # and delete (SiteImages).
+    # Languages (config.i18n) and translated pages (content.translations):
+    # what's refused, and what the public bundle carries.
+    def languages(a)
+      site = "/core_data/sites/#{a.site.id}"
+      pages = [{ slug: 'about', title: 'About', sections: [{ type: 'call_to_action', title: 'Map', button_url: '/en/search/places' }] }]
+      i18n = ->(locales) { { 'default_locale' => 'en', 'locales' => locales } }
+      config = ->(locales) { (a.site.reload.config || {}).merge('i18n' => i18n.(locales)) }
+
+      status 'a language the renderer doesn\'t route is refused', patch(site, { site: { config: config.(%w[en zz]) } }, a.token), %w[400 422]
+      status 'so is a translation into one', patch(site, { site: { content: { pages:, translations: { zz: { pages: [] } } } } }, a.token), %w[400 422]
+      status 'or of a page the atlas doesn\'t have', patch(site, { site: { content: { pages:, translations: { es: { pages: [{ slug: 'nope', title: 'No' }] } } } } }, a.token), %w[400 422]
+      bad = { pages:, translations: { es: { pages: [{ slug: 'about', title: 'A', sections: [{ type: 'call_to_action', button_url: 'javascript:alert(1)' }] }] } } }
+      status 'or a translation with a javascript: link', patch(site, { site: { content: bad } }, a.token), %w[400 422]
+      status 'or a menu label in an unknown language', patch(site, { site: { navigation: { items: [{ _template: 'Page', page: 'about', labels: { zz: 'x' } }] } } }, a.token), %w[400 422]
+
+      res = patch(site, { site: { config: config.(%w[en es]), content: { pages:, translations: { es: { pages: [{ slug: 'about', title: 'Acerca de', sections: [] }] } } } } }, a.token)
+      status 'English and Spanish, with a Spanish page, is saved', res, '200'
+
+      atlas = body(get("/core_data/public/v1/atlases/#{a.site.slug}"))['atlas'] || {}
+      menu = atlas.dig('navigations', 'es', 'items') || []
+      check 'the public bundle carries the translation', atlas.dig('content', 'translations', 'es', 'pages', 0, 'title') == 'Acerca de'
+      check 'and a menu per language, with Spanish titles and links', menu.any? { |item| item['label'] == 'Acerca de' && item['href'] == '/es/pages/about' } &&
+                                                                     (atlas.dig('navigations', 'en', 'items') || []).any? { |item| item['href'] == '/en/pages/about' },
+            menu.inspect[0, 200]
+    ensure
+      a.site.reload.update_columns(content: {}, navigation: {}, config: (a.site.config || {}).except('i18n'))
+    end
+
     # A project editor (FairData's role) does the atlas's content work —
     # settings, pages, images, categories, places, imports, reindexing —
     # but publishing, the slug, the domain, the preview link and deleting

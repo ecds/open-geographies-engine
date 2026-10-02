@@ -70,6 +70,8 @@ module CoreDataConnector
               config:,
               branding: site.to_branding,
               navigation: site.to_navigation(default_locale),
+              # The menu in each of the atlas's languages.
+              navigations: site.to_navigations,
               content: site.to_content,
               images: site.to_images
             }

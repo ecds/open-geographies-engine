@@ -18,6 +18,9 @@ import { liveUrl as atlasLiveUrl } from '../atlasLinks';
 import AtlasHeader from '../components/AtlasHeader';
 import DomainPanel from '../components/DomainPanel';
 import HistoricMapPanel from '../components/HistoricMapPanel';
+import LanguagesPanel from '../components/LanguagesPanel';
+import TranslatedPagesEditor from '../components/TranslatedPagesEditor';
+import { atlasLocales as atlasLocalesOf, localeName } from '../locales';
 import ImageLibrary from '../components/ImageLibrary';
 import PublishPanel from '../components/PublishPanel';
 import ImageField from '../components/ImageField';
@@ -95,6 +98,8 @@ const AtlasEditor = ({ id, navigate }) => {
   const [fieldModels, setFieldModels] = useState([]);
   const [searchFields, setSearchFields] = useState([]);
   const [tab, setTab] = useState('general');
+  // The language the Home page and Pages & menu tabs are editing.
+  const [contentLocale, setContentLocale] = useState(null);
   const [advancedText, setAdvancedText] = useState('');
   const [advancedError, setAdvancedError] = useState(false);
   const [preview, setPreview] = useState(null);
@@ -129,7 +134,9 @@ const AtlasEditor = ({ id, navigate }) => {
   const home = content.home || { sections: [] };
 
   const locale = siteConfig.i18n?.default_locale || 'en';
-  const atlasLocales = siteConfig.i18n?.locales?.length ? siteConfig.i18n.locales : [locale];
+  const atlasLocales = atlasLocalesOf(siteConfig.i18n);
+  const editingLocale = _.contains(atlasLocales, contentLocale) ? contentLocale : locale;
+  const translations = content.translations || {};
   const searchName = siteConfig.search?.[0]?.name;
   const searchHref = searchName ? `/${locale}/search/${searchName}` : undefined;
   const liveUrl = atlasLiveUrl(site);
@@ -211,6 +218,22 @@ const AtlasEditor = ({ id, navigate }) => {
   };
 
   /**
+   * The atlas's languages (config.i18n, otherwise advanced JSON).
+   */
+  const updateI18n = (i18n) => {
+    const next = { ...siteConfig, i18n };
+    update({ config: next });
+    setAdvancedText(JSON.stringify(_.omit(next, MANAGED_KEYS), null, 2));
+  };
+
+  /**
+   * One language's translations (content.translations[<locale>]).
+   */
+  const updateTranslation = (loc, changes) => update({
+    content: { ...content, translations: { ...translations, [loc]: { ...(translations[loc] || {}), ...changes } } }
+  });
+
+  /**
    * The advanced JSON is merged beneath the managed sections when it parses.
    */
   const onAdvancedBlur = () => {
@@ -266,6 +289,8 @@ const AtlasEditor = ({ id, navigate }) => {
       <PublishPanel onChange={(changes) => setSite((prev) => ({ ...prev, ...changes }))} site={site} />
       <h3>Address</h3>
       <DomainPanel onChange={(changes) => setSite((prev) => ({ ...prev, ...changes }))} site={site} />
+      <h3>Languages</h3>
+      <LanguagesPanel i18n={siteConfig.i18n} onChange={updateI18n} />
       <Field label='Name' required>
         <input className='input' onChange={(e) => update({ name: e.target.value })} value={site.name || ''} />
       </Field>
@@ -403,8 +428,62 @@ const AtlasEditor = ({ id, navigate }) => {
     </>
   );
 
-  const renderHome = () => (
+  /**
+   * Which language the content tabs edit, when the atlas has more than one.
+   */
+  const renderLanguageSwitch = () => atlasLocales.length > 1 && (
+    <div className='language-switch' role='group' aria-label='Language'>
+      <span className='muted'>Language:</span>
+      { _.map(atlasLocales, (code) => (
+        <Button key={code} onClick={() => setContentLocale(code)} primary={code === editingLocale} subtle={code !== editingLocale}>
+          { localeName(code) }{ code === locale ? ' (default)' : '' }
+        </Button>
+      ))}
+    </div>
+  );
+
+  const renderTranslatedHome = () => {
+    const translatedHome = translations[editingLocale]?.home;
+    const name = localeName(editingLocale);
+
+    return (
+      <>
+        { renderLanguageSwitch() }
+        { !translatedHome && (
+          <Message>
+            <p>The {name} home page isn’t written yet: visitors to the atlas in {name} see the {localeName(locale)} one.</p>
+            <Button onClick={() => updateTranslation(editingLocale, { home: JSON.parse(JSON.stringify(home)) })} primary>
+              Start from the {localeName(locale)} version
+            </Button>
+          </Message>
+        )}
+        { translatedHome && (
+          <>
+            <p className='muted'>
+              The home page in {name}.
+              { liveUrl && <> <a href={`${liveUrl}/${editingLocale}`} rel='noreferrer' target='_blank'>View it ↗</a></> }
+            </p>
+            <Field hint='Shown by search engines and link previews.' label={`Description (${name})`}>
+              <input className='input' onChange={(e) => updateTranslation(editingLocale, { home: { ...translatedHome, description: e.target.value } })} value={translatedHome.description || ''} />
+            </Field>
+            <h4>Sections</h4>
+            <SectionsEditor
+              assets={assets}
+              fallbackTitle={branding.title || site.name}
+              onChange={(sections) => updateTranslation(editingLocale, { home: { ...translatedHome, sections } })}
+              onUpload={onUpload}
+              sections={translatedHome.sections}
+            />
+            <Button onClick={() => updateTranslation(editingLocale, { home: null })} subtle>Remove the {name} home page</Button>
+          </>
+        )}
+      </>
+    );
+  };
+
+  const renderHome = () => (editingLocale !== locale ? renderTranslatedHome() : (
     <>
+      { renderLanguageSwitch() }
       <p className='muted'>
         The atlas's front page, top to bottom.
         { liveUrl && <> <a href={`${liveUrl}/${locale}`} rel='noreferrer' target='_blank'>View the home page ↗</a></> }
@@ -421,9 +500,27 @@ const AtlasEditor = ({ id, navigate }) => {
         sections={home.sections}
       />
     </>
-  );
+  ));
 
-  const renderPages = () => (
+  const renderPages = () => (editingLocale !== locale ? (
+    <>
+      { renderLanguageSwitch() }
+      <TranslatedPagesEditor
+        assets={assets}
+        defaultLocale={locale}
+        items={navItems}
+        liveUrl={liveUrl}
+        locale={editingLocale}
+        onChange={(pages) => updateTranslation(editingLocale, { pages })}
+        onItemsChange={(items) => update({ navigation: { ...(site.navigation || {}), items } })}
+        onUpload={onUpload}
+        pages={content.pages || []}
+        translated={translations[editingLocale]?.pages || []}
+      />
+    </>
+  ) : (
+    <>
+    { renderLanguageSwitch() }
     <PagesEditor
       assets={assets}
       items={navItems}
@@ -435,7 +532,8 @@ const AtlasEditor = ({ id, navigate }) => {
       savedSlugs={savedSlugs}
       searchHref={searchHref}
     />
-  );
+    </>
+  ));
 
   const renderLayers = () => (
     <>

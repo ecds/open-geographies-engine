@@ -292,6 +292,20 @@ before this was added were published by the migration). The wizard creates draft
   records through FairData's public API), so a draft's records are reachable there by
   anyone who knows the project's ids, as before; it's the atlas that's private.
 
+## Languages
+
+Settings → General → **Languages**: the atlas's default language and the others visitors can
+switch to (`config.i18n`; one of English, Español, Français, Deutsch, Italiano, Português —
+`SiteContent::LOCALES`, the prefixes the renderer routes; validated). On the Home page and
+Pages & menu tabs a **Language** switch edits `content.translations[<locale>]`: the home page
+and each page start from a copy of the default language's ("Start from the English version" /
+"Translate"), title, description and sections translated in place; a page left untranslated
+shows in the default language. Pages are added, removed and ordered in the default language
+only; a translation must match one of its pages (by slug). Menu items take a label per
+language (`labels: { es: 'Inicio' }`). The public bundle carries `navigations` — the menu
+resolved per language (translated page titles, `/es/…` links, "Explorar" for the starter
+menu's Explore). Interface text (buttons, filters) stays English for now.
+
 ## Section names
 
 Settings → Detail pages lists, per model, the relationship groups a record shows on its page

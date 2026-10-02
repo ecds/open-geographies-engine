@@ -76,7 +76,8 @@ const ERROR_PREFIXES = {
   base: '',
   content: '',
   branding: 'Branding: ',
-  navigation: 'Menu: '
+  navigation: 'Menu: ',
+  config: ''
 };
 
 export const errorMessages = (error, prefixes = {}) => {

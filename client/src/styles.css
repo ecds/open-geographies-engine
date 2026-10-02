@@ -316,3 +316,7 @@ td .status-pill { margin-left: 0; }
 .section-names .field-label { display: block; }
 .section-names .table td { vertical-align: middle; }
 .section-names .table .input { min-width: 160px; }
+.language-switch { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 16px; }
+.languages-panel .row { display: flex; flex-wrap: wrap; gap: 14px; margin: 6px 0 10px; }
+.translated-page .row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.translated-page .status-pill { margin-left: 0; }

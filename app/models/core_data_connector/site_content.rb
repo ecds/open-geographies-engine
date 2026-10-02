@@ -4,7 +4,13 @@ module CoreDataConnector
   # …), stored on Site#content as
   #
   #   { 'home'  => { description, sections: [...] },
-  #     'pages' => [{ slug, title, description, sections: [...] }, ...] }
+  #     'pages' => [{ slug, title, description, sections: [...] }, ...],
+  #     'translations' => { 'es' => { 'home' => {...}, 'pages' => [...] }, ... } }
+  #
+  # `translations` holds the atlas's pages in its other languages, in the same
+  # shape: a translated page has the address (slug) of one of the atlas's
+  # pages, and a page or home page left untranslated shows in the atlas's
+  # default language. Only languages the renderer routes (LOCALES) are kept.
   #
   # A section is one of SECTION_FIELDS' types. Text is Markdown, stored as
   # the curator wrote it; the renderer turns it into HTML and sanitizes it, so
@@ -35,6 +41,18 @@ module CoreDataConnector
     IMAGE_FIELDS = %w[image].freeze
     MARKDOWN_FIELDS = %w[body].freeze
     CHOICES = { 'image_position' => %w[left right] }.freeze
+
+    # The languages an atlas can be in: the [lang] prefixes the renderer's
+    # routing knows (its src/config.defaults.json i18n.locales), with the
+    # name the console shows.
+    LOCALES = {
+      'en' => 'English',
+      'es' => 'Español',
+      'fr' => 'Français',
+      'de' => 'Deutsch',
+      'it' => 'Italiano',
+      'pt' => 'Português'
+    }.freeze
 
     MAX_PAGES = 50
     MAX_SECTIONS = 30
@@ -114,6 +132,8 @@ module CoreDataConnector
       slugs = pages.filter_map { |page| page['slug'] if page.is_a?(Hash) }.reject(&:blank?)
       slugs.tally.each { |slug, count| errors << "More than one page has the address \"#{slug}\"." if count > 1 }
 
+      translation_errors(@document['translations'], slugs, errors)
+
       errors
     end
 
@@ -125,11 +145,78 @@ module CoreDataConnector
 
       {
         'home' => home.is_a?(Hash) ? normalize_page(home, home: true) : nil,
-        'pages' => pages.is_a?(Array) ? pages.select { |page| page.is_a?(Hash) }.map { |page| normalize_page(page, home: false) } : []
+        'pages' => pages.is_a?(Array) ? pages.select { |page| page.is_a?(Hash) }.map { |page| normalize_page(page, home: false) } : [],
+        'translations' => normalize_translations(@document['translations'])
       }.compact
     end
 
     private
+
+    def translation_errors(translations, slugs, errors)
+      return if translations.nil?
+
+      unless translations.is_a?(Hash)
+        errors << 'Translations must be an object.'
+        return
+      end
+
+      translations.each do |locale, translation|
+        unless LOCALES.key?(locale)
+          errors << "Pages can be translated into #{LOCALES.values.join(', ')}; \"#{locale}\" isn't one of them."
+          next
+        end
+
+        language = LOCALES[locale]
+
+        unless translation.is_a?(Hash)
+          errors << "The #{language} pages must be an object."
+          next
+        end
+
+        page_errors(translation['home'], "The #{language} home page", errors, home: true) if translation['home'].is_a?(Hash)
+        errors << "The #{language} home page must be an object." unless translation['home'].nil? || translation['home'].is_a?(Hash)
+
+        pages = translation['pages']
+        next if pages.nil?
+
+        unless pages.is_a?(Array)
+          errors << "The #{language} pages must be a list."
+          next
+        end
+
+        pages.each_with_index do |page, index|
+          unless page.is_a?(Hash)
+            errors << "#{language} page #{index + 1} must be an object."
+            next
+          end
+
+          name = "The #{language} version of #{page_name(page, index).sub(/\APage/, 'page')}"
+          page_errors(page, name, errors, home: false)
+          errors << "#{name} doesn't match one of the atlas's pages (address \"#{page['slug']}\")." if page['slug'].present? && !slugs.include?(page['slug'])
+        end
+
+        translated = pages.filter_map { |page| page['slug'] if page.is_a?(Hash) }.reject(&:blank?)
+        translated.tally.each { |slug, count| errors << "There is more than one #{language} version of the page \"#{slug}\"." if count > 1 }
+      end
+    end
+
+    # Translations in supported languages, normalized like the default
+    # pages; a language with nothing translated is dropped.
+    def normalize_translations(translations)
+      return nil unless translations.is_a?(Hash)
+
+      normalized = translations.slice(*LOCALES.keys).filter_map do |locale, translation|
+        next unless translation.is_a?(Hash)
+
+        home = translation['home'].is_a?(Hash) ? normalize_page(translation['home'], home: true) : nil
+        pages = Array(translation['pages']).select { |page| page.is_a?(Hash) }.map { |page| normalize_page(page, home: false) }
+        document = { 'home' => home, 'pages' => pages.presence }.compact
+
+        [locale, document] if document.any?
+      end.to_h
+
+      normalized.presence
+    end
 
     def page_name(page, index)
       title = page['title'].presence || page['slug'].presence
