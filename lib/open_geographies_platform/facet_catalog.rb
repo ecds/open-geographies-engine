@@ -41,9 +41,10 @@ module OpenGeographiesPlatform
     SEARCHABLE_TYPES = %w[String Text RichText].freeze
 
     # Fields that can place records in time (a search's `dates`): dates, and
-    # numbers whose name says they're a year ("Year built").
+    # numbers whose name says they're a year ("Year built"), not a number of
+    # years ("Years open").
     DATE_TYPES = %w[Date FuzzyDate].freeze
-    YEAR_NAME = /\byears?\b/i
+    YEAR_NAME = /\byear\b/i
 
     # Fields every search already looks in (Site::DEFAULT_SEARCH_ATTRIBUTES),
     # so not offered as a choice.
@@ -109,18 +110,23 @@ module OpenGeographiesPlatform
         DATE_TYPES.include?(field.data_type) || (field.data_type == 'Number' && field.column_name.match?(YEAR_NAME))
       end
 
-      # The top-level key a field's value is indexed under: its promoted key
-      # (Map Layers' "Date" → `date`), else its parameterized name — moved to
-      # `<key>_2` when that name is a canonical scalar property the field
-      # isn't promoted to ("Date" on Places; the lower engine's RESERVED_KEYS
-      # rule). A dotted promoted path, which a search can't take its dates
-      # from, falls back to the field's own key.
+      # The top-level key that holds a date field's whole value, mirroring the
+      # lower engine's rule (RESERVED_KEYS): the field's parameterized name,
+      # moved to `<key>_2` when that name is a canonical scalar property — one
+      # the field isn't promoted to ("Date" on Places), or a date property it
+      # is promoted to (Map Layers' "Date" → `date`, Works' "Date Published"),
+      # which holds only the first day. A promoted path that keeps the whole
+      # value (not a mapped date, not dotted) is used as it is.
       def date_key(model, field)
         promoted = (promoted_udfs_for[template_model_name_for(model)] || {})[field.column_name].to_s
-        return promoted if promoted.present? && !promoted.include?('.')
+        return promoted if promoted.present? && !promoted.include?('.') && !date_property?(promoted)
 
         key = field.column_name.to_s.parameterize.underscore
-        reserved_key?(key) ? "#{key}_2" : key
+        reserved_key?(key) && (promoted != key || date_property?(key)) ? "#{key}_2" : key
+      end
+
+      def date_property?(path)
+        mapping_property(path)&.dig(:type) == 'date'
       end
 
       def reserved_key?(key)

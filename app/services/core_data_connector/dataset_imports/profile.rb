@@ -75,6 +75,8 @@ module CoreDataConnector
       # as a date instead, so it can date the places (the atlas's year filter).
       YEAR_VALUE = /\A1\d{3}\z|\A20\d{2}\z/
       DATE_HEADER = /(\A|[^a-z])(year|years|yr|date|dates|dated|built|founded|established|erected|constructed|completed|opened|listed|circa)([^a-z]|\z)/i
+      # ...unless the header names a measure ("Built area (sq ft)", "Listed price").
+      MEASURE_HEADER = /(\A|[^a-z])(area|price|cost|value|units?|size|sq|ft|feet|acres?|count|number|total|amount|population|height|width|length|capacity)([^a-z]|\z)/i
 
       # Values that are something other than a name: dates (also partial,
       # "1983-03-"), links, GUIDs.
@@ -174,7 +176,8 @@ module CoreDataConnector
 
       # "YearBuilt" and "CertDate" count as well as "Year built".
       def date_header?(column)
-        column.to_s.gsub(/([a-z])([A-Z])/, '\\1 \\2').match?(DATE_HEADER)
+        words = column.to_s.gsub(/([a-z])([A-Z])/, '\\1 \\2')
+        words.match?(DATE_HEADER) && !words.match?(MEASURE_HEADER)
       end
 
       def infer_type(values, distinct, column = nil)

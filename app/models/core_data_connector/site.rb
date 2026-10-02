@@ -59,11 +59,11 @@ module CoreDataConnector
     ].freeze
     MAX_ASSET_BYTES = 10.megabytes
 
-    # What every search looks in (the renderer's own default); a search's
-    # `search_fields` are added after these.
     # A search's date field (search[].dates.field): a top-level document key.
     DATE_FIELD = /\A[a-z0-9_]+\z/
 
+    # What every search looks in (the renderer's own default); a search's
+    # `search_fields` are added after these.
     DEFAULT_SEARCH_ATTRIBUTES = [
       { 'field' => 'name', 'weight' => 3 },
       { 'field' => 'names', 'weight' => 2 },

@@ -84,11 +84,58 @@ const SEARCH_TYPES = [
   { value: 'image', text: 'Image gallery (no map)' }
 ];
 
-// A year typed into a layer's Year box: digits (and a leading minus) only, or
-// undefined to clear it.
+// A year typed into a layer's Year box: digits (and a leading minus) only;
+// null for anything else, undefined for an empty box.
 const toYear = (text) => {
-  const match = String(text).trim().match(/^-?\d{1,4}$/);
-  return match ? Number(match[0]) : undefined;
+  const trimmed = String(text ?? '').trim();
+
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const match = trimmed.match(/^-?\d{1,4}$/);
+  return match ? Number(match[0]) : null;
+};
+
+/**
+ * A year box. What's typed stays as typed ("-", a fifth digit, a stray letter)
+ * so nothing vanishes under the cursor; the layer takes the year only once the
+ * box holds one, and an empty box clears it.
+ */
+const YearInput = ({ error, hint, label, onChange, placeholder, value }) => {
+  const [text, setText] = useState(value ?? '');
+
+  // Follow changes made elsewhere (a historic map's title year), not our own.
+  useEffect(() => {
+    if (toYear(text) !== value) {
+      setText(value ?? '');
+    }
+  }, [value]);
+
+  const parsed = toYear(text);
+
+  return (
+    <Field
+      error={parsed === null ? 'A year in digits, e.g. 1878.' : error}
+      hint={hint}
+      label={label}
+    >
+      <input
+        className='input'
+        inputMode='numeric'
+        onChange={(e) => {
+          setText(e.target.value);
+          const year = toYear(e.target.value);
+
+          if (year !== null) {
+            onChange(year);
+          }
+        }}
+        placeholder={placeholder}
+        value={text}
+      />
+    </Field>
+  );
 };
 
 /**
@@ -580,24 +627,23 @@ const AtlasEditor = ({ id, navigate }) => {
           </Field>
           { layer.overlay === true && (
             <div className='grid-2'>
-              <Field label='Year' hint='The year the map shows. With two or more dated overlays, visitors get a slider to move between them.'>
-                <input
-                  className='input'
-                  inputMode='numeric'
-                  onChange={(e) => updateLayer(index, { start_year: toYear(e.target.value) })}
-                  placeholder='e.g. 1878'
-                  value={layer.start_year ?? ''}
-                />
-              </Field>
-              <Field label='Until (optional)' hint='For a map that stands for several years, the last one.'>
-                <input
-                  className='input'
-                  inputMode='numeric'
-                  onChange={(e) => updateLayer(index, { end_year: toYear(e.target.value) })}
-                  placeholder={layer.start_year ? String(layer.start_year) : ''}
-                  value={layer.end_year ?? ''}
-                />
-              </Field>
+              <YearInput
+                hint='The year the map shows. With maps from two or more different years, visitors get a slider to move between them.'
+                label='Year'
+                onChange={(year) => updateLayer(index, { start_year: year })}
+                placeholder='e.g. 1878'
+                value={layer.start_year}
+              />
+              <YearInput
+                error={_.isNumber(layer.end_year) && _.isNumber(layer.start_year) && layer.end_year < layer.start_year
+                  ? 'Until is before Year; it will be ignored.'
+                  : undefined}
+                hint='For a map that stands for several years, the last one.'
+                label='Until (optional)'
+                onChange={(year) => updateLayer(index, { end_year: year })}
+                placeholder={layer.start_year ? String(layer.start_year) : ''}
+                value={layer.end_year}
+              />
             </div>
           )}
           { layer.layer_type === 'georeference' && (
