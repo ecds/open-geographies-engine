@@ -311,3 +311,4 @@ td .status-pill { margin-left: 0; }
 .historic-map-summary img { width: 96px; height: 72px; object-fit: cover; border-radius: 4px; border: 1px solid var(--og-border); }
 .historic-map-summary p { margin: 2px 0 0; }
 .historic-map-found .row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.domain-panel code { font-family: ui-monospace, monospace; font-size: 13px; }

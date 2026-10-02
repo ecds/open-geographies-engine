@@ -98,6 +98,30 @@ module CoreDataConnector
       base && slug.present? ? "#{slug}.#{base}" : nil
     end
 
+    # The other half of a www pair: "www.example.org" for "example.org" and
+    # the other way round. Visitors who type the other one are sent to the
+    # atlas's domain, once its DNS points here too (only the domain's owner
+    # can make it). Nil for a www name with no domain left after the www.
+    def self.www_pair(domain)
+      return nil if domain.blank?
+
+      if domain.start_with?('www.')
+        rest = domain.delete_prefix('www.')
+        rest.include?('.') ? rest : nil
+      else
+        "www.#{domain}"
+      end
+    end
+
+    # The connected site serving `name`: the one whose domain it is, else the
+    # one it's the www pair of.
+    def self.site_for(name)
+      return nil if name.blank?
+
+      connected = Site.where.not(domain_verified_at: nil)
+      connected.find_by(domain: name) || ((pair = www_pair(name)) && connected.find_by(domain: pair))
+    end
+
     # The DNS records that connect `domain` to the atlas `slug`, for the
     # console's instructions.
     def self.instructions(domain, slug)
@@ -107,6 +131,7 @@ module CoreDataConnector
         cname: platform_host(slug),
         txt_name: "#{TXT_PREFIX}.#{domain}",
         txt_value: slug,
+        www: www_pair(domain),
         local: local_name?(domain)
       }
     end

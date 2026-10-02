@@ -126,6 +126,12 @@ const DomainPanel = ({ onChange, site }) => {
             </div>
           )}
           { connected && !dns?.local && <p className='muted'>Keep the DNS record in place: the atlas is served at { site.domain } only while it points here.</p> }
+          { dns?.www && !dns?.local && (
+            <p className='muted'>
+              Optional: point <code>{ dns.www }</code> here too{ dns.cname && <> (a CNAME to <code>{ dns.cname }</code>)</> }, and
+              visitors who type it are sent to { site.domain }.
+            </p>
+          )}
           { dns?.local && <p className='muted'>A .localhost name: it works on this development server only, with no DNS.</p> }
           <div className='row'>
             <Button loading={saving && !confirmRemove} onClick={() => run(checkSiteDomain(site.id))}>Check DNS</Button>

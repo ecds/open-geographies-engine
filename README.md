@@ -373,8 +373,11 @@ Every atlas has a platform address, `<slug>.<base domain>` (`OG_ATLAS_URL_TEMPLA
   visit and never for a name nobody connected.
 - DNS is re-checked when the curator asks, or by `bin/rails open_geographies:check_domains`
   (every domain; prints what changed) — run it from cron so a domain whose DNS moved away
-  is disconnected, and one whose DNS arrived late is connected. Not done: `www` ↔ root
-  pairing.
+  is disconnected, and one whose DNS arrived late is connected.
+- **www pair:** the `www.` name of a connected domain (or the bare name of a connected
+  `www.` domain) resolves to the same atlas in `by_domain` and the TLS check; its `domain`
+  is the connected one, so the renderer sends visitors there. It reaches us only if the
+  domain's owner points it here too (the console says how).
 
 ## Upstream-PR posture
 

@@ -480,6 +480,10 @@ module OpenGeographiesPlatform
         check 'and the slug lookup names the domain', body(get("/core_data/public/v1/atlases/#{a.site.slug}")).dig('atlas', 'domain') == domain
         status 'the TLS check allows it', get(allowed.(domain)), '200'
         status 'in any case', get(lookup.(domain.upcase)), '200'
+        res = get(lookup.("www.#{domain}"))
+        check 'its www pair resolves to the same atlas, naming the domain to send visitors to',
+              res.code == '200' && body(res).dig('atlas', 'slug') == a.site.slug && body(res).dig('atlas', 'domain') == domain, res.code
+        status 'and gets a certificate', get(allowed.("www.#{domain}")), '200'
 
         res = put(path_b, { domain: }, b.token)
         status 'another atlas can enter the same domain', res, '200'
@@ -515,8 +519,11 @@ module OpenGeographiesPlatform
       status 'the domain it replaced is no longer served', get(lookup.(domain)), '404' if local
       check 'and the atlas isn\'t sent anywhere', body(get("/core_data/public/v1/atlases/#{a.site.slug}")).dig('atlas', 'domain').nil?
 
+      status 'nor its www pair', get(lookup.("www.#{elsewhere}")), '404'
+
       res = put(path_a, { domain: '' }, a.token)
       check 'the owner can remove it', res.code == '200' && a.site.reload.domain.nil?
+      status 'after which its www pair isn\'t served either', get(lookup.("www.#{domain}")), '404' if local
 
       if base
         status 'the TLS check allows an atlas\'s platform address', get(allowed.("#{a.site.slug}.#{base}")), '200'

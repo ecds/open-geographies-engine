@@ -4,7 +4,7 @@ module CoreDataConnector
       # GET /core_data/public/v1/domains/allowed?domain=atlas.example.org
       #
       # 200 when `domain` is an address this platform serves an atlas at — a
-      # connected custom domain (SiteDomains) or an atlas's platform address
+      # connected custom domain or its www pair (SiteDomains) or an atlas's platform address
       # (<slug>.<base domain>) — else 404. The shape of Caddy's on-demand TLS
       # `ask` check, so the proxy in front of the renderer gets a
       # certificate for an atlas's domain the first time it's visited, and
@@ -23,7 +23,7 @@ module CoreDataConnector
         private
 
         def served?(domain)
-          return true if Site.where.not(domain_verified_at: nil).exists?(domain:)
+          return true if SiteDomains.site_for(domain)
 
           base = SiteDomains.base_domain
           return false unless base && domain.end_with?(".#{base}")

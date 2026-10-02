@@ -38,11 +38,12 @@ module CoreDataConnector
         # The same document for the atlas whose own domain this is: the
         # renderer's lookup for a request on a custom domain (its Host). Only
         # a connected domain resolves (see SiteDomains): a domain an atlas
-        # has entered but whose DNS doesn't name it yet is unknown here.
+        # has entered but whose DNS doesn't name it yet is unknown here. The
+        # www pair of a connected domain resolves to the same atlas; the
+        # document's `domain` is the connected one, so the renderer sends
+        # visitors there.
         def by_domain
-          domain = SiteDomains.normalize(params[:domain])
-
-          render_atlas domain && Site.where.not(domain_verified_at: nil).find_by(domain:)
+          render_atlas SiteDomains.site_for(SiteDomains.normalize(params[:domain]))
         end
 
         private
