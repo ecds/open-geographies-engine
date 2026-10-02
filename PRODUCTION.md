@@ -166,7 +166,17 @@ An open item with the indexing engine (the index-mapping proposal of 2026-09-30)
   switched by `OG_INDEX_LAYOUT=shared|both|per_project`, with `og_indexes:build`, `report` and
   `drop_shared` for the move). This engine is ready for it: when the indexing engine provides
   it, each atlas's config names its own index and the console's Reindex rebuilds that index
-  with no downtime. Without it, or with `shared`, nothing changes.
+  with no downtime. Without it, or with `shared`, nothing changes. With it, keep
+  Elasticsearch from creating a project index by itself:
+  `action.auto_create_index: "-open_geographies_v1_project_*,+*"`.
+- [ ] **Dated searches need runtime fields.** A search with dates (Settings → Search → Time)
+  computes each record's years at search time with a fixed Painless script over `_source`. The
+  cluster must allow it: `search.allow_expensive_queries` true (the default; with it false the
+  year filter fails while everything else works) and inline scripts in the runtime-field
+  contexts (the default; a cluster restricted to stored scripts fails every dated search). Cost,
+  measured on HRCGA's 444 churches through the renderer: about 100 ms per dated search against
+  15–30 ms undated, growing with the atlas's size. The renderer caps a request at 20 searches of
+  at most 250 results, each with a 10 s Elasticsearch timeout.
 
 ## 9. Before the first atlas goes public
 

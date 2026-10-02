@@ -312,11 +312,11 @@ the scan to the same places on today's map. Under **Settings → Map layers → 
 
 Visitors switch historic maps on and off with the layers button on the map.
 
-**Maps from different years.** Give each map its **Year** in the **Layers** list below (a year in
-the map's title is filled in for you; **Until** is for a map that stands for several years). With
-two or more dated maps, visitors get a **Historic map** slider on the map instead: each step shows
-the map for that year, and the first step shows none. The map marked **Visible by default** is where
-the slider starts.
+**Maps from different years.** Give each map its **Year** in the **Layers** list below (when you
+add a historic map, a year in its title is filled in for you; **Until** is for a map that stands
+for several years). With maps from two or more different years, visitors get a **Historic map**
+slider on the map instead: each step shows the maps for that year, and the first step shows none.
+The map marked **Visible by default** is where the slider starts.
 
 ### Other layers
 
