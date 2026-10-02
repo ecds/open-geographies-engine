@@ -304,3 +304,10 @@ td .status-pill { margin-left: 0; }
 }
 .tabs .tab-external { margin-left: auto; }
 .input[readonly] { background: var(--og-ground); color: var(--og-muted); }
+.historic-map-panel h4 { margin-top: 0; }
+.historic-map-panel .message p { margin: 0 0 8px; }
+.historic-map-found { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.historic-map-summary { display: flex; gap: 12px; align-items: center; }
+.historic-map-summary img { width: 96px; height: 72px; object-fit: cover; border-radius: 4px; border: 1px solid var(--og-border); }
+.historic-map-summary p { margin: 2px 0 0; }
+.historic-map-found .row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }

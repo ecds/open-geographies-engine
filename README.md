@@ -292,6 +292,26 @@ before this was added were published by the migration). The wizard creates draft
   records through FairData's public API), so a draft's records are reachable there by
   anyone who knows the project's ids, as before; it's the atlas that's private.
 
+## Historic maps
+
+Settings → Map layers → **Add a historic map** lays a georeferenced scan over the atlas's
+map. Georeferencing happens in [Allmaps](https://allmaps.org) (free; the curator matches a
+few points on the scan to today's map); the layer is `{ layer_type: 'georeference', url:
+<Georeference Annotation>, overlay: true, default, opacity }`, drawn by the renderer as an
+Allmaps warped layer (verified on the single MapLibre 5 instance).
+
+- The curator pastes an Allmaps link (annotation, Viewer or Editor) or the IIIF address of
+  the scan (a manifest or image). `client/src/allmaps.js` resolves it in the browser against
+  Allmaps' public, CORS-enabled API — `annotations.allmaps.org/?url=<IIIF address>` answers a
+  redirect to the annotation, or 404 — so the server never fetches a curator-supplied
+  address. Found: title (from the annotation's manifest label), thumbnail (IIIF image
+  service), number of maps, and an outline of the control points on a preview map; name,
+  opacity and "shown when the map opens" are chosen before adding. Not georeferenced yet,
+  or Allmaps can't answer (it refuses loc.gov addresses): a button into the Allmaps Editor
+  with the scan loaded.
+- The layer list below names the types ("Historic map (Allmaps)", "PMTiles archive" …), labels
+  the address per type, and has an opacity slider for historic maps.
+
 ## Owners and editors
 
 An atlas's people are its FairData project's members, added on the project's Users page

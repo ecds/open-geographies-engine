@@ -17,6 +17,7 @@ import {
 import { liveUrl as atlasLiveUrl } from '../atlasLinks';
 import AtlasHeader from '../components/AtlasHeader';
 import DomainPanel from '../components/DomainPanel';
+import HistoricMapPanel from '../components/HistoricMapPanel';
 import ImageLibrary from '../components/ImageLibrary';
 import PublishPanel from '../components/PublishPanel';
 import ImageField from '../components/ImageField';
@@ -54,6 +55,22 @@ const COLORS = [
 ];
 
 const LAYER_TYPES = ['vector', 'raster', 'pmtiles', 'geojson', 'georeference'];
+
+// What each layer type is, and what its address points at.
+const LAYER_TYPE_LABELS = {
+  vector: 'Vector tiles (a style)',
+  raster: 'Raster tiles',
+  pmtiles: 'PMTiles archive',
+  geojson: 'GeoJSON',
+  georeference: 'Historic map (Allmaps)'
+};
+const LAYER_URL_LABELS = {
+  vector: 'Style address',
+  raster: 'Tile address ({z}/{x}/{y})',
+  pmtiles: 'Archive address (.pmtiles)',
+  geojson: 'GeoJSON address',
+  georeference: 'Allmaps annotation address'
+};
 const SEARCH_TYPES = ['map', 'list', 'grid', 'image'];
 
 /**
@@ -398,6 +415,9 @@ const AtlasEditor = ({ id, navigate }) => {
 
   const renderLayers = () => (
     <>
+      <HistoricMapPanel onAdd={(layer) => updateConfig({ layers: [...(siteConfig.layers || []), layer] })} />
+      <h3>Layers</h3>
+      <p className='muted'>The base maps visitors choose from, and overlays they can switch on. Changes apply when you save.</p>
       { _.map(siteConfig.layers || [], (layer, index) => (
         <div className='card' key={index}>
           <div className='grid-2'>
@@ -405,12 +425,17 @@ const AtlasEditor = ({ id, navigate }) => {
               <input className='input' onChange={(e) => updateLayer(index, { name: e.target.value })} value={layer.name || ''} />
             </Field>
             <Field label='Type'>
-              <Select onChange={(v) => updateLayer(index, { layer_type: v })} options={_.map(LAYER_TYPES, (t) => ({ value: t, text: t }))} placeholder='Select a type' value={layer.layer_type || ''} />
+              <Select onChange={(v) => updateLayer(index, { layer_type: v })} options={_.map(LAYER_TYPES, (t) => ({ value: t, text: LAYER_TYPE_LABELS[t] }))} placeholder='Select a type' value={layer.layer_type || ''} />
             </Field>
           </div>
-          <Field label='URL'>
+          <Field label={LAYER_URL_LABELS[layer.layer_type] || 'Address'}>
             <input className='input' onChange={(e) => updateLayer(index, { url: e.target.value })} value={layer.url || ''} />
           </Field>
+          { layer.layer_type === 'georeference' && (
+            <Field label={`Opacity: ${Math.round((layer.opacity ?? 1) * 100)}%`}>
+              <input max='1' min='0.2' onChange={(e) => updateLayer(index, { opacity: Number(e.target.value) })} step='0.05' type='range' value={layer.opacity ?? 1} />
+            </Field>
+          )}
           <div className='row'>
             <label className='check'>
               <input checked={layer.overlay === true} onChange={(e) => updateLayer(index, { overlay: e.target.checked })} type='checkbox' />
