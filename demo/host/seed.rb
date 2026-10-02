@@ -137,5 +137,5 @@ log.call("reindexing #{churches.name}…")
 count = OpenGeographiesPlatform::Indexing.reindex_project_models([churches]) do |completed, total|
   log.call("  #{completed}/#{total}") if completed.positive? && (completed % 500).zero?
 end
-log.call("reindexed #{count} records into #{OpenGeographiesPlatform::Indexing.index_name}")
+log.call("reindexed #{count} records into #{OpenGeographiesPlatform::Indexing.index_name(churches.project_id)}")
 log.call("HRCGA is live: http://#{SLUG}.localhost:4321/en/search/places")

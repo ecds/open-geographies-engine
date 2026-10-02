@@ -8,7 +8,7 @@ module CoreDataConnector
   class ReindexRecordsJob < ApplicationJob
     def perform(project_id, model_class, ids)
       ReindexAtlasJob.with_project_lock(project_id) do
-        ::OpenGeographiesPlatform::Indexing.reindex_records(model_class.constantize, ids)
+        ::OpenGeographiesPlatform::Indexing.reindex_records(model_class.constantize, ids, project_id:)
       end
     rescue StandardError => error
       Rails.logger.error(["#{self.class} - #{error.class}: #{error.message}", error.backtrace].join("\n"))

@@ -514,10 +514,14 @@ module CoreDataConnector
       facet_names = (expanded['facets'] || []).map { |facet| facet['name'] }.compact
       facet_names = Array(elasticsearch['facet_attributes']).presence || ['types'] if facet_names.empty?
 
+      # index_name is always the platform's: the atlas's own index (or the
+      # shared one), never a stored value.
       expanded['elasticsearch'] = {
-        'index_name' => ::OpenGeographiesPlatform::Indexing.index_name,
         'model_ids' => search_collection&.project_model_ids&.map(&:to_s)
-      }.compact.merge(elasticsearch).merge('facet_attributes' => facet_names)
+      }.compact.merge(elasticsearch).merge(
+        'index_name' => ::OpenGeographiesPlatform::Indexing.index_name(project_id),
+        'facet_attributes' => facet_names
+      )
 
       expanded
     end

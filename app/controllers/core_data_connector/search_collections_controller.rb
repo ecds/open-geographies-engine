@@ -23,7 +23,10 @@ module CoreDataConnector
         extra: {
           search_collection_id: search_collection.id,
           search_collection_name: search_collection.name,
-          project_model_ids: search_collection.project_model_ids
+          project_model_ids: search_collection.project_model_ids,
+          # A curator's Reindex rebuilds the atlas's own index when it has one
+          # (fresh index, swapped in when complete); see Indexing.
+          rebuild: true
         }
       )
 

@@ -9,18 +9,25 @@ module OpenGeographiesPlatform
   # to do about that:
   #
   #   - suspend per-record indexing around a bulk write, then reindex exactly
-  #     the records that were written (never a whole model class: the index is
-  #     shared across every atlas, discriminated by project_id, so a bare
+  #     the records that were written (never a whole model class: the index may
+  #     be shared across every atlas, discriminated by project_id, so a bare
   #     class-level reindex would rebuild everyone's data);
   #   - make sure the index exists WITH ITS MAPPING before an atlas's first
   #     single-record save (a per-record reindex into a missing index lets
   #     Elasticsearch auto-create it with dynamic mapping, silently breaking
   #     keyword exact-match fields).
   #
+  # When the lower engine has one index per project (its V1::Indexes, behind
+  # OG_INDEX_LAYOUT), the index name comes from there and a whole-atlas
+  # reindex is a zero-downtime rebuild of that project's index; with the
+  # shared layout, or a lower engine without V1::Indexes, everything below
+  # works exactly as before.
+  #
   # Everything here degrades to a no-op when the lower engine isn't loaded, so
   # this engine still boots on a host that hasn't mounted it yet.
   module Indexing
     V1 = 'OpenGeographies::V1'.freeze
+    INDEXES = "#{V1}::Indexes".freeze
 
     # Used only when the lower engine is absent (e.g. a host that hasn't mounted
     # it); with it present the real name is read from its Searchkick config.
@@ -31,14 +38,28 @@ module OpenGeographiesPlatform
         Object.const_defined?("#{V1}::Reindexable")
       end
 
-      # The shared v1 index the renderer queries. Read from the lower engine so
-      # a rename there can't silently strand the site config.
-      def index_name
+      # The index (an alias, per project) the renderer queries for a project's
+      # atlas. Read from the lower engine so a rename there can't silently
+      # strand the site config.
+      def index_name(project_id = nil)
+        return indexes.name_for(project_id) if project_id && indexes
+
         return FALLBACK_INDEX_NAME unless Object.const_defined?("#{V1}::Place")
 
         "#{V1}::Place".constantize.searchkick_index.name
       rescue StandardError
         FALLBACK_INDEX_NAME
+      end
+
+      # The lower engine's V1::Indexes when it has one per project and its
+      # layout isn't the plain shared one; nil otherwise (then the shared-index
+      # paths below apply unchanged).
+      def per_project_indexes
+        indexes if indexes && indexes.layout != 'shared'
+      end
+
+      def indexes
+        Object.const_defined?(INDEXES) ? INDEXES.constantize : nil
       end
 
       # Runs the block with per-record indexing suspended. Callers must follow
@@ -57,9 +78,15 @@ module OpenGeographiesPlatform
       end
 
       # Creates the index (mapping-aware) if it does not exist yet, for every
-      # distinct model class among the passed project models.
+      # distinct model class among the passed project models — and each
+      # project's own index when the lower engine has them.
       def ensure_index!(project_models)
         return unless available?
+
+        if (per_project = per_project_indexes)
+          project_models.map(&:project_id).uniq.each { |project_id| per_project.ensure!(project_id) }
+          return if per_project.per_project?
+        end
 
         reindexable = "#{V1}::Reindexable".constantize
 
@@ -71,21 +98,43 @@ module OpenGeographiesPlatform
 
       # Reindexes the given records of one upstream model class (a few places
       # just given a location), in one bulk request.
-      def reindex_records(model_class, ids)
+      def reindex_records(model_class, ids, project_id: nil)
         return 0 unless available? && ids.present?
 
         klass = v1_class_for(model_class)
         return 0 unless klass
 
-        klass.where(id: ids).reindex
+        if (per_project = per_project_indexes) && project_id
+          per_project.import(project_id, klass.where(id: ids))
+        else
+          klass.where(id: ids).reindex
+        end
+
         ids.size
       end
 
-      # Reindexes the records of the passed project models — and only those —
-      # into the shared index. Yields (completed, total) as batches finish so a
-      # job can report progress. Returns the number of records reindexed.
-      def reindex_project_models(project_models)
+      # Reindexes the records of the passed project models — and only those.
+      # When each project reads from its own index, `rebuild:` (a curator's
+      # Reindex) or passing every model of the project rebuilds that index
+      # instead — every record of the project into a fresh index, the alias
+      # swapped when it's complete; anything else is written into the live
+      # index(es). Yields (completed, total) as batches finish so a job can
+      # report progress. Returns the number of records reindexed.
+      def reindex_project_models(project_models, rebuild: false, &block)
         return 0 unless available?
+
+        per_project = per_project_indexes
+
+        if per_project&.per_project? && project_models.map(&:project_id).uniq.one? && (rebuild || whole_project?(project_models))
+          completed = 0
+
+          per_project.rebuild(project_models.first.project_id) do |done, total|
+            completed = done
+            block&.call(done, total)
+          end
+
+          return completed
+        end
 
         ensure_index!(project_models)
 
@@ -96,7 +145,7 @@ module OpenGeographiesPlatform
         end
 
         completed = 0
-        yield(completed, total) if block_given?
+        block&.call(completed, total)
 
         groups.each do |model_class, models|
           klass = v1_class_for(model_class)
@@ -105,14 +154,26 @@ module OpenGeographiesPlatform
           klass.where(project_model_id: models.map(&:id)).find_in_batches(batch_size: 500) do |batch|
             # Relation reindex: Searchkick bulk-writes exactly these records,
             # so a batch is one round-trip rather than one per record.
-            klass.where(id: batch.map(&:id)).reindex
+            batch_relation = klass.where(id: batch.map(&:id))
+            per_project ? per_project.import(models.first.project_id, batch_relation) : batch_relation.reindex
 
             completed += batch.size
-            yield(completed, total) if block_given?
+            block&.call(completed, total)
           end
         end
 
         completed
+      end
+
+      private
+
+      # Whether the project models are every model of one project (a rebuild
+      # then covers exactly what was asked for).
+      def whole_project?(project_models)
+        project_ids = project_models.map(&:project_id).uniq
+        return false unless project_ids.one?
+
+        (::CoreDataConnector::ProjectModel.where(project_id: project_ids.first).pluck(:id) - project_models.map(&:id)).empty?
       end
     end
   end
