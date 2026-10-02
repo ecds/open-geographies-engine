@@ -70,6 +70,12 @@ module CoreDataConnector
       LEADING_ZERO = /\A-?0\d/
       ISO_DATE = /\A\d{4}-\d{2}-\d{2}\z/
 
+      # A column of years ("1911") reads as numbers; under a header that says
+      # it's a date or a year ("Year built", "Date", "erected") it's proposed
+      # as a date instead, so it can date the places (the atlas's year filter).
+      YEAR_VALUE = /\A1\d{3}\z|\A20\d{2}\z/
+      DATE_HEADER = /(\A|[^a-z])(year|years|yr|date|dates|dated|built|founded|established|erected|constructed|completed|opened|listed|circa)([^a-z]|\z)/i
+
       # Values that are something other than a name: dates (also partial,
       # "1983-03-"), links, GUIDs.
       DATE_LIKE = /\A\d{4}-\d{2}(-\d{0,2})?/
@@ -160,15 +166,21 @@ module CoreDataConnector
             misfits: TYPED.to_h { |type| [type, Values.misfits(values, type)] }.compact,
             samples: distinct.first(SAMPLES_PER_COLUMN),
             max_length: values.map(&:length).max || 0,
-            data_type: infer_type(values, distinct),
+            data_type: infer_type(values, distinct, column),
             options: distinct.size <= SELECT_MAX_DISTINCT ? distinct.sort : nil
           }]
         end
       end
 
-      def infer_type(values, distinct)
+      # "YearBuilt" and "CertDate" count as well as "Year built".
+      def date_header?(column)
+        column.to_s.gsub(/([a-z])([A-Z])/, '\\1 \\2').match?(DATE_HEADER)
+      end
+
+      def infer_type(values, distinct, column = nil)
         return 'String' if values.empty?
         return 'Boolean' if values.all? { |v| BOOLEAN_VALUES.include?(v.downcase) } || Values.checkmark_column?(values)
+        return 'FuzzyDate' if date_header?(column) && values.all? { |v| v.strip.match?(YEAR_VALUE) }
         return 'Number' if values.all? { |v| v.match?(NUMBER) } && values.none? { |v| v.match?(LEADING_ZERO) }
         return 'Date' if values.all? { |v| v.match?(ISO_DATE) }
         return 'FuzzyDate' if values.all? { |v| Values.fuzzy_date(v.strip) != :invalid }

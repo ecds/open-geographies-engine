@@ -29,7 +29,8 @@ module OpenGeographiesPlatform
   #
   # Other scalar fields (text, numbers, dates) are not facetable as v1
   # indexes them; they are listed with `facetable: false` so the console can
-  # say why.
+  # say why. A date field becomes a search's year filter instead (its `dates`
+  # setting; see date_fields_for_models).
   class FacetCatalog
     Entry = Struct.new(:attribute, :label, :facetable, :reason, keyword_init: true) do
       def to_h
@@ -38,6 +39,11 @@ module OpenGeographiesPlatform
     end
 
     SEARCHABLE_TYPES = %w[String Text RichText].freeze
+
+    # Fields that can place records in time (a search's `dates`): dates, and
+    # numbers whose name says they're a year ("Year built").
+    DATE_TYPES = %w[Date FuzzyDate].freeze
+    YEAR_NAME = /\byears?\b/i
 
     # Fields every search already looks in (Site::DEFAULT_SEARCH_ATTRIBUTES),
     # so not offered as a choice.
@@ -83,6 +89,43 @@ module OpenGeographiesPlatform
             { path:, label: field.column_name }
           end
         end.uniq { |entry| entry[:path] }
+      end
+
+      # The fields a search can take its dates from, for the console's Time
+      # setting: [{ field:, label: }], `field` being the top-level document key
+      # the renderer reads the date from (the promoted key, e.g. Map Layers'
+      # "Date" → `date`, else the parameterized name).
+      def date_fields_for_models(project_models)
+        project_models.flat_map do |model|
+          model.user_defined_fields.order(:order).filter_map do |field|
+            next unless date_field?(field)
+
+            { field: date_key(model, field), label: field.column_name }
+          end
+        end.uniq { |entry| entry[:field] }
+      end
+
+      def date_field?(field)
+        DATE_TYPES.include?(field.data_type) || (field.data_type == 'Number' && field.column_name.match?(YEAR_NAME))
+      end
+
+      # The top-level key a field's value is indexed under: its promoted key
+      # (Map Layers' "Date" → `date`), else its parameterized name — moved to
+      # `<key>_2` when that name is a canonical scalar property the field
+      # isn't promoted to ("Date" on Places; the lower engine's RESERVED_KEYS
+      # rule). A dotted promoted path, which a search can't take its dates
+      # from, falls back to the field's own key.
+      def date_key(model, field)
+        promoted = (promoted_udfs_for[template_model_name_for(model)] || {})[field.column_name].to_s
+        return promoted if promoted.present? && !promoted.include?('.')
+
+        key = field.column_name.to_s.parameterize.underscore
+        reserved_key?(key) ? "#{key}_2" : key
+      end
+
+      def reserved_key?(key)
+        property = mapping.dig(:mappings, :properties, key.to_sym)
+        property.is_a?(Hash) && property[:type].present? && !%w[object nested].include?(property[:type])
       end
 
       # Where the index holds a field's text.
@@ -136,6 +179,11 @@ module OpenGeographiesPlatform
         # which the mapping's facets_as_keyword template makes aggregatable.
         if field.data_type == 'Select'
           return Entry.new(attribute: "#{field.column_name.parameterize.underscore}_facet", label:, facetable: true)
+        end
+
+        if date_field?(field)
+          return Entry.new(attribute: field.column_name.parameterize.underscore, label:, facetable: false,
+                           reason: 'A date filters by years instead: choose it under Time.')
         end
 
         Entry.new(attribute: field.column_name.parameterize.underscore, label:, facetable: false,

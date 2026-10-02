@@ -59,7 +59,10 @@ module CoreDataConnector
 
       models = ProjectModel.where(project_id: site.project_id).order(:order)
 
-      render json: { search_fields: ::OpenGeographiesPlatform::FacetCatalog.search_fields_for_models(models) }, status: :ok
+      render json: {
+        search_fields: ::OpenGeographiesPlatform::FacetCatalog.search_fields_for_models(models),
+        date_fields: ::OpenGeographiesPlatform::FacetCatalog.date_fields_for_models(models)
+      }, status: :ok
     end
 
     # GET /core_data/sites/:id/config

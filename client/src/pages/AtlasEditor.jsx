@@ -84,6 +84,13 @@ const SEARCH_TYPES = [
   { value: 'image', text: 'Image gallery (no map)' }
 ];
 
+// A year typed into a layer's Year box: digits (and a leading minus) only, or
+// undefined to clear it.
+const toYear = (text) => {
+  const match = String(text).trim().match(/^-?\d{1,4}$/);
+  return match ? Number(match[0]) : undefined;
+};
+
 /**
  * The atlas editor: the site record's name/slug, branding, the home page and
  * standalone pages with the menu, map layers and search apps, plus the config
@@ -105,6 +112,7 @@ const AtlasEditor = ({ id, navigate }) => {
   const [facets, setFacets] = useState([]);
   const [fieldModels, setFieldModels] = useState([]);
   const [searchFields, setSearchFields] = useState([]);
+  const [dateFields, setDateFields] = useState([]);
   const [tab, setTab] = useState('general');
   // The language the Home page and Pages & menu tabs are editing.
   const [contentLocale, setContentLocale] = useState(null);
@@ -129,7 +137,10 @@ const AtlasEditor = ({ id, navigate }) => {
           fetchSearchCollections(data.site.project_id).then((d) => setCollections(d.search_collections || [])),
           fetchSiteFacets(id).then((d) => setFacets(d.facets || [])),
           fetchSiteFields(id).then((d) => setFieldModels(d.models || [])),
-          fetchSiteSearchFields(id).then((d) => setSearchFields(d.search_fields || []))
+          fetchSiteSearchFields(id).then((d) => {
+            setSearchFields(d.search_fields || []);
+            setDateFields(d.date_fields || []);
+          })
         ]);
       })
       .catch((error) => setErrors(errorMessages(error)));
@@ -567,6 +578,28 @@ const AtlasEditor = ({ id, navigate }) => {
           <Field label={LAYER_URL_LABELS[layer.layer_type] || 'Address'}>
             <input className='input' onChange={(e) => updateLayer(index, { url: e.target.value })} value={layer.url || ''} />
           </Field>
+          { layer.overlay === true && (
+            <div className='grid-2'>
+              <Field label='Year' hint='The year the map shows. With two or more dated overlays, visitors get a slider to move between them.'>
+                <input
+                  className='input'
+                  inputMode='numeric'
+                  onChange={(e) => updateLayer(index, { start_year: toYear(e.target.value) })}
+                  placeholder='e.g. 1878'
+                  value={layer.start_year ?? ''}
+                />
+              </Field>
+              <Field label='Until (optional)' hint='For a map that stands for several years, the last one.'>
+                <input
+                  className='input'
+                  inputMode='numeric'
+                  onChange={(e) => updateLayer(index, { end_year: toYear(e.target.value) })}
+                  placeholder={layer.start_year ? String(layer.start_year) : ''}
+                  value={layer.end_year ?? ''}
+                />
+              </Field>
+            </div>
+          )}
           { layer.layer_type === 'georeference' && (
             <Field label={`Opacity: ${Math.round((layer.opacity ?? 1) * 100)}%`}>
               <input max='1' min='0.2' onChange={(e) => updateLayer(index, { opacity: Number(e.target.value) })} step='0.05' type='range' value={layer.opacity ?? 1} />
@@ -623,6 +656,40 @@ const AtlasEditor = ({ id, navigate }) => {
               value={entry.search_fields || []}
             />
           </Field>
+          <fieldset className='field'>
+            <legend className='field-label'>Time</legend>
+            <Field label='Dates from' hint='The field that places these records in time. Visitors get a date filter (a range of years); a list or grid of results can also be sorted oldest or newest first.'>
+              <Select
+                onChange={(v) => updateSearch(index, {
+                  dates: v ? { ...(entry.dates || {}), field: v } : undefined
+                })}
+                options={_.map(dateFields, (f) => ({ value: f.field, text: f.label }))}
+                placeholder={_.isEmpty(dateFields) ? 'No date fields in this atlas' : 'No dates'}
+                value={entry.dates?.field || ''}
+              />
+            </Field>
+            { entry.dates?.field && (
+              <div className='grid-2'>
+                <Field label='Filter name' hint='What visitors see above the date filter.'>
+                  <input
+                    className='input'
+                    maxLength={80}
+                    onChange={(e) => updateSearch(index, { dates: _.omit({ ...entry.dates, label: e.target.value }, (v) => v === '') })}
+                    placeholder={_.findWhere(dateFields, { field: entry.dates.field })?.label || 'Date'}
+                    value={entry.dates.label || ''}
+                  />
+                </Field>
+                <label className='check'>
+                  <input
+                    checked={entry.dates.timeline === true}
+                    onChange={(e) => updateSearch(index, { dates: { ...entry.dates, timeline: e.target.checked } })}
+                    type='checkbox'
+                  />
+                  Show a timeline (a Timeline button above the map)
+                </label>
+              </div>
+            )}
+          </fieldset>
           <Field label='Facets' hint='In display order. Only attributes the index can facet on are offered.'>
             <MultiSelect
               onChange={(names) => updateSearch(index, {

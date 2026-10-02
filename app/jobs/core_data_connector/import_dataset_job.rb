@@ -127,6 +127,7 @@ module CoreDataConnector
           'fields_created' => @fields_created.presence,
           'filters_added' => @filters_added.presence,
           'searched_fields' => @searched_fields.presence,
+          'dates_added' => @dates_added.presence,
           'hidden_fields' => @hidden_fields.presence,
           'problems' => @problems.presence,
           'geocode_error' => @geocode_error,
@@ -313,6 +314,12 @@ module CoreDataConnector
       photo_key = @photo_column && @fields[@photo_column].column_name.parameterize.underscore
       hidden << photo_key if photo_key
 
+      # The first date column dates the places: the year filter and date
+      # sorts (search[].dates), on searches that have no dates yet.
+      date_field = @fields.values.find { |field| ::OpenGeographiesPlatform::FacetCatalog.date_field?(field) }
+      dates = date_field && { 'field' => ::OpenGeographiesPlatform::FacetCatalog.date_key(@model, date_field), 'label' => date_field.column_name }
+      @dates_added = []
+
       # Text fields become searchable ("Peachtree" finds the addresses);
       # columns of web addresses don't.
       searchable = @fields.except(@identifier_column, *@link_columns).values
@@ -336,6 +343,11 @@ module CoreDataConnector
 
               facets << { 'name' => name, 'type' => 'list' }
               @filters_added << label
+            end
+
+            if dates && search['dates'].blank?
+              search['dates'] = dates
+              @dates_added << dates['label']
             end
 
             fields = (search['search_fields'] ||= [])
@@ -369,6 +381,7 @@ module CoreDataConnector
       @filters_added.uniq!
       @hidden_fields.uniq!
       @searched_fields.uniq!
+      @dates_added.uniq!
     end
 
     # A search with no collection covers the whole project.

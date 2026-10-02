@@ -119,8 +119,15 @@ The **Columns** table lists every column with examples. Under **Use as**, choose
 - **Pick-list (filterable)**: these become filters on the atlas.
 - **Number**.
 - **Yes / No**: marked rows are Yes, blank rows are No.
-- **Date (a year, month or day)**: partial dates such as `1983` or `1983-03` are fine.
+- **Date (a year, month or day)**: partial dates such as `1983` or `1983-03` are fine, and so are
+  ranges (`1861-1865`), decades (`1890s`), circa dates (`c. 1890`, `ca. 1825- ca. 1830`) and the
+  Library of Congress's quarter centuries (`18q2` is 1825–1849). A column of years under a heading
+  such as "Year built" is suggested as a date.
 - **Exact date (YYYY-MM-DD)**.
+
+The first date column dates your places: visitors get a date filter (and, on a list or grid of
+results, can sort oldest or newest first). You can change which field that is, or turn on a timeline, under **Settings → Search → Time**
+(see [Search and filters](#10-search-and-filters)).
 
 If some values don't fit the type you chose, the console says how many would be left empty and
 suggests another type.
@@ -262,6 +269,13 @@ changes you haven't saved yet.
   "Types").
 - **Also search in**: the search box always looks at names and descriptions; add other text fields
   such as an address.
+- **Time → Dates from**: the field that places your records in time (a date, or a number field
+  named for a year, such as "Year built"). Visitors get a date filter, a range of years; when
+  results show as a list or a grid they can also sort **Oldest first** or **Newest first**. A
+  record dated as a range (1861–1865) or a decade
+  shows up for any year it covers. Records with no date stay in the results until a visitor narrows
+  the years. **Filter name** is what visitors see above the filter. **Show a timeline** adds a
+  **Timeline** button above the map that lays the results out by date.
 - **Result card attributes**: what each search result shows under the name.
 - **Shows results as**: a map with the results beside it (the usual), or without a map: a list,
   a grid of cards, or an image gallery.
@@ -297,6 +311,12 @@ the scan to the same places on today's map. Under **Settings → Map layers → 
    Editor**. Place your points there, then paste the Allmaps link it gives you.
 
 Visitors switch historic maps on and off with the layers button on the map.
+
+**Maps from different years.** Give each map its **Year** in the **Layers** list below (a year in
+the map's title is filled in for you; **Until** is for a map that stands for several years). With
+two or more dated maps, visitors get a **Historic map** slider on the map instead: each step shows
+the map for that year, and the first step shows none. The map marked **Visible by default** is where
+the slider starts.
 
 ### Other layers
 
@@ -408,6 +428,7 @@ Someone invited by email can work on the atlases they've been added to, but can'
 | Address lookup | U.S. street addresses |
 | Images | PNG, JPEG, GIF, WebP, AVIF, SVG, ICO up to 10 MB; TIFF up to 100 MB |
 | Languages | English, Spanish, French, German, Italian, Portuguese |
-| Historic maps | Georeferenced in Allmaps (allmaps.org), from a IIIF scan |
+| Historic maps | Georeferenced in Allmaps (allmaps.org), from a IIIF scan; give each a Year for the slider |
+| Dates | Settings → Search → Time: a date filter, oldest/newest sorts (list and grid), an optional timeline |
 | Draft → public | Settings → General → Visibility → **Publish atlas** (owners) |
 | Changes live | Within 30 seconds of **Save** |

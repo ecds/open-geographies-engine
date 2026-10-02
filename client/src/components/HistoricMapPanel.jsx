@@ -35,13 +35,18 @@ const HistoricMapPanel = ({ onAdd }) => {
   };
 
   const onAddLayer = () => {
+    // A year in the map's name ("Atlanta, 1878") dates the layer; the curator
+    // can change it in the layer list.
+    const year = name.match(/\b(1[5-9]\d\d|20\d\d)\b/);
+
     onAdd({
       name: name.trim() || 'Historic map',
       layer_type: 'georeference',
       url: result.url,
       overlay: true,
       default: shown,
-      opacity
+      opacity,
+      ...(year ? { start_year: Number(year[1]) } : {})
     });
     setText('');
     setResult(null);

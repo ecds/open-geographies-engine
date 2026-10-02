@@ -61,6 +61,9 @@ module CoreDataConnector
 
     # What every search looks in (the renderer's own default); a search's
     # `search_fields` are added after these.
+    # A search's date field (search[].dates.field): a top-level document key.
+    DATE_FIELD = /\A[a-z0-9_]+\z/
+
     DEFAULT_SEARCH_ATTRIBUTES = [
       { 'field' => 'name', 'weight' => 3 },
       { 'field' => 'names', 'weight' => 2 },
@@ -497,6 +500,17 @@ module CoreDataConnector
       expanded = entry.deep_dup
       search_collection = search_collections_by_id[expanded.delete('search_collection_id')&.to_i]
       expanded.delete('typesense')
+
+      # The field that places the search's records in time (the renderer's
+      # year filter, date sorts and timeline): a top-level document key only.
+      dates = expanded.delete('dates')
+      if dates.is_a?(Hash) && dates['field'].is_a?(String) && dates['field'].match?(DATE_FIELD)
+        expanded['dates'] = {
+          'field' => dates['field'],
+          'label' => dates['label'].presence&.to_s&.strip&.truncate(80),
+          'timeline' => dates['timeline'] == true
+        }.compact
+      end
 
       elasticsearch = expanded['elasticsearch'] || {}
 

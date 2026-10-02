@@ -34,6 +34,11 @@ module CoreDataConnector
       DECADE = /\A(\d{3})0s\z/
       RANGE = /\A(\d{4})\s*(?:-|–|—|to)\s*(\d{4})\z/
       CIRCA = /\A(?:c\.?|ca\.?|circa|about)\s*(\d{4})\z/i
+      # The Library of Congress's quarter-century notation (HABS building
+      # dates): "18q2" is the second quarter of the 1800s, 1825–1849.
+      QUARTER = /\A(\d{2})q([1-4])\z/i
+      # "ca. 1825- ca. 1830": a range with circa on either end, kept as written.
+      CIRCA_RANGE = /\A(?:c\.?|ca\.?|circa|about)\s*(\d{4})\s*(?:-|–|—|to)\s*(?:(?:c\.?|ca\.?|circa|about)\s*)?(\d{4})\z/i
 
       ACCURACY = { year: 0, month: 1, date: 2 }.freeze
 
@@ -132,6 +137,18 @@ module CoreDataConnector
         if (match = CIRCA.match(value))
           year = match[1].to_i
           return fuzzy(Date.new(year, 1, 1), Date.new(year, 12, 31), :year, description: value)
+        end
+
+        if (match = CIRCA_RANGE.match(value))
+          from, to = match[1].to_i, match[2].to_i
+          return :invalid if to < from
+
+          return fuzzy(Date.new(from, 1, 1), Date.new(to, 12, 31), :year, range: true, description: value)
+        end
+
+        if (match = QUARTER.match(value))
+          from = match[1].to_i * 100 + (match[2].to_i - 1) * 25
+          return fuzzy(Date.new(from, 1, 1), Date.new(from + 24, 12, 31), :year, range: true)
         end
 
         :invalid
