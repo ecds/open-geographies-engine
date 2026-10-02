@@ -78,14 +78,19 @@ module OpenGeographiesPlatform
       end
 
       # Creates the index (mapping-aware) if it does not exist yet, for every
-      # distinct model class among the passed project models — and each
-      # project's own index when the lower engine has them.
+      # distinct model class among the passed project models. When each project
+      # reads from its own index, it's that project's: the lower engine creates
+      # an empty one only for a project with nothing to index yet (a new atlas),
+      # and otherwise builds it whole, so it never holds only some records.
+      # Under `both` the project indexes are built by og_indexes:build, not here.
       def ensure_index!(project_models)
         return unless available?
 
-        if (per_project = per_project_indexes)
+        per_project = per_project_indexes
+
+        if per_project&.per_project?
           project_models.map(&:project_id).uniq.each { |project_id| per_project.ensure!(project_id) }
-          return if per_project.per_project?
+          return
         end
 
         reindexable = "#{V1}::Reindexable".constantize
@@ -136,7 +141,9 @@ module OpenGeographiesPlatform
           return completed
         end
 
-        ensure_index!(project_models)
+        # A project index that doesn't exist yet is built whole by the first
+        # import below, never created empty first.
+        ensure_index!(project_models) unless per_project&.per_project?
 
         groups = project_models.group_by(&:model_class)
         total = groups.sum do |model_class, models|

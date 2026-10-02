@@ -1,10 +1,12 @@
 module CoreDataConnector
-  # Reindexes an atlas's records into the shared v1 search index — the
-  # coalesced reindex that follows a bulk write (imports suspend per-record
-  # indexing for the duration), or a console-requested rebuild.
+  # Reindexes an atlas's records into its search index (the shared v1 index,
+  # or the atlas's own when the lower engine has one per project; see
+  # OpenGeographiesPlatform::Indexing) — the coalesced reindex that follows a
+  # bulk write (imports suspend per-record indexing for the duration), or a
+  # console-requested rebuild.
   #
-  # Scoped, never global: the index is shared across every atlas, so this job
-  # only ever touches the records of the project models it is given
+  # Scoped, never global: the index may be shared across every atlas, so this
+  # job only ever touches the records of the project models it is given
   # (extra.project_model_ids), defaulting to all of the job's project's models.
   # Progress lands on the Job row (extra.progress) for the console.
   #
