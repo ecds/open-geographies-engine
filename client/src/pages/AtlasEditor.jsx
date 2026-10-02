@@ -17,6 +17,7 @@ import {
 import { liveUrl as atlasLiveUrl } from '../atlasLinks';
 import AtlasHeader from '../components/AtlasHeader';
 import DomainPanel from '../components/DomainPanel';
+import ImageLibrary from '../components/ImageLibrary';
 import PublishPanel from '../components/PublishPanel';
 import ImageField from '../components/ImageField';
 import PagesEditor from '../components/PagesEditor';
@@ -28,6 +29,7 @@ const TABS = [
   { key: 'branding', label: 'Branding' },
   { key: 'home', label: 'Home page' },
   { key: 'pages', label: 'Pages & menu' },
+  { key: 'images', label: 'Images' },
   { key: 'layers', label: 'Map layers' },
   { key: 'search', label: 'Search' },
   { key: 'detail', label: 'Detail pages' },
@@ -67,6 +69,8 @@ const SEARCH_TYPES = ['map', 'list', 'grid', 'image'];
  */
 const AtlasEditor = ({ id, navigate }) => {
   const [site, setSite] = useState(null);
+  // The atlas as last saved (what the live atlas shows), beside the edited copy.
+  const [savedSite, setSavedSite] = useState(null);
   const [assets, setAssets] = useState([]);
   const [savedSlugs, setSavedSlugs] = useState([]);
   const [collections, setCollections] = useState([]);
@@ -86,6 +90,7 @@ const AtlasEditor = ({ id, navigate }) => {
     fetchSite(id)
       .then((data) => {
         setSite(data.site);
+        setSavedSite(data.site);
         setSavedSlugs(_.pluck(data.site.content?.pages || [], 'slug'));
         setAdvancedText(JSON.stringify(_.omit(data.site.config || {}, MANAGED_KEYS), null, 2));
 
@@ -185,6 +190,7 @@ const AtlasEditor = ({ id, navigate }) => {
     updateSite(site.id, _.pick(site, 'name', 'slug', 'config', 'area', 'branding', 'navigation', 'content'))
       .then((data) => {
         setSite(data.site);
+        setSavedSite(data.site);
         setSavedSlugs(_.pluck(data.site.content?.pages || [], 'slug'));
         setSaved(true);
         setPreview(null);
@@ -560,11 +566,16 @@ const AtlasEditor = ({ id, navigate }) => {
     </>
   );
 
+  const renderImages = () => (
+    <ImageLibrary assets={assets} onChange={setAssets} onUpload={onUpload} savedSite={savedSite} site={site} />
+  );
+
   const renderers = {
     general: renderGeneral,
     branding: renderBranding,
     home: renderHome,
     pages: renderPages,
+    images: renderImages,
     layers: renderLayers,
     search: renderSearch,
     detail: renderDetail,

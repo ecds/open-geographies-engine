@@ -289,6 +289,16 @@ before this was added were published by the migration). The wizard creates draft
   records through FairData's public API), so a draft's records are reachable there by
   anyone who knows the project's ids, as before; it's the atlas that's private.
 
+## Images
+
+Settings → Images lists the atlas's uploaded images (the same `GET /core_data/sites/:id/assets`
+the pickers use) with where each is used: logo, favicon, link preview image, footer, home
+page, each page (Markdown included), other settings. "Used" covers both the saved atlas and
+unsaved edits, so an image that's about to be used, or is still on the live atlas, isn't
+counted as unused. Unused images can be deleted one by one or all at once
+(`DELETE /core_data/sites/:id/assets/:key`, copies included); deleting a used one says
+which places will show no image.
+
 ## An atlas's own domain
 
 Every atlas has a platform address, `<slug>.<base domain>` (`OG_ATLAS_URL_TEMPLATE`, e.g.

@@ -286,3 +286,19 @@ td .status-pill { margin-left: 0; }
 .dns-records .table td { font-size: 14px; }
 .dns-records .table td:nth-child(2) { white-space: nowrap; }
 .dns-records code { font-family: ui-monospace, monospace; font-size: 13px; user-select: all; overflow-wrap: anywhere; }
+.library-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 12px 0; }
+.image-library .message .row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.library-list { list-style: none; margin: 12px 0 0; padding: 0; border: 1px solid var(--og-border); border-radius: 8px; background: var(--og-surface); }
+.library-list li { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--og-border); }
+.library-list li:last-child { border-bottom: 0; }
+.library-list img { width: 96px; height: 64px; object-fit: contain; border-radius: 4px; background: repeating-conic-gradient(#c9ced3 0% 25%, #e4e7ea 0% 50%) 50% / 12px 12px; }
+.library-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 14px; }
+.library-info strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.library-info .muted { margin: 0; font-size: 13px; }
+.library-info .status-pill { margin-left: 0; align-self: flex-start; }
+.library-delete { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; max-width: 360px; font-size: 14px; }
+@media (max-width: 640px) {
+  .library-list li { grid-template-columns: 64px minmax(0, 1fr); }
+  .library-list img { width: 64px; height: 48px; }
+  .library-delete { grid-column: 1 / -1; justify-content: flex-start; }
+}
