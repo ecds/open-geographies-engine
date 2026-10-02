@@ -26,6 +26,7 @@ const Shell = ({ active, children, navigate }) => {
           { link(paths.atlases(), 'Atlases', 'atlases') }
           { canCreateAtlases() && link(paths.wizard(), 'Create an atlas', 'wizard') }
         </nav>
+        { config.guideUrl && <a className='shell-link shell-console' href={config.guideUrl} rel='noreferrer' target='_blank'>Guide ↗</a> }
         <a className='shell-link shell-console' href={`${config.consoleUrl}/`}>FairData console →</a>
       </header>
       { children }

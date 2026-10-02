@@ -15,6 +15,8 @@ module CoreDataConnector
   # authentication of its own (the page holds no data; every API call it makes
   # is authenticated by the console session).
   class WizardController < ActionController::Base
+    GUIDE_URL = 'https://github.com/ecds/open-geographies-engine/blob/main/docs/CURATOR_GUIDE.md'
+
     protect_from_forgery with: :exception
 
     layout false
@@ -24,7 +26,9 @@ module CoreDataConnector
         apiBaseUrl: '',
         consoleUrl: '',
         mapTilerKey: ENV.fetch('VITE_MAP_TILER_KEY', nil),
-        atlasUrlTemplate: ENV.fetch('OG_ATLAS_URL_TEMPLATE', nil)
+        atlasUrlTemplate: ENV.fetch('OG_ATLAS_URL_TEMPLATE', nil),
+        # The curator guide (docs/CURATOR_GUIDE.md), linked from the console.
+        guideUrl: ENV.fetch('OG_GUIDE_URL', GUIDE_URL)
       }
     end
   end

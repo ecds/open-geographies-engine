@@ -14,7 +14,8 @@ const config = {
   consoleUrl: injected.consoleUrl || '',
   mapTilerKey: injected.mapTilerKey || '',
   mapStyle: injected.mapStyle || (injected.mapTilerKey ? MAPTILER_STYLE : FALLBACK_STYLE),
-  atlasUrlTemplate: injected.atlasUrlTemplate || null
+  atlasUrlTemplate: injected.atlasUrlTemplate || null,
+  guideUrl: injected.guideUrl || null
 };
 
 export default config;
