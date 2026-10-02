@@ -15,6 +15,9 @@ namespace is **`OpenGeographiesPlatform`** (gem `open_geographies_platform`). It
 domain classes still live in `CoreDataConnector::`; references into the lower engine
 are written `::OpenGeographies::V1::…` / `::OpenGeographies::ProjectModelRole`.
 
+Running it in production (with the renderer): [`PRODUCTION.md`](PRODUCTION.md), the
+readiness checklist. Trying it locally in one command: [`demo/`](demo/).
+
 ## Why an engine
 
 Jay/Emory asked that we **not diverge** the `core-data-connector` / `core-data-cloud`
