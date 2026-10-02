@@ -100,4 +100,16 @@ namespace :open_geographies do
       puts "#{site.slug}: #{count} image(s) copied" if count.positive?
     end
   end
+
+  desc 'Check every atlas domain\'s DNS again: connect the ones that now point at their atlas, ' \
+       'disconnect the ones that stopped (run it from cron, e.g. hourly)'
+  task check_domains: :environment do
+    CoreDataConnector::Site.where.not(domain: nil).find_each do |site|
+      was = site.domain_status
+      result = site.check_domain!
+      now = site.domain_status
+
+      puts "#{site.slug}: #{site.domain} #{was} → #{now}#{result.connected ? '' : " (#{result.message})"}" if was != now
+    end
+  end
 end

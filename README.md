@@ -320,8 +320,10 @@ Every atlas has a platform address, `<slug>.<base domain>` (`OG_ATLAS_URL_TEMPLA
   an existing atlas's platform address, else 404: the shape of Caddy's on-demand TLS
   `ask`, so the proxy in front of the renderer can get a certificate per domain on first
   visit and never for a name nobody connected.
-- Not done: DNS isn't re-checked on a schedule (a domain stays connected until the next
-  check after its DNS moves away); no `www` ↔ root pairing.
+- DNS is re-checked when the curator asks, or by `bin/rails open_geographies:check_domains`
+  (every domain; prints what changed) — run it from cron so a domain whose DNS moved away
+  is disconnected, and one whose DNS arrived late is connected. Not done: `www` ↔ root
+  pairing.
 
 ## Upstream-PR posture
 
