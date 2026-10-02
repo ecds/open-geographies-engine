@@ -14,7 +14,7 @@ module CoreDataConnector
     def reindex
       search_collection = SearchCollection.find(params[:id])
 
-      authorize search_collection, :update?
+      authorize search_collection, :reindex?
 
       job = Job.create(
         project_id: search_collection.project_id,

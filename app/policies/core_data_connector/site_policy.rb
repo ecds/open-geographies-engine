@@ -30,8 +30,20 @@ module CoreDataConnector
       !project.archived? && member?
     end
 
-    # A user can update sites if they are the owner of the project.
+    # The atlas's content — settings, pages, branding, images, places,
+    # categories, imports, reindexing — is edited by any member of the
+    # project: its owners and its editors (FairData's project roles, set on
+    # the project's Users page).
     def update?
+      return true if current_user.admin?
+
+      !project.archived? && member?
+    end
+
+    # What decides where and whether the atlas is public is the owners':
+    # publishing and unpublishing, the slug (its platform address), its own
+    # domain, replacing the preview link. Deleting it is #destroy?.
+    def manage?
       return true if current_user.admin?
 
       !project.archived? && owner?

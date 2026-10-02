@@ -5,7 +5,7 @@ import { liveUrl, previewUrl } from './atlasLinks';
 import config from './config';
 import { JobStatuses } from './jobs';
 import useJobPolling from './hooks/useJobPolling';
-import { isSignedIn, setSession } from './session';
+import { canCreateAtlases, isSignedIn, setSession } from './session';
 import { paths, useRoute } from './router';
 import AtlasAreaForm from './components/AtlasAreaForm';
 import PlaceSources from './components/PlaceSources';
@@ -365,7 +365,16 @@ const App = () => {
   }
 
   const page = {
-    wizard: () => <Wizard navigate={navigate} />,
+    wizard: () => (canCreateAtlases() ? <Wizard navigate={navigate} /> : (
+      <main className='wizard'>
+        <h1>Create your atlas</h1>
+        <p>
+          Your account works on the atlases you’ve been added to, but can’t start new ones. Ask a FairData administrator
+          if you need to create an atlas.
+        </p>
+        <a href={paths.atlases()} onClick={(e) => { e.preventDefault(); navigate(paths.atlases()); }}>Your atlases</a>
+      </main>
+    )),
     atlases: () => <AtlasList navigate={navigate} />,
     atlas: () => <AtlasEditor id={route.id} key={route.id} navigate={navigate} />,
     imports: () => <AtlasImports id={route.id} key={route.id} navigate={navigate} />,

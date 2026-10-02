@@ -228,8 +228,8 @@ const AtlasEditor = ({ id, navigate }) => {
       <Field label='Name' required>
         <input className='input' onChange={(e) => update({ name: e.target.value })} value={site.name || ''} />
       </Field>
-      <Field hint='Lowercase letters, numbers, and hyphens. The atlas’s platform address is built from it; changing it changes that address, and a connected domain has to be checked again.' label='Slug' required>
-        <input className='input' onChange={(e) => update({ slug: e.target.value })} value={site.slug || ''} />
+      <Field hint={site.permissions?.manage === false ? 'The atlas’s platform address is built from it. Only the atlas’s owners can change it.' : 'Lowercase letters, numbers, and hyphens. The atlas’s platform address is built from it; changing it changes that address, and a connected domain has to be checked again.'} label='Slug' required>
+        <input className='input' onChange={(e) => update({ slug: e.target.value })} readOnly={site.permissions?.manage === false} value={site.slug || ''} />
       </Field>
       <h3>Search index</h3>
       { _.isEmpty(collections) && <p className='muted'>No search collections.</p> }

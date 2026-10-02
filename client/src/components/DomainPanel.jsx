@@ -7,8 +7,10 @@ import { Button, Message } from './ui';
  * DNS points at this atlas (the server checks: a CNAME to the platform
  * address, or a TXT record naming the atlas); from then on the platform
  * address sends visitors there. Takes effect at once, separately from Save.
+ * Only the atlas's owners change it; editors see it.
  */
 const DomainPanel = ({ onChange, site }) => {
+  const canManage = site.permissions?.manage !== false;
   const [value, setValue] = useState('');
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState([]);
@@ -56,7 +58,14 @@ const DomainPanel = ({ onChange, site }) => {
         </p>
       )}
 
-      { !site.domain && (
+      { !canManage && (
+        <p className='muted'>
+          { site.domain ? <>Its own domain: <strong>{ site.domain }</strong> ({ connected ? 'connected' : 'waiting for DNS' }). </> : 'No domain of its own. ' }
+          Only the atlas’s owners can change its address.
+        </p>
+      )}
+
+      { canManage && !site.domain && (
         <form onSubmit={onAdd}>
           <label className='field-label' htmlFor='atlas-domain'>Your own domain</label>
           <div className='preview-link'>
@@ -76,7 +85,7 @@ const DomainPanel = ({ onChange, site }) => {
         </form>
       )}
 
-      { site.domain && (
+      { canManage && site.domain && (
         <>
           <p>
             <span className={`status-pill ${connected ? 'status-published' : 'status-draft'}`}>

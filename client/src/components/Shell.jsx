@@ -1,5 +1,6 @@
 import config from '../config';
 import { paths } from '../router';
+import { canCreateAtlases } from '../session';
 
 /**
  * The console chrome: a slim header with the two entry points and a way back
@@ -23,7 +24,7 @@ const Shell = ({ active, children, navigate }) => {
         <span className='shell-brand'>Open Geographies</span>
         <nav className='shell-nav'>
           { link(paths.atlases(), 'Atlases', 'atlases') }
-          { link(paths.wizard(), 'Create an atlas', 'wizard') }
+          { canCreateAtlases() && link(paths.wizard(), 'Create an atlas', 'wizard') }
         </nav>
         <a className='shell-link shell-console' href={`${config.consoleUrl}/`}>FairData console →</a>
       </header>

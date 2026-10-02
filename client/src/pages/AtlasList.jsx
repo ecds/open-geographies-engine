@@ -4,6 +4,7 @@ import { errorMessages, fetchSites } from '../api';
 import { liveUrl } from '../atlasLinks';
 import { paths } from '../router';
 import { Button, Message } from '../components/ui';
+import { canCreateAtlases } from '../session';
 
 /**
  * The atlases the signed-in user can edit (the sites policy scope: their
@@ -23,11 +24,15 @@ const AtlasList = ({ navigate }) => {
     <main className='wizard'>
       <div className='page-head'>
         <h1>Atlases</h1>
-        <Button onClick={() => navigate(paths.wizard())} primary>Create an atlas</Button>
+        { canCreateAtlases() && <Button onClick={() => navigate(paths.wizard())} primary>Create an atlas</Button> }
       </div>
       { !_.isEmpty(errors) && <Message list={errors} tone='negative' /> }
       { sites && _.isEmpty(sites) && (
-        <Message>No atlases yet. Create one: it stays private, with a preview link, until you publish it.</Message>
+        <Message>
+          { canCreateAtlases()
+            ? 'No atlases yet. Create one: it stays private, with a preview link, until you publish it.'
+            : 'No atlases yet. An atlas’s owner can add you to it.' }
+        </Message>
       )}
       { !_.isEmpty(sites) && (
         <table className='table'>

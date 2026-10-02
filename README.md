@@ -289,6 +289,24 @@ before this was added were published by the migration). The wizard creates draft
   records through FairData's public API), so a draft's records are reachable there by
   anyone who knows the project's ids, as before; it's the atlas that's private.
 
+## Owners and editors
+
+An atlas's people are its FairData project's members, added on the project's Users page
+(`/projects/:id/user_projects`; the atlas header's **People →** links there, for owners).
+
+- **Editors** do the content work: settings, home page and pages, menu, branding, images,
+  map layers, search, detail pages, places without a location, category values, dataset and
+  gazetteer imports, reindexing (`SitePolicy#update?`, `AtlasProjectPolicy#import?`,
+  `SearchCollectionPolicy#reindex?`: any member of the project).
+- **Owners** also decide where and whether the atlas is public: publish/unpublish, the slug,
+  its own domain, replacing the preview link (`SitePolicy#manage?`), and deleting it
+  (`#destroy?`). A general update that would change `published` or `slug` needs `manage?`;
+  sending them unchanged (the console saves the slug with everything else) doesn't.
+- The site JSON carries `permissions: { edit, manage, delete }` for the signed-in user; the
+  console hides what the user can't do and says who can.
+- Accounts made by inviting someone are FairData "guests": they work on the projects they
+  were added to but can't create projects, so the console hides "Create an atlas" for them.
+
 ## Images
 
 Settings → Images lists the atlas's uploaded images (the same `GET /core_data/sites/:id/assets`

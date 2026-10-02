@@ -32,6 +32,13 @@ export const isSignedIn = () => {
 };
 
 /**
+ * FairData lets admins and "member" accounts create projects (and so
+ * atlases). An account made by inviting someone to a project is a "guest":
+ * it works on the projects it was added to but can't start new ones.
+ */
+export const canCreateAtlases = () => getSession().user?.role !== 'guest';
+
+/**
  * Stores a session as the console would (the /auth/login response: token,
  * exp, user), so the two clients share one sign-in.
  */

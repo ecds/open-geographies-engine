@@ -24,7 +24,7 @@ module CoreDataConnector
 
     def preview
       project = Project.find(params[:project_id])
-      authorize project, :update?
+      authorize project, :import?, policy_class: AtlasProjectPolicy
 
       upload = params.require(:file)
       model = place_model(project, params[:project_model_id])
@@ -71,7 +71,7 @@ module CoreDataConnector
 
     def geocode
       project = Project.find(params[:project_id])
-      authorize project, :update?
+      authorize project, :import?, policy_class: AtlasProjectPolicy
 
       blob = ActiveStorage::Blob.find_signed(params[:blob_id].to_s)
       render json: { errors: [{ base: 'The uploaded file has expired; upload it again.' }] }, status: :unprocessable_entity and return if blob.nil?
@@ -137,7 +137,7 @@ module CoreDataConnector
 
     def create
       project = Project.find(params[:project_id])
-      authorize project, :update?
+      authorize project, :import?, policy_class: AtlasProjectPolicy
 
       attributes = params.require(:dataset_import).permit(:blob_id, :project_model_id, columns: [:name, :role, :label, :data_type, :capitalize, :copy])
       model = place_model(project, attributes[:project_model_id])

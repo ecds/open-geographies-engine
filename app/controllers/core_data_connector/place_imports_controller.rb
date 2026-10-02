@@ -15,7 +15,7 @@ module CoreDataConnector
     # map. Synchronous and bounded (one authority page).
     def preview
       project = Project.find(params[:project_id])
-      authorize project, :update?
+      authorize project, :import?, policy_class: AtlasProjectPolicy
 
       source = PlaceImports::Sources.for(
         web_authority(project),
@@ -41,7 +41,7 @@ module CoreDataConnector
     # outcome are visible in the console.
     def create
       project = Project.find(params[:project_id])
-      authorize project, :update?
+      authorize project, :import?, policy_class: AtlasProjectPolicy
 
       job = Job.create!(
         project_id: project.id,
@@ -70,7 +70,7 @@ module CoreDataConnector
     def admin_children
       if params[:project_id].present?
         project = Project.find(params[:project_id])
-        authorize project, :update?
+        authorize project, :import?, policy_class: AtlasProjectPolicy
 
         authority = WebAuthority.find_or_create_by!(project:, source_type: 'geonames')
         username = authority.access&.dig('username').presence || ENV.fetch('GEONAMES_USERNAME', nil)

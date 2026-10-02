@@ -303,3 +303,4 @@ td .status-pill { margin-left: 0; }
   .library-delete { grid-column: 1 / -1; justify-content: flex-start; }
 }
 .tabs .tab-external { margin-left: auto; }
+.input[readonly] { background: var(--og-ground); color: var(--og-muted); }

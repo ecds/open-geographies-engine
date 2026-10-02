@@ -6,9 +6,12 @@ import { Button, Message } from './ui';
 /**
  * Draft or published. A draft is visible only through its preview link;
  * publishing makes it public at its address. Both take effect at once
- * (separately from Save), within the renderer's 30-second cache.
+ * (separately from Save), within the renderer's 30-second cache. Only the
+ * atlas's owners publish, unpublish and replace the link; editors see the
+ * state and the preview link.
  */
 const PublishPanel = ({ onChange, site }) => {
+  const canManage = site.permissions?.manage !== false;
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState([]);
   const [confirmUnpublish, setConfirmUnpublish] = useState(false);
@@ -52,7 +55,8 @@ const PublishPanel = ({ onChange, site }) => {
             <span className='status-pill status-published'>Published</span>
             { ' ' }Anyone can see this atlas{ live && <> at <a href={live} rel='noreferrer' target='_blank'>{ live }</a></> }.
           </p>
-          { !confirmUnpublish && <Button disabled={saving} onClick={() => setConfirmUnpublish(true)} subtle>Unpublish…</Button> }
+          { !canManage && <p className='muted'>Only the atlas’s owners can unpublish it.</p> }
+          { canManage && !confirmUnpublish && <Button disabled={saving} onClick={() => setConfirmUnpublish(true)} subtle>Unpublish…</Button> }
           { confirmUnpublish && (
             <div className='row'>
               <span>Visitors will find no atlas at this address until you publish it again.</span>
@@ -65,7 +69,7 @@ const PublishPanel = ({ onChange, site }) => {
         <>
           <p>
             <span className='status-pill status-draft'>Draft</span>
-            { ' ' }Only people with the preview link can see this atlas. Publish it when it’s ready.
+            { ' ' }Only people with the preview link can see this atlas.{ canManage && ' Publish it when it’s ready.' }
           </p>
           { preview && (
             <div className='preview-link'>
@@ -74,6 +78,8 @@ const PublishPanel = ({ onChange, site }) => {
               <a className='button' href={preview} rel='noreferrer' target='_blank'>Open ↗</a>
             </div>
           )}
+          { !canManage && <p className='muted'>Only the atlas’s owners can publish it or replace the preview link.</p> }
+          { canManage && (
           <div className='row'>
             <Button loading={saving} onClick={() => setPublished(true)} primary>Publish atlas</Button>
             { !confirmReplace && <Button disabled={saving} onClick={() => setConfirmReplace(true)} subtle>Replace preview link…</Button> }
@@ -85,6 +91,7 @@ const PublishPanel = ({ onChange, site }) => {
               </>
             )}
           </div>
+          )}
         </>
       )}
     </section>

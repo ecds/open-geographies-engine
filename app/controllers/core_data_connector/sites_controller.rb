@@ -6,6 +6,19 @@ module CoreDataConnector
     # Preloads
     preloads :project
 
+    # PATCH /core_data/sites/:id
+    #
+    # Any member of the project (owner or editor) saves the atlas's
+    # content; publishing, unpublishing and changing the slug are the
+    # owners' (SitePolicy#manage?). A value sent unchanged — the console
+    # saves the slug with everything else — needs no more than editing.
+    def update
+      site = Site.find(params[:id])
+      authorize site, :manage? if owner_change?(site)
+
+      super
+    end
+
     # GET /core_data/sites/:id/facets
     #
     # The facet attributes this site's searches can declare, derived from the
@@ -149,7 +162,7 @@ module CoreDataConnector
     # working.
     def regenerate_preview_token
       site = Site.find(params[:id])
-      authorize site, :update?
+      authorize site, :manage?
 
       site.regenerate_preview_token
 
@@ -164,7 +177,7 @@ module CoreDataConnector
     # checked when it changes.
     def update_domain
       site = Site.find(params[:id])
-      authorize site, :update?
+      authorize site, :manage?
 
       site.domain = params[:domain]
 
@@ -180,7 +193,7 @@ module CoreDataConnector
     # Checks the domain's DNS again ("Check DNS" in the console).
     def check_domain
       site = Site.find(params[:id])
-      authorize site, :update?
+      authorize site, :manage?
 
       render json: domain_json(site, site.check_domain!), status: :ok
     end
@@ -201,7 +214,29 @@ module CoreDataConnector
       head :no_content
     end
 
+    protected
+
+    # The site as the console shows it, with what the current user may do
+    # with it: edit its content, manage it (publish, slug, domain, preview
+    # link) and delete it.
+    def build_show_response(item)
+      super.tap do |response|
+        policy = SitePolicy.new(current_user, item)
+        response[:site][:permissions] = { edit: policy.update?, manage: policy.manage?, delete: policy.destroy? }
+      end
+    end
+
     private
+
+    # True when an update would publish or unpublish the site, or change
+    # its slug.
+    def owner_change?(site)
+      attributes = params[:site]
+      return false unless attributes.respond_to?(:key?)
+
+      (attributes.key?(:published) && ActiveModel::Type::Boolean.new.cast(attributes[:published]) != site.published) ||
+        (attributes.key?(:slug) && attributes[:slug].to_s != site.slug)
+    end
 
     def domain_json(site, check)
       {

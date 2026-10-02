@@ -36,6 +36,14 @@ module CoreDataConnector
       !project.archived? && owner?
     end
 
+    # Reindexing an atlas's search collection is content work: any member
+    # (owner or editor) can, like the imports that queue it.
+    def reindex?
+      return true if current_user.admin?
+
+      !project.archived? && member?
+    end
+
     def permitted_attributes
       SearchCollection.permitted_params
     end

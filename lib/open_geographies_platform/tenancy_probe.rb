@@ -18,18 +18,23 @@ module OpenGeographiesPlatform
     # Creates and removes the two tenants' rows. Everything is namespaced
     # "og-tenancy-probe" so a crashed run can be cleaned up by hand.
     class Fixtures
-      attr_reader :a, :b
+      attr_reader :a, :b, :editor
+
+      EDITOR_EMAIL = 'og-tenancy-probe-e@example.test'
 
       def self.build!(password:)
         new.tap { |fixtures| fixtures.build!(password:) }
       end
 
       def build!(password:)
+        remove_editor
         @a = build_tenant('a', password:, discoverable: true)
         @b = build_tenant('b', password:, discoverable: false)
+        @editor = build_editor(@a, password:)
       end
 
       def teardown!
+        remove_editor
         [a, b].compact.each do |tenant|
           tenant.job&.destroy
           tenant.site&.destroy
@@ -40,6 +45,27 @@ module OpenGeographiesPlatform
       end
 
       private
+
+      # A curator invited to A's project as an editor (FairData's project
+      # role; an invited account is a "guest").
+      def build_editor(tenant, password:)
+        user = ::CoreDataConnector::User.create!(
+          name: 'Tenancy Probe Editor', email: EDITOR_EMAIL, password:, password_confirmation: password,
+          role: ::CoreDataConnector::User::ROLE_GUEST, require_password_change: false,
+          skip_invitation: true, last_sign_in_at: Time.now.utc
+        )
+        ::CoreDataConnector::UserProject.create!(project: tenant.project, user:, role: ::CoreDataConnector::UserProject::ROLE_EDITOR)
+
+        user
+      end
+
+      def remove_editor
+        ::CoreDataConnector::User.where(email: EDITOR_EMAIL).find_each do |user|
+          ::CoreDataConnector::Job.where(user_id: user.id).delete_all
+          ::CoreDataConnector::UserProject.where(user_id: user.id).delete_all
+          user.destroy
+        end
+      end
 
       def build_tenant(key, password:, discoverable:)
         email = "og-tenancy-probe-#{key}@example.test"
@@ -268,6 +294,10 @@ module OpenGeographiesPlatform
         status 'own image delete', delete("/core_data/sites/#{a.site.id}/assets/#{own_key}", a.token), '204'
       end
 
+      group 'an editor edits the content; owners manage the atlas' do
+        editor(a, b)
+      end
+
       group 'placing places without a location' do
         unplaced = ::CoreDataConnector::Place.create!(project_model_id: a.place.project_model_id, place_names_attributes: [{ name: 'Probe Unplaced', primary: true }])
         list = "/core_data/sites/#{a.site.id}/unlocated_places"
@@ -348,6 +378,63 @@ module OpenGeographiesPlatform
 
     # A 2400 x 1600 photo through upload, the public bundle, the public route
     # and delete (SiteImages).
+    # A project editor (FairData's role) does the atlas's content work —
+    # settings, pages, images, categories, places, imports, reindexing —
+    # but publishing, the slug, the domain, the preview link and deleting
+    # stay with the owners (SitePolicy#manage?, #destroy?). And the editor
+    # of A is nobody on B.
+    def editor(a, b)
+      token = login(Fixtures::EDITOR_EMAIL)
+      site = "/core_data/sites/#{a.site.id}"
+      project = "/core_data/projects/#{a.project.id}"
+
+      res = get(site, token)
+      status 'an editor opens the atlas', res, '200'
+      check 'and is told it can edit but not manage or delete', body(res).dig('site', 'permissions') == { 'edit' => true, 'manage' => false, 'delete' => false },
+            body(res).dig('site', 'permissions').inspect
+      check 'the owner is told it can do all three', body(get(site, a.token)).dig('site', 'permissions') == { 'edit' => true, 'manage' => true, 'delete' => true }
+
+      status 'saves the pages', patch(site, { site: { content: { pages: [{ slug: 'editors', title: 'Editors', sections: [{ type: 'text', body: 'Hi' }] }] } } }, token), '200'
+      status 'and the branding', patch(site, { site: { branding: { primary_color: '#123456' } } }, token), '200'
+      status 'a save that sends the slug and state unchanged goes through', patch(site, { site: { name: a.site.name, slug: a.site.slug, published: true } }, token), '200'
+      refused 'but changing the slug is refused', patch(site, { site: { slug: "#{a.site.slug}-moved" } }, token)
+      refused 'so is unpublishing', patch(site, { site: { published: false } }, token)
+      a.site.reload
+      check 'and both are unchanged', a.site.slug == 'og-tenancy-probe-a' && a.site.published, "#{a.site.slug} #{a.site.published}"
+      refused 'replacing the preview link is refused', post("#{site}/preview_token", {}, token)
+      refused 'so is setting a domain', put("#{site}/domain", { domain: 'og-probe-editor.example.com' }, token)
+      refused 'or checking one', post("#{site}/domain/check", {}, token)
+      check 'and the atlas has no domain', a.site.reload.domain.nil?
+      refused 'deleting the atlas is refused', delete(site, token)
+      check 'and it\'s still there', ::CoreDataConnector::Site.exists?(a.site.id)
+
+      res = upload("#{site}/assets", 'editor.png', PNG, token)
+      status 'uploads an image', res, '200'
+      status 'and deletes it', delete("#{site}/assets/#{body(res).dig('asset', 'key')}", token), '204'
+      status 'lists the categories', get("#{site}/categories", token), '200'
+      status 'lists the places without a location', get("#{site}/unlocated_places", token), '200'
+
+      # Imports: an incomplete request gets past authorization and fails on
+      # its input, never 401/403/404.
+      res = post("#{project}/dataset_imports/preview", {}, token)
+      check 'can upload a dataset (gets past authorization)', !REFUSED.include?(res.code), "got #{res.code}"
+      res = post("#{project}/dataset_imports", { dataset_import: { columns: [] } }, token)
+      check 'can import one', !REFUSED.include?(res.code), "got #{res.code}"
+      res = post("#{project}/place_imports/preview", { place_import: { source: 'nowhere', area: {}, filters: {} } }, token)
+      check 'can preview a gazetteer import', !REFUSED.include?(res.code), "got #{res.code}"
+
+      res = post("/core_data/search_collections/#{a.collection.id}/reindex", {}, token)
+      status 'reindexes the atlas', res, '200'
+      job = ::CoreDataConnector::Job.find_by(id: body(res).dig('job', 'id'))
+      20.times { break if job.nil? || %w[completed failed].include?(job.reload.status); sleep 0.5 }
+
+      refused 'edits nothing of B\'s', patch("/core_data/sites/#{b.site.id}", { site: { name: 'x' } }, token)
+      refused 'imports nothing into B', post("/core_data/projects/#{b.project.id}/dataset_imports/preview", {}, token)
+      refused 'reindexes nothing of B\'s', post("/core_data/search_collections/#{b.collection.id}/reindex", {}, token)
+    ensure
+      a.site.reload.update!(slug: 'og-tenancy-probe-a', published: true, content: {}, branding: {}) if a.site
+    end
+
     # An atlas's own domain (SiteDomains): who can set it, what's refused,
     # that only a connected domain is served and only for its own atlas,
     # that a second atlas can't take it without the DNS, and that drafts
