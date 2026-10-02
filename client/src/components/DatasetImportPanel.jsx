@@ -451,8 +451,9 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
   return (
     <div className='import-panel'>
       <p className='muted'>
-        A spreadsheet (Excel .xlsx, OpenDocument .ods, or CSV), a GeoJSON file, or a shapefile zipped
-        with its .dbf and .prj. Nothing is imported until you review it and press Import.
+        A spreadsheet (Excel .xlsx, OpenDocument .ods, or CSV or tab-separated text: .csv, .tsv, .txt), a
+        GeoJSON file (.geojson or .json), or a shapefile zipped with its .dbf and .prj; up to 50 MB and
+        50,000 rows. Nothing is imported until you review it and press Import.
       </p>
 
       { !_.isEmpty(errors) && <Message list={errors} tone='negative' /> }

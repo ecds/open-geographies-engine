@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import _ from 'underscore';
 import { createAtlas, errorMessages, signIn } from './api';
 import { liveUrl, previewUrl } from './atlasLinks';
+import { LOCALES } from './locales';
 import config from './config';
 import { JobStatuses } from './jobs';
 import useJobPolling from './hooks/useJobPolling';
@@ -37,14 +38,8 @@ const PROVISION_STAGES = [
   { key: 'search_index', label: 'Create the search index' }
 ];
 
-const LOCALES = [
-  { value: 'en', text: 'English' },
-  { value: 'es', text: 'Spanish' },
-  { value: 'fr', text: 'French' },
-  { value: 'de', text: 'German' },
-  { value: 'it', text: 'Italian' },
-  { value: 'pt', text: 'Portuguese' }
-];
+// The atlas's languages, by their own names (as in Settings → General).
+const LANGUAGE_OPTIONS = _.map(LOCALES, (text, value) => ({ value, text }));
 
 const TEMPLATES = [
   { value: 'places', title: 'Places', description: 'Places and a place-type vocabulary — the lightest start' },
@@ -183,7 +178,7 @@ const Wizard = ({ navigate }) => {
           </Field>
           <Field label='Default language'>
             <select className='input' onChange={(e) => update({ locale: e.target.value })} value={atlas.locale}>
-              { _.map(LOCALES, (locale) => <option key={locale.value} value={locale.value}>{ locale.text }</option>) }
+              { _.map(LANGUAGE_OPTIONS, (locale) => <option key={locale.value} value={locale.value}>{ locale.text }</option>) }
             </select>
           </Field>
           <fieldset className='field'>

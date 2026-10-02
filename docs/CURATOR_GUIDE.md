@@ -23,7 +23,7 @@ shows.
 11. [Place pages](#11-place-pages)
 12. [Map layers and historic maps](#12-map-layers-and-historic-maps)
 13. [Languages](#13-languages)
-14. [Preview and publish](#14-preview-and-publish)
+14. [Preview and publish](#14-preview-and-publish) (and [deleting an atlas](#deleting-an-atlas))
 15. [Your own domain](#15-your-own-domain)
 16. [People: owners and editors](#16-people-owners-and-editors)
 17. [Keeping track, and when something goes wrong](#17-keeping-track-and-when-something-goes-wrong)
@@ -87,8 +87,9 @@ Under **Imports** (or step 3 of the wizard), choose **Upload your data**.
 
 Choose your file and **Preview**. Nothing is imported until you review it and press **Import**.
 
-- **Files read:** Excel `.xlsx`, OpenDocument `.ods`, CSV (also tab-separated), GeoJSON, and a
-  shapefile zipped with its `.dbf`, `.shx` and `.prj`. Up to 50 MB and 50,000 rows.
+- **Files read:** Excel `.xlsx`, OpenDocument `.ods`, CSV or tab-separated text (`.csv`, `.tsv`,
+  `.txt`), GeoJSON (`.geojson` or `.json`), and a shapefile zipped with its `.dbf`, `.shx` and `.prj`.
+  Up to 50 MB and 50,000 rows.
 - **Converting other files:**
   - **Older `.xls`:** save it as `.xlsx` or CSV in Excel first.
   - **KML:** convert it to GeoJSON (with QGIS or geojson.io).
@@ -262,6 +263,8 @@ changes you haven't saved yet.
 - **Also search in**: the search box always looks at names and descriptions; add other text fields
   such as an address.
 - **Result card attributes**: what each search result shows under the name.
+- **Shows results as**: a map with the results beside it (the usual), or without a map: a list,
+  a grid of cards, or an image gallery.
 
 ## 11. Place pages
 
@@ -336,6 +339,12 @@ General → Visibility**:
 
 The atlas header says **Draft** or **Published**, and **Preview ↗** or **View atlas ↗** opens it.
 
+### Deleting an atlas
+
+Owners can delete an atlas at the bottom of **Settings → General** (**Delete this atlas…**, then
+type its name to confirm). This deletes its website, pages, branding, images, settings and
+address. Its places and other records stay in its FairData project. It can't be undone.
+
 ## 15. Your own domain
 
 Every atlas has a platform address built from its name. It can also have a domain of its own,
@@ -371,7 +380,7 @@ invite people by email and choose their role:
   - publish and unpublish the atlas;
   - change its address and domain;
   - replace the preview link;
-  - delete it.
+  - delete it ([Deleting an atlas](#deleting-an-atlas)).
 
 Someone invited by email can work on the atlases they've been added to, but can't create new ones.
 

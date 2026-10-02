@@ -20,6 +20,9 @@ module CoreDataConnector
                     domain_status: ->(site, *) { site.domain_status },
                     domain_dns: ->(site, *) { SiteDomains.instructions(site.domain, site.slug) },
                     public_url: ->(site, *) { site.public_url },
-                    platform_url: ->(site, *) { site.platform_url }
+                    platform_url: ->(site, *) { site.platform_url },
+                    # The FairData project the atlas's records live in (they
+                    # stay there if the atlas is deleted).
+                    project_name: ->(site, *) { site.project&.name }
   end
 end

@@ -16,6 +16,7 @@ import {
 } from '../api';
 import { liveUrl as atlasLiveUrl } from '../atlasLinks';
 import AtlasHeader from '../components/AtlasHeader';
+import DeleteAtlasPanel from '../components/DeleteAtlasPanel';
 import DomainPanel from '../components/DomainPanel';
 import HistoricMapPanel from '../components/HistoricMapPanel';
 import LanguagesPanel from '../components/LanguagesPanel';
@@ -27,6 +28,7 @@ import ImageField from '../components/ImageField';
 import PagesEditor from '../components/PagesEditor';
 import SectionsEditor from '../components/SectionsEditor';
 import { Button, Field, Message, MultiSelect, Select, Tag } from '../components/ui';
+import { paths } from '../router';
 
 const TABS = [
   { key: 'general', label: 'General' },
@@ -74,7 +76,13 @@ const LAYER_URL_LABELS = {
   geojson: 'GeoJSON address',
   georeference: 'Allmaps annotation address'
 };
-const SEARCH_TYPES = ['map', 'list', 'grid', 'image'];
+// How a search shows its results (the renderer's search `type`); no type
+// is the map, offered as the select's empty choice.
+const SEARCH_TYPES = [
+  { value: 'list', text: 'List of results (no map)' },
+  { value: 'grid', text: 'Grid of cards (no map)' },
+  { value: 'image', text: 'Image gallery (no map)' }
+];
 
 /**
  * The atlas editor: the site record's name/slug, branding, the home page and
@@ -314,6 +322,12 @@ const AtlasEditor = ({ id, navigate }) => {
       <h3>Map tiles</h3>
       <p className='muted'>Generates PMTiles from the project's place geometries — the full-dataset map layer for large collections. Runs as a job.</p>
       <Button onClick={onBuildTiles}>Build map tiles</Button>
+      { site.permissions?.delete && (
+        <>
+          <h3>Delete</h3>
+          <DeleteAtlasPanel onDeleted={() => navigate(paths.atlases())} site={site} />
+        </>
+      )}
     </>
   );
 
@@ -589,8 +603,8 @@ const AtlasEditor = ({ id, navigate }) => {
             <Field label='Route'>
               <input className='input' onChange={(e) => updateSearch(index, { route: e.target.value })} placeholder='/places' value={entry.route || ''} />
             </Field>
-            <Field label='Type'>
-              <Select onChange={(v) => updateSearch(index, { type: v || undefined })} options={_.map(SEARCH_TYPES, (t) => ({ value: t, text: t }))} placeholder='map (default)' value={entry.type || ''} />
+            <Field label='Shows results as'>
+              <Select onChange={(v) => updateSearch(index, { type: v || undefined })} options={SEARCH_TYPES} placeholder='Map, with the results beside it' value={entry.type === 'map' ? '' : (entry.type || '')} />
             </Field>
           </div>
           <div className='row'>

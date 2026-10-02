@@ -320,3 +320,7 @@ td .status-pill { margin-left: 0; }
 .languages-panel .row { display: flex; flex-wrap: wrap; gap: 14px; margin: 6px 0 10px; }
 .translated-page .row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .translated-page .status-pill { margin-left: 0; }
+.button-danger:not(:disabled) { background: var(--og-negative); border-color: var(--og-negative); color: #fff; }
+.delete-atlas p { margin: 0 0 8px; }
+.delete-atlas .row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.delete-atlas .field-label { display: block; margin: 8px 0 6px; }

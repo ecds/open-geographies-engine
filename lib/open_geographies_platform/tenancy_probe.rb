@@ -71,7 +71,7 @@ module OpenGeographiesPlatform
         email = "og-tenancy-probe-#{key}@example.test"
 
         # Leftovers from a KEEP=1 or crashed run.
-        ::CoreDataConnector::Site.where(slug: ["og-tenancy-probe-#{key}", 'og-tenancy-probe-bare', 'og-tenancy-probe-foreign', 'og-tenancy-probe-borrowed']).destroy_all
+        ::CoreDataConnector::Site.where(slug: ["og-tenancy-probe-#{key}", 'og-tenancy-probe-bare', 'og-tenancy-probe-foreign', 'og-tenancy-probe-borrowed', 'og-tenancy-probe-doomed']).destroy_all
         ::CoreDataConnector::SearchCollection.where(name: "og_tenancy_probe_#{key}").destroy_all
         ::CoreDataConnector::Project.where(name: "OG Tenancy Probe #{key.upcase}").destroy_all
         ::CoreDataConnector::User.where(email:).destroy_all
@@ -286,6 +286,15 @@ module OpenGeographiesPlatform
         status 'nor a color that isn\'t one', res, %w[400 422]
         res = patch("/core_data/sites/#{a.site.id}", { site: { branding: { footer: { copyright: 'x' * 301 } } } }, a.token)
         status 'nor a 301-character copyright line', res, %w[400 422]
+
+        doomed = ::CoreDataConnector::Site.create!(project: a.project, name: 'OG Tenancy Probe doomed', slug: 'og-tenancy-probe-doomed', published: true)
+        doomed.assets.attach(io: StringIO.new(PNG), filename: 'doomed.png', content_type: 'image/png')
+        refused 'another tenant can\'t delete an atlas', delete("/core_data/sites/#{doomed.id}", b.token)
+        status 'anonymous can\'t either', delete("/core_data/sites/#{doomed.id}"), '401'
+        status 'the owner can', delete("/core_data/sites/#{doomed.id}", a.token), '200'
+        check 'and the atlas is gone, its project and records kept', !::CoreDataConnector::Site.exists?(doomed.id) &&
+                                                                    ::CoreDataConnector::Project.exists?(a.project.id) && ::CoreDataConnector::Place.exists?(a.place.id)
+        status 'its public address answers 404', get('/core_data/public/v1/atlases/og-tenancy-probe-doomed'), '404'
 
         res = upload("/core_data/sites/#{a.site.id}/assets", 'own.png', PNG, a.token)
         status 'own image upload', res, '200'

@@ -141,6 +141,8 @@ export const updateSite = (id, site) => request('PATCH', `/core_data/sites/${id}
 
 export const regeneratePreviewToken = (id) => request('POST', `/core_data/sites/${id}/preview_token`);
 
+export const deleteSite = (id) => request('DELETE', `/core_data/sites/${id}`);
+
 /**
  * Sets (blank: removes) the atlas's own domain; the server checks its DNS.
  */
