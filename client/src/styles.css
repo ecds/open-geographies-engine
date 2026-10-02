@@ -302,3 +302,4 @@ td .status-pill { margin-left: 0; }
   .library-list img { width: 64px; height: 48px; }
   .library-delete { grid-column: 1 / -1; justify-content: flex-start; }
 }
+.tabs .tab-external { margin-left: auto; }
