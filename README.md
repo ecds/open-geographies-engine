@@ -292,6 +292,16 @@ before this was added were published by the migration). The wizard creates draft
   records through FairData's public API), so a draft's records are reachable there by
   anyone who knows the project's ids, as before; it's the atlas that's private.
 
+## Section names
+
+Settings → Detail pages lists, per model, the relationship groups a record shows on its page
+and in the map's panel (from `GET /core_data/sites/:id/fields`: `relationships`, forward
+and inverse, from `FieldCatalog`), each with its FairData name and a box per atlas language
+for the atlas's own name. Stored as `config.i18n.strings[<locale>][t_<uuid without
+hyphens>(_inverse)]` — the renderer's translation key for the heading, which already sits
+above the FairData descriptor labels — so "Contained In" can read "County" on the atlas
+without renaming anything in FairData. Empty = the FairData name.
+
 ## Historic maps
 
 Settings → Map layers → **Add a historic map** lays a georeferenced scan over the atlas's

@@ -52,7 +52,8 @@ module OpenGeographiesPlatform
 
     class << self
       # One entry per renderer model the project uses:
-      #   { model: 'places', name: 'Churches, States', fields: [{ key:, label:, kind: }] }
+      #   { model: 'places', name: 'Churches, States', fields: [{ key:, label:, kind: }],
+      #     relationships: [{ key:, name:, related:, inverse: }] }
       # Several project models can share a renderer model (Churches and States
       # are both places); the exclusion list is per renderer model, so their
       # fields are offered together.
@@ -66,7 +67,8 @@ module OpenGeographiesPlatform
           {
             model: renderer_model,
             name: models.map(&:name).join(', '),
-            fields: udfs + attribute_fields(renderer_model)
+            fields: udfs + attribute_fields(renderer_model),
+            relationships: models.flat_map { |model| relationships(model) }.uniq { |relationship| relationship[:key] }
           }
         end
       end
@@ -82,6 +84,38 @@ module OpenGeographiesPlatform
             kind: 'user_defined'
           }
         end
+      end
+
+      # The relationship groups a record of `model` shows on its detail page
+      # and panel, each headed by its FairData name: relationships from the
+      # model, and relationships into it that are shown the other way round
+      # (allow_inverse, headed by the inverse name). `key` is the renderer's
+      # translation key for the heading (t_<uuid without hyphens>, plus
+      # _inverse), so an atlas can name a section its own way in
+      # config.i18n.strings.
+      def relationships(model)
+        relationship_class = ::CoreDataConnector::ProjectModelRelationship
+
+        outgoing = relationship_class.where(primary_model_id: model.id).includes(:related_model).order(:order).map do |relationship|
+          { key: translation_key(relationship.uuid), name: relationship.name, related: relationship.related_model&.name, inverse: false }
+        end
+
+        incoming = relationship_class.where(related_model_id: model.id, allow_inverse: true).includes(:primary_model).order(:order).map do |relationship|
+          {
+            key: translation_key(relationship.uuid, inverse: true),
+            name: relationship.inverse_name.presence || relationship.name,
+            related: relationship.primary_model&.name,
+            inverse: true
+          }
+        end
+
+        outgoing + incoming
+      end
+
+      # The renderer's i18n key for a relationship (src/i18n/utils.ts
+      # getTranslationKey: `t_` + the key without hyphens).
+      def translation_key(uuid, inverse: false)
+        "t_#{uuid.to_s.delete('-')}#{inverse ? '_inverse' : ''}"
       end
 
       def attribute_fields(renderer_model)

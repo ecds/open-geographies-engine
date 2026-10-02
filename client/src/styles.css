@@ -312,3 +312,7 @@ td .status-pill { margin-left: 0; }
 .historic-map-summary p { margin: 2px 0 0; }
 .historic-map-found .row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .domain-panel code { font-family: ui-monospace, monospace; font-size: 13px; }
+.section-names { margin-top: 16px; }
+.section-names .field-label { display: block; }
+.section-names .table td { vertical-align: middle; }
+.section-names .table .input { min-width: 160px; }

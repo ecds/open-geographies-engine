@@ -129,6 +129,7 @@ const AtlasEditor = ({ id, navigate }) => {
   const home = content.home || { sections: [] };
 
   const locale = siteConfig.i18n?.default_locale || 'en';
+  const atlasLocales = siteConfig.i18n?.locales?.length ? siteConfig.i18n.locales : [locale];
   const searchName = siteConfig.search?.[0]?.name;
   const searchHref = searchName ? `/${locale}/search/${searchName}` : undefined;
   const liveUrl = atlasLiveUrl(site);
@@ -182,6 +183,29 @@ const AtlasEditor = ({ id, navigate }) => {
     models[model] = { ...(models[model] || {}), exclude };
 
     const next = { ...siteConfig, detail_pages: { ...(siteConfig.detail_pages || {}), models } };
+    update({ config: next });
+    setAdvancedText(JSON.stringify(_.omit(next, MANAGED_KEYS), null, 2));
+  };
+
+  /**
+   * A relationship section's heading on detail pages and panels, per
+   * language: config.i18n.strings[<locale>][<key>] (the renderer's
+   * translation key for the relationship). Blank goes back to the FairData
+   * name. i18n is otherwise advanced JSON, so the advanced text is refreshed.
+   */
+  const updateSectionName = (key, loc, value) => {
+    const strings = { ...(siteConfig.i18n?.strings || {}) };
+    const forLocale = { ...(strings[loc] || {}) };
+
+    if (value.trim()) {
+      forLocale[key] = value;
+    } else {
+      delete forLocale[key];
+    }
+
+    strings[loc] = forLocale;
+
+    const next = { ...siteConfig, i18n: { ...(siteConfig.i18n || {}), strings } };
     update({ config: next });
     setAdvancedText(JSON.stringify(_.omit(next, MANAGED_KEYS), null, 2));
   };
@@ -562,7 +586,7 @@ const AtlasEditor = ({ id, navigate }) => {
 
   const renderDetail = () => (
     <>
-      <p className='muted'>Fields hidden on each record's detail page and search panel — internal bookkeeping such as legacy ids, CMS links or slugs. Searches only ever return declared fields; this governs the record pages.</p>
+      <p className='muted'>What each record's detail page and search panel show: fields to hide — internal bookkeeping such as legacy ids, CMS links or slugs — and the names of the sections of related records.</p>
       { _.isEmpty(fieldModels) && <p className='muted'>No models with a detail page in this project.</p> }
       { _.map(fieldModels, (entry) => (
         <div className='card' key={entry.model}>
@@ -574,6 +598,44 @@ const AtlasEditor = ({ id, navigate }) => {
               value={siteConfig.detail_pages?.models?.[entry.model]?.exclude || []}
             />
           </Field>
+          { !_.isEmpty(entry.relationships) && (
+            <div className='section-names'>
+              <span className='field-label'>Section names</span>
+              <p className='muted'>
+                How each group of related records is headed on a record’s page and in the map’s panel. Leave a name empty
+                to use the FairData name.
+              </p>
+              <table className='table'>
+                <thead>
+                  <tr>
+                    <th>In FairData</th>
+                    { _.map(atlasLocales, (loc) => <th key={loc}>{ atlasLocales.length > 1 ? `On the atlas (${loc})` : 'On the atlas' }</th>) }
+                  </tr>
+                </thead>
+                <tbody>
+                  { _.map(entry.relationships, (relationship) => (
+                    <tr key={relationship.key}>
+                      <td>
+                        { relationship.name }
+                        { relationship.related && <span className='muted'> · { relationship.inverse ? 'from' : 'to' } { relationship.related }</span> }
+                      </td>
+                      { _.map(atlasLocales, (loc) => (
+                        <td key={loc}>
+                          <input
+                            aria-label={`${relationship.name} (${loc})`}
+                            className='input'
+                            onChange={(e) => updateSectionName(relationship.key, loc, e.target.value)}
+                            placeholder={relationship.name}
+                            value={siteConfig.i18n?.strings?.[loc]?.[relationship.key] || ''}
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       ))}
     </>
