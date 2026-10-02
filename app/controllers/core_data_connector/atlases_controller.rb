@@ -110,7 +110,7 @@ module CoreDataConnector
           project_id: project.id,
           site_id: site.id,
           slug: site.slug,
-          live_url: atlas_url(site.slug),
+          live_url: site.public_url,
           published: site.published,
           preview_token: site.preview_token,
           search_collection_id: search_collection.id,
@@ -151,15 +151,6 @@ module CoreDataConnector
       suffix = 1
       name = "#{base}_#{suffix += 1}" while SearchCollection.exists?(name:)
       name
-    end
-
-    # The atlas's public URL on the shared dynamic renderer, when a URL template
-    # is configured: OG_ATLAS_URL_TEMPLATE with `{slug}` substituted, e.g.
-    # "https://{slug}.opengeographies.org". Returns nil when unset (local
-    # single-tenant dev), so the wizard simply omits the link — the atlas is
-    # live either way the instant it's provisioned.
-    def atlas_url(slug)
-      ENV['OG_ATLAS_URL_TEMPLATE'].presence&.gsub('{slug}', slug)
     end
 
     # The stored config for a fresh atlas: an OSM base layer and one places

@@ -280,3 +280,9 @@ td .status-pill { margin-left: 0; }
 .category-values .table .input { min-width: 260px; }
 .category-filter { max-width: 360px; margin-bottom: 8px; }
 .numeric { text-align: right; font-variant-numeric: tabular-nums; }
+.domain-panel form .field-label { display: block; margin-bottom: 6px; }
+.domain-panel .muted { margin-top: 8px; }
+.dns-records { margin-top: 12px; }
+.dns-records .table td { font-size: 14px; }
+.dns-records .table td:nth-child(2) { white-space: nowrap; }
+.dns-records code { font-family: ui-monospace, monospace; font-size: 13px; user-select: all; overflow-wrap: anywhere; }

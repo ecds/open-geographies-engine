@@ -2,6 +2,7 @@ module CoreDataConnector
   module Public
     module V1
       # GET /core_data/public/v1/atlases/:slug
+      # GET /core_data/public/v1/atlases/by_domain?domain=
       #
       # Public, by-slug resolution of a published atlas for the shared dynamic
       # renderer (core-data-places). Returns everything the SSR app needs to
@@ -29,8 +30,24 @@ module CoreDataConnector
         include UnauthenticateableController
 
         def show
-          site = Site.find_by(slug: params[:slug])
+          render_atlas Site.find_by(slug: params[:slug])
+        end
 
+        # GET /core_data/public/v1/atlases/by_domain?domain=atlas.example.org
+        #
+        # The same document for the atlas whose own domain this is: the
+        # renderer's lookup for a request on a custom domain (its Host). Only
+        # a connected domain resolves (see SiteDomains): a domain an atlas
+        # has entered but whose DNS doesn't name it yet is unknown here.
+        def by_domain
+          domain = SiteDomains.normalize(params[:domain])
+
+          render_atlas domain && Site.where.not(domain_verified_at: nil).find_by(domain:)
+        end
+
+        private
+
+        def render_atlas(site)
           return head :not_found unless site&.project&.discoverable?
 
           preview = !site.published?
@@ -44,6 +61,9 @@ module CoreDataConnector
           render json: {
             atlas: {
               slug: site.slug,
+              # The connected domain: the renderer sends the platform
+              # address there.
+              domain: site.connected_domain,
               published: site.published,
               preview:,
               config:,

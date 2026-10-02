@@ -156,6 +156,35 @@ module CoreDataConnector
       render json: { preview_token: site.preview_token }, status: :ok
     end
 
+    # PUT /core_data/sites/:id/domain { domain: "atlas.example.org" }
+    #
+    # Sets the atlas's own domain (blank removes it) and checks its DNS
+    # straight away; the domain is served only once connected (see
+    # SiteDomains). Separate from the general update so a domain is always
+    # checked when it changes.
+    def update_domain
+      site = Site.find(params[:id])
+      authorize site, :update?
+
+      site.domain = params[:domain]
+
+      unless site.save
+        render json: { errors: [site.errors.to_hash] }, status: :unprocessable_entity and return
+      end
+
+      render json: domain_json(site, site.check_domain!), status: :ok
+    end
+
+    # POST /core_data/sites/:id/domain/check
+    #
+    # Checks the domain's DNS again ("Check DNS" in the console).
+    def check_domain
+      site = Site.find(params[:id])
+      authorize site, :update?
+
+      render json: domain_json(site, site.check_domain!), status: :ok
+    end
+
     # DELETE /core_data/sites/:id/assets/:key
     #
     # Removes an uploaded image and its copies. Pages or branding still
@@ -173,6 +202,19 @@ module CoreDataConnector
     end
 
     private
+
+    def domain_json(site, check)
+      {
+        site: {
+          domain: site.domain,
+          domain_status: site.domain_status,
+          domain_dns: SiteDomains.instructions(site.domain, site.slug),
+          public_url: site.public_url,
+          platform_url: site.platform_url
+        },
+        check: check && { connected: check.connected, how: check.how, message: check.message }
+      }
+    end
 
     def asset_json(blob)
       {

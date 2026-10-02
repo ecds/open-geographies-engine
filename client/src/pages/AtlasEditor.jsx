@@ -14,8 +14,9 @@ import {
   updateSite,
   uploadSiteAsset
 } from '../api';
-import config from '../config';
+import { liveUrl as atlasLiveUrl } from '../atlasLinks';
 import AtlasHeader from '../components/AtlasHeader';
+import DomainPanel from '../components/DomainPanel';
 import PublishPanel from '../components/PublishPanel';
 import ImageField from '../components/ImageField';
 import PagesEditor from '../components/PagesEditor';
@@ -108,7 +109,7 @@ const AtlasEditor = ({ id, navigate }) => {
   const locale = siteConfig.i18n?.default_locale || 'en';
   const searchName = siteConfig.search?.[0]?.name;
   const searchHref = searchName ? `/${locale}/search/${searchName}` : undefined;
-  const liveUrl = site && config.atlasUrlTemplate ? config.atlasUrlTemplate.replace('{slug}', site.slug) : null;
+  const liveUrl = atlasLiveUrl(site);
 
   const update = (changes) => { setSite((prev) => ({ ...prev, ...changes })); setSaved(false); };
   const updateConfig = (changes) => update({ config: { ...siteConfig, ...changes } });
@@ -216,10 +217,12 @@ const AtlasEditor = ({ id, navigate }) => {
     <>
       <h3>Visibility</h3>
       <PublishPanel onChange={(changes) => setSite((prev) => ({ ...prev, ...changes }))} site={site} />
+      <h3>Address</h3>
+      <DomainPanel onChange={(changes) => setSite((prev) => ({ ...prev, ...changes }))} site={site} />
       <Field label='Name' required>
         <input className='input' onChange={(e) => update({ name: e.target.value })} value={site.name || ''} />
       </Field>
-      <Field hint='Lowercase letters, numbers, and hyphens. Used in the atlas URL (e.g. my-atlas.opengeographies.org).' label='Slug' required>
+      <Field hint='Lowercase letters, numbers, and hyphens. The atlas’s platform address is built from it; changing it changes that address, and a connected domain has to be checked again.' label='Slug' required>
         <input className='input' onChange={(e) => update({ slug: e.target.value })} value={site.slug || ''} />
       </Field>
       <h3>Search index</h3>

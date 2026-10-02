@@ -3,6 +3,7 @@
 require 'base64'
 require 'net/http'
 require 'json'
+require 'securerandom'
 require 'stringio'
 require 'uri'
 
@@ -138,6 +139,10 @@ module OpenGeographiesPlatform
         status 'makes it public', get(path), '200'
       ensure
         a.site.update!(published: true) unless a.site.reload.published
+      end
+
+      group 'an atlas\'s own domain' do
+        own_domain(a, b)
       end
 
       group 'uploaded images' do
@@ -343,6 +348,100 @@ module OpenGeographiesPlatform
 
     # A 2400 x 1600 photo through upload, the public bundle, the public route
     # and delete (SiteImages).
+    # An atlas's own domain (SiteDomains): who can set it, what's refused,
+    # that only a connected domain is served and only for its own atlas,
+    # that a second atlas can't take it without the DNS, and that drafts
+    # stay private there. On a development server .localhost names connect
+    # without DNS; elsewhere they're refused and only the DNS path is checked.
+    def own_domain(a, b)
+      suffix = SecureRandom.hex(3)
+      local = ::CoreDataConnector::SiteDomains.local_names_allowed?
+      base = ::CoreDataConnector::SiteDomains.base_domain
+      domain = "og-probe-a-#{suffix}.test.localhost"
+      elsewhere = "og-probe-#{suffix}.example.com"
+      path_a = "/core_data/sites/#{a.site.id}/domain"
+      path_b = "/core_data/sites/#{b.site.id}/domain"
+      lookup = ->(name) { "/core_data/public/v1/atlases/by_domain?domain=#{name}" }
+      allowed = ->(name) { "/core_data/public/v1/domains/allowed?domain=#{name}" }
+
+      refused 'anonymous can\'t set a domain', put(path_a, { domain: elsewhere })
+      refused 'nor another tenant', put(path_a, { domain: elsewhere }, b.token)
+      refused 'nor check one', post("#{path_a}/check", {}, b.token)
+      check 'and the atlas has none', a.site.reload.domain.nil?
+
+      refusals = ['localhost', '127.0.0.1', 'bad..name.org', '-x.example.org', "#{'a' * 64}.org", 'xn--caf-dma.org.' * 20, 'café.org']
+      refusals << 'og-tenancy-probe-b.localhost' if local
+      refusals += [base, "#{b.site.slug}.#{base}"] if base
+      console = ::CoreDataConnector::SiteDomains.console_host
+      refusals << console if console&.include?('.')
+      refusals.uniq.each { |name| status "#{name.truncate(40)} is refused", put(path_a, { domain: name }, a.token), '422' }
+
+      res = patch("/core_data/sites/#{b.site.id}", { site: { domain: elsewhere, domain_verified_at: Time.now.utc } }, b.token)
+      b.site.reload
+      check 'the general update can\'t set or connect a domain', b.site.domain.nil? && b.site.domain_verified_at.nil?, "#{res.code} #{b.site.domain.inspect}"
+
+      if local
+        res = put(path_a, { domain: "HTTPS://#{domain.upcase}:4321/about?x=1" }, a.token)
+        status 'the owner can set one', res, '200'
+        check 'stored without scheme, case, port or path', body(res).dig('site', 'domain') == domain, body(res).dig('site', 'domain')
+        check 'a local name connects without DNS', body(res).dig('site', 'domain_status') == 'connected'
+
+        res = get(lookup.(domain))
+        status 'the domain resolves', res, '200'
+        check 'to its own atlas only', body(res).dig('atlas', 'slug') == a.site.slug &&
+                                       body(res).dig('atlas', 'config', 'core_data', 'project_ids') == [a.project.id.to_s]
+        check 'and the slug lookup names the domain', body(get("/core_data/public/v1/atlases/#{a.site.slug}")).dig('atlas', 'domain') == domain
+        status 'the TLS check allows it', get(allowed.(domain)), '200'
+        status 'in any case', get(lookup.(domain.upcase)), '200'
+
+        res = put(path_b, { domain: }, b.token)
+        status 'another atlas can enter the same domain', res, '200'
+        check 'but it isn\'t connected to it', body(res).dig('site', 'domain_status') == 'pending'
+        res = post("#{path_b}/check", {}, b.token)
+        check 'checking again doesn\'t take it', body(res).dig('site', 'domain_status') == 'pending' && body(res).dig('check', 'connected') == false
+        check 'and the domain still serves the first atlas', body(get(lookup.(domain))).dig('atlas', 'slug') == a.site.slug
+        put(path_b, { domain: '' }, b.token)
+
+        a.site.update!(published: false)
+        status 'a draft isn\'t served at its domain', get(lookup.(domain)), '404'
+        status 'nor with another atlas\'s preview token', get(lookup.(domain), nil, preview: b.site.preview_token), '404'
+        status 'its own preview token shows it', get(lookup.(domain), nil, preview: a.site.preview_token), '200'
+        status 'and it still gets a certificate (preview links need one)', get(allowed.(domain)), '200'
+        a.site.update!(published: true)
+
+        slug = a.site.slug
+        patch("/core_data/sites/#{a.site.id}", { site: { slug: "#{slug}-moved" } }, a.token)
+        check 'a new slug disconnects the domain', a.site.reload.domain_status == 'pending'
+        status 'which then isn\'t served', get(lookup.(domain)), '404'
+        patch("/core_data/sites/#{a.site.id}", { site: { slug: } }, a.token)
+        res = post("#{path_a}/check", {}, a.token)
+        check 'until it\'s checked again', body(res).dig('site', 'domain_status') == 'connected' && get(lookup.(domain)).code == '200'
+      else
+        status '.localhost domains are refused outside development', put(path_a, { domain: }, a.token), '422'
+      end
+
+      res = put(path_a, { domain: elsewhere }, a.token)
+      status 'a domain whose DNS doesn\'t name the atlas can be entered', res, '200'
+      check 'and waits for DNS', body(res).dig('site', 'domain_status') == 'pending' && body(res).dig('check', 'connected') == false
+      status 'it isn\'t served', get(lookup.(elsewhere)), '404'
+      status 'and gets no certificate', get(allowed.(elsewhere)), '404'
+      status 'the domain it replaced is no longer served', get(lookup.(domain)), '404' if local
+      check 'and the atlas isn\'t sent anywhere', body(get("/core_data/public/v1/atlases/#{a.site.slug}")).dig('atlas', 'domain').nil?
+
+      res = put(path_a, { domain: '' }, a.token)
+      check 'the owner can remove it', res.code == '200' && a.site.reload.domain.nil?
+
+      if base
+        status 'the TLS check allows an atlas\'s platform address', get(allowed.("#{a.site.slug}.#{base}")), '200'
+        status 'but not a made-up one', get(allowed.("no-such-atlas-#{suffix}.#{base}")), '404'
+      end
+      status 'nor an unknown domain', get(allowed.("nobody-#{suffix}.example.org")), '404'
+    ensure
+      [a.site, b.site].each { |site| site.reload.update_columns(domain: nil, domain_verified_at: nil) }
+      a.site.update!(published: true) unless a.site.published
+      a.site.update!(slug: 'og-tenancy-probe-a') unless a.site.slug == 'og-tenancy-probe-a'
+    end
+
     def image_copies(a)
       xyz = Vips::Image.xyz(2400, 1600)
       photo = (xyz[0] * (255.0 / 2400)).bandjoin([xyz[1] * (255.0 / 1600), xyz[0] * 0 + 128]).cast(:uchar)
@@ -489,6 +588,7 @@ module OpenGeographiesPlatform
 
     def post(path, payload, token = nil) = request(Net::HTTP::Post, path, payload, token)
     def patch(path, payload, token = nil) = request(Net::HTTP::Patch, path, payload, token)
+    def put(path, payload, token = nil) = request(Net::HTTP::Put, path, payload, token)
     def delete(path, token = nil) = request(Net::HTTP::Delete, path, nil, token)
 
     def request(klass, path, payload, token, accept: 'application/json', preview: nil)

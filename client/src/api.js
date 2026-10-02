@@ -140,6 +140,13 @@ export const updateSite = (id, site) => request('PATCH', `/core_data/sites/${id}
 
 export const regeneratePreviewToken = (id) => request('POST', `/core_data/sites/${id}/preview_token`);
 
+/**
+ * Sets (blank: removes) the atlas's own domain; the server checks its DNS.
+ */
+export const updateSiteDomain = (id, domain) => request('PUT', `/core_data/sites/${id}/domain`, { body: { domain } });
+
+export const checkSiteDomain = (id) => request('POST', `/core_data/sites/${id}/domain/check`);
+
 export const fetchSiteConfig = (id) => request('GET', `/core_data/sites/${id}/config`);
 
 export const fetchSiteFacets = (id) => request('GET', `/core_data/sites/${id}/facets`);

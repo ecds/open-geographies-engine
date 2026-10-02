@@ -113,13 +113,88 @@ module CoreDataConnector
     validate :validate_content
     validate :validate_branding
     validate :validate_navigation
+    validate :validate_domain
 
     before_save :normalize_content
+
+    # A domain is connected to the atlas its DNS names (SiteDomains), and the
+    # DNS names the atlas by its slug: a new domain, or a new slug, has to be
+    # checked again before the atlas is served there.
+    before_save :disconnect_domain, if: -> { will_save_change_to_domain? || will_save_change_to_slug? }
 
     def self.permitted_params
       [:project_id, :name, :slug, :published,
        { config: {} }, { area: {} },
        { branding: {} }, { navigation: {} }, { content: {} }]
+    end
+
+    # The atlas's own domain, stored without scheme, path, port or case
+    # (SiteDomains.normalize). Set through SitesController#update_domain,
+    # which checks the DNS; not one of the permitted params.
+    def domain=(value)
+      super(SiteDomains.normalize(value))
+    end
+
+    # True when the domain is connected: its DNS named this atlas when last
+    # checked. Only then is the atlas served there.
+    def domain_connected?
+      domain.present? && domain_verified_at.present?
+    end
+
+    # The connected domain, or nil.
+    def connected_domain
+      domain_connected? ? domain : nil
+    end
+
+    # Checks the domain's DNS (SiteDomains.check) and records the answer:
+    # connected, taking the domain from any other atlas it was connected to
+    # (the DNS has moved), or not connected. Returns the check, or nil when
+    # there's no domain.
+    def check_domain!
+      result = SiteDomains.check(self)
+      return nil unless result
+
+      self.class.transaction do
+        if result.connected
+          self.class.where(domain:).where.not(id:).where.not(domain_verified_at: nil).update_all(domain_verified_at: nil)
+          update_columns(domain_verified_at: Time.current)
+        else
+          update_columns(domain_verified_at: nil)
+        end
+      end
+
+      result
+    rescue ActiveRecord::RecordNotUnique
+      reload
+      SiteDomains::Check.new(connected: false, message: "#{domain} was just connected to another atlas.")
+    end
+
+    # The atlas's public address: its connected domain, else its platform
+    # address (OG_ATLAS_URL_TEMPLATE with the slug). The domain keeps the
+    # template's scheme and port, so a development server's
+    # http://…localhost:4321 stays one. Nil when no template is configured.
+    def public_url
+      url = platform_url
+      return url unless url && domain_connected?
+
+      uri = URI.parse(url)
+      uri.host = domain
+      uri.to_s
+    rescue URI::InvalidURIError
+      url
+    end
+
+    # The atlas's address on the platform (<slug>.<base domain>), which
+    # redirects to its domain once one is connected.
+    def platform_url
+      ENV['OG_ATLAS_URL_TEMPLATE'].presence&.gsub('{slug}', slug.to_s)
+    end
+
+    # The domain's state for the console: nil, 'pending' or 'connected'.
+    def domain_status
+      return nil if domain.blank?
+
+      domain_connected? ? 'connected' : 'pending'
     end
 
     # True when `token` is this site's preview token (compared in constant
@@ -250,6 +325,15 @@ module CoreDataConnector
 
     def normalize_content
       self.content = SiteContent.new(content).to_h if will_save_change_to_content?
+    end
+
+    def validate_domain
+      message = SiteDomains.problem(domain) if will_save_change_to_domain?
+      errors.add(:domain, message) if message
+    end
+
+    def disconnect_domain
+      self.domain_verified_at = nil
     end
 
     # Colors and sizes go into the renderer's CSS, URLs into src/href

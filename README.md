@@ -289,6 +289,40 @@ before this was added were published by the migration). The wizard creates draft
   records through FairData's public API), so a draft's records are reachable there by
   anyone who knows the project's ids, as before; it's the atlas that's private.
 
+## An atlas's own domain
+
+Every atlas has a platform address, `<slug>.<base domain>` (`OG_ATLAS_URL_TEMPLATE`, e.g.
+`https://{slug}.atlas.example.edu`). It can also have a domain of its own
+(`sites.domain`, `CoreDataConnector::SiteDomains`), set in Settings → General → Address.
+
+- **Connected only through DNS.** The domain is stored as entered (no scheme, path, port or
+  trailing dot; lower case) but served only once its DNS names this atlas: a CNAME to the
+  platform address (for a subdomain such as `atlas.example.org`), or a TXT record
+  `_open-geographies.<domain>` whose value is the slug (for a root domain, which also needs
+  A/ALIAS records to the renderer). The server checks when the domain is set and on
+  "Check DNS" (`PUT /core_data/sites/:id/domain`, `POST /core_data/sites/:id/domain/check`;
+  3 s timeout); `sites.domain_verified_at` records the result. The general update can't set
+  a domain or mark it connected.
+- So a curator can't claim someone else's domain by typing it in, and the platform address
+  never redirects to a domain whose DNS isn't ready. Several atlases may enter the same
+  domain; only one is connected (unique partial index), the one the DNS names — it moves
+  when the DNS moves. A new slug or a new domain disconnects until checked again.
+- Refused outright: IP addresses, single names, malformed names, the base domain and
+  `<x>.<base>` (atlas addresses), the console's own host. Development servers also accept
+  names like `atlas.test.localhost` (three labels or more), connected without DNS, first
+  come first served; production refuses `.localhost`.
+- `GET /core_data/public/v1/atlases/by_domain?domain=` serves the same bundle as the
+  by-slug endpoint (same discoverable/draft/preview rules) for a connected domain; both
+  carry `domain` (connected only), which the renderer uses to send the platform address
+  there. Console links (`public_url` in the site JSON, "View atlas", preview links) follow
+  the domain.
+- `GET /core_data/public/v1/domains/allowed?domain=` answers 200 for a connected domain or
+  an existing atlas's platform address, else 404: the shape of Caddy's on-demand TLS
+  `ask`, so the proxy in front of the renderer can get a certificate per domain on first
+  visit and never for a name nobody connected.
+- Not done: DNS isn't re-checked on a schedule (a domain stays connected until the next
+  check after its DNS moves away); no `www` ↔ root pairing.
+
 ## Upstream-PR posture
 
 A few decorators carry changes that are **general improvements** to Core Data, not

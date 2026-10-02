@@ -57,6 +57,10 @@ module OpenGeographiesPlatform
           # Images uploaded for the atlas (logo, favicon, page images).
           get :assets, on: :member
           post :preview_token, action: :regenerate_preview_token, on: :member
+
+          # The atlas's own domain: set/remove, and check its DNS again.
+          put :domain, action: :update_domain, on: :member
+          post 'domain/check', action: :check_domain, on: :member, as: :check_domain
           get :unlocated_places, to: 'unlocated_places#index', on: :member
           post 'unlocated_places/lookup', to: 'unlocated_places#lookup', on: :member, as: :lookup_unlocated_places
           post 'unlocated_places/locate', to: 'unlocated_places#locate', on: :member, as: :locate_unlocated_places
@@ -87,8 +91,14 @@ module OpenGeographiesPlatform
         # --- Public V1 API (→ /core_data/public/v1/...) ---
         namespace :public do
           namespace :v1 do
-            # Shared dynamic renderer: resolve a published atlas by slug.
+            # Shared dynamic renderer: resolve a published atlas by its own
+            # domain, or by slug. by_domain first: it would otherwise read as
+            # a slug.
+            get 'atlases/by_domain', to: 'atlases#by_domain', as: nil
             resources :atlases, only: [:show], param: :slug
+
+            # The proxy's on-demand TLS check: is this an atlas's address?
+            get 'domains/allowed', to: 'domains#allowed', as: nil
 
             # An atlas's uploaded images, by blob key (the filename is cosmetic).
             get 'assets/:key(/*filename)', to: 'assets#show', as: nil, format: false
