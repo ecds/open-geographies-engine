@@ -169,6 +169,12 @@ export const uploadSiteAsset = (id, file) => {
   return request('POST', `/core_data/sites/${id}/assets`, { form });
 };
 
+/**
+ * A cropped copy of an uploaded image, as a new image of the atlas:
+ * rect = { x, y, width, height } in the image's pixels.
+ */
+export const cropSiteAsset = (id, key, rect) => request('POST', `/core_data/sites/${id}/assets/${encodeURIComponent(key)}/crop`, { body: rect });
+
 export const deleteSiteAsset = (id, key) => request('DELETE', `/core_data/sites/${id}/assets/${encodeURIComponent(key)}`);
 
 export const buildTiles = (id) => request('POST', `/core_data/sites/${id}/build_tiles`, { body: {} });

@@ -277,6 +277,13 @@ colors, sizes and fonts to their formats, since they end up in the renderer's CS
   image. Truncated files and images over 100 megapixels are refused. Needs libvips (already
   in FairData's Dockerfile) through `ruby-vips`; without it images are served as uploaded.
   `bin/rails open_geographies:image_copies [SITE=id]` makes copies for earlier uploads.
+- Cropping (`POST /core_data/sites/:id/assets/:key/crop` `{ x, y, width, height }`, pixels
+  of the upright image; `SiteImages.crop`): a cropped copy stored as a new asset with its own
+  web-sized copies (JPEG when opaque, PNG when transparent), the original kept; the new blob's
+  metadata records `og_crop` (source key + rectangle), so the console re-crops from the
+  original. The console's cropper (`ImageCropper`) fixes the shape where the renderer shows
+  one: banner 3:1, share image 1.91:1, favicon 1:1; free otherwise. The renderer needs no
+  change.
 - `GET /core_data/public/v1/atlases/:slug` carries `content` and `images` next to `config`,
   `branding` and `navigation`; `config` (which the browser also fetches) never holds the
   pages.

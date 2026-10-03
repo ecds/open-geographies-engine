@@ -159,6 +159,28 @@ module CoreDataConnector
       render json: { errors: [{ base: e.message }] }, status: :unprocessable_entity
     end
 
+    # POST /core_data/sites/:id/assets/:key/crop { x:, y:, width:, height: }
+    #
+    # A cropped copy of an uploaded image, stored as a new image of the atlas
+    # (with its web-sized copies); the original stays. The rectangle is in
+    # pixels of the image as it displays. Answers with the new asset.
+    def crop_asset
+      site = Site.find(params[:id])
+      authorize site, :update?
+
+      attachment = site.assets_attachments.joins(:blob).find_by(active_storage_blobs: { key: params[:key] })
+      return head :not_found unless attachment
+
+      rect = %i[x y width height].to_h { |key| [key, Integer(params[key].to_s, 10)] }
+      blob = SiteImages.crop(site, attachment.blob, **rect)
+
+      render json: { asset: asset_json(blob) }, status: :ok
+    rescue ArgumentError
+      render json: { errors: [{ base: 'The crop needs whole-pixel x, y, width and height.' }] }, status: :unprocessable_entity
+    rescue SiteImages::Error => e
+      render json: { errors: [{ base: e.message }] }, status: :unprocessable_entity
+    end
+
     # POST /core_data/sites/:id/preview_token
     #
     # A new preview link for a draft atlas; links handed out before stop
@@ -264,6 +286,8 @@ module CoreDataConnector
         height: blob.metadata['height'],
         path: Site.asset_path(blob),
         thumbnail_path: SiteImages.thumbnail_path(blob) || Site.asset_path(blob),
+        preview_path: SiteImages.preview_path(blob),
+        cropped_from: blob.metadata['og_crop'],
         created_at: blob.created_at
       }
     end

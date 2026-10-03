@@ -12,6 +12,7 @@ import {
   fetchSiteSearchFields,
   reindexSearchCollection,
   updateSite,
+  cropSiteAsset,
   uploadSiteAsset
 } from '../api';
 import { liveUrl as atlasLiveUrl } from '../atlasLinks';
@@ -25,6 +26,7 @@ import { atlasLocales as atlasLocalesOf, localeName } from '../locales';
 import ImageLibrary from '../components/ImageLibrary';
 import PublishPanel from '../components/PublishPanel';
 import ImageField from '../components/ImageField';
+import { CROP_SHAPES, ImageCropContext } from '../components/ImageCropper';
 import PagesEditor from '../components/PagesEditor';
 import SectionsEditor from '../components/SectionsEditor';
 import { Button, Field, Message, MultiSelect, Select, Tag } from '../components/ui';
@@ -230,6 +232,12 @@ const AtlasEditor = ({ id, navigate }) => {
     return data.asset;
   });
 
+  // A cropped copy joins the library like an upload (ImageField's Crop…).
+  const onCrop = useCallback((key, rect) => cropSiteAsset(site.id, key, rect).then((data) => {
+    setAssets((prev) => [data.asset, ...prev]);
+    return data.asset;
+  }), [site?.id]);
+
   const footerLogos = branding.footer?.logos || [];
   const updateFooterLogo = (index, changes) => updateBrandingSection('footer', {
     logos: footerLogos.map((logo, i) => (i === index ? { ...logo, ...changes } : logo))
@@ -411,6 +419,7 @@ const AtlasEditor = ({ id, navigate }) => {
         <ImageField
           assets={assets}
           hint='The icon in the browser tab: a square PNG, SVG or ICO.'
+          crop={CROP_SHAPES.favicon}
           label='Favicon'
           onChange={(path) => updateBranding({ favicon: path })}
           onUpload={onUpload}
@@ -420,6 +429,7 @@ const AtlasEditor = ({ id, navigate }) => {
       <ImageField
         assets={assets}
         hint={'Used in link previews (e.g. when the atlas is shared) for pages without a banner image. About 1200×630.'}
+        crop={CROP_SHAPES.linkPreview}
         label='Share image'
         onChange={(path) => updateBranding({ share_image: path })}
         onUpload={onUpload}
@@ -895,6 +905,7 @@ const AtlasEditor = ({ id, navigate }) => {
   };
 
   return (
+    <ImageCropContext.Provider value={site ? onCrop : null}>
     <main className='wizard'>
       <AtlasHeader active='settings' navigate={navigate} site={site} />
       { !_.isEmpty(errors) && <Message list={errors} tone='negative' /> }
@@ -914,6 +925,7 @@ const AtlasEditor = ({ id, navigate }) => {
         </section>
       )}
     </main>
+    </ImageCropContext.Provider>
   );
 };
 

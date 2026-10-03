@@ -247,7 +247,7 @@ Press **Save** at the bottom of Settings; the atlas shows your changes within 30
 
 - **Site title** and **Site description** (used by search engines and link previews).
 - **Logo** (a transparent PNG or SVG works best), **Favicon** (the browser tab icon), and **Share
-  image** (for link previews, about 1200×630).
+  image** (for link previews, about 1200×630). Each can be cropped (see [Cropping](#cropping)).
 - **Header font** and **Body font**.
 - The **Colors**: primary, secondary, background, text and so on.
 - **Footer**:
@@ -268,6 +268,26 @@ changes you haven't saved yet.
   unused ones…**).
 - Deleting an image that's still in use tells you which places will show no image. Deleting can't be
   undone.
+
+### Cropping
+
+Beside an uploaded photo or graphic (JPEG, PNG, WebP or AVIF) — the logo, favicon, share image, a
+banner, a section's image, a partner logo — **Crop…** opens it with a frame to drag: move the frame,
+or drag its edges and corners. With the keyboard, the arrow keys move it and Shift + arrow keys resize
+it (add Option/Alt for a single pixel). Where the atlas shows an image at a fixed shape, the frame
+keeps it:
+
+| Image | Shape |
+|---|---|
+| Banner (home page and page banners) | 3:1, as a wide screen shows it; phones show its middle |
+| Share image (link previews) | 1.91:1, ideally at least 1200 × 630 |
+| Favicon | Square |
+| Logo, section images, partner logos | Any shape |
+
+**Save cropped copy** adds the cropped image to your images and uses it there; the original stays, so
+you can crop it again differently. Cropping a cropped image starts from its original at the earlier
+frame. When an image's shape doesn't match where it's used, the field says so ("This image is 3:2;
+link previews are 1.91:1, so its edges are cut off").
 
 ## 10. Search and filters
 

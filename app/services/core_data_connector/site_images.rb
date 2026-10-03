@@ -102,6 +102,78 @@ module CoreDataConnector
       converted&.dig(:file)&.close!
     end
 
+    # The smallest crop, in pixels each way.
+    MIN_CROP = 8
+
+    # Crops an uploaded image (an asset of `site`) to the rectangle x, y,
+    # width, height — pixels of the image as it displays (upright) — and
+    # stores the result as a new asset with its own copies, like an upload.
+    # The original stays. The new blob's metadata records where it came
+    # from: { "og_crop" => { "from" => key, "x", "y", "width", "height" } }.
+    # Opaque crops are stored as JPEG, transparent ones as PNG (lossless: a
+    # logo's edges). Raises Error with a message for the curator.
+    def self.crop(site, original, x:, y:, width:, height:)
+      raise Error, 'Images can\'t be cropped on this server (libvips isn\'t available).' unless available?
+      raise Error, 'Only JPEG, PNG, WebP and AVIF images can be cropped.' unless RESIZABLE_TYPES.include?(original.content_type)
+
+      original.open do |file|
+        header = Vips::Image.new_from_file(file.path, access: :sequential, fail_on: :error)
+        check_pixels!(header)
+        raise Error, 'Animated images can\'t be cropped.' if animated?(header)
+
+        full_width, full_height = upright_size(header)
+        unless [x, y, width, height].all?(Integer) && x >= 0 && y >= 0 && width >= MIN_CROP && height >= MIN_CROP &&
+               x + width <= full_width && y + height <= full_height
+          raise Error, "The crop must lie within the image (#{full_width} × #{full_height}) and be at least #{MIN_CROP} pixels each way."
+        end
+
+        # Upright and in sRGB at full size, as the copies are made. Opened
+        # twice — once to see whether the crop is transparent, once to save
+        # it — because each opening reads the file once, in order (a PNG
+        # can't be read twice that way).
+        cropped = lambda do
+          image = Vips::Image.thumbnail(file.path, full_width, height: UNBOUNDED, size: :down, export_profile: 'srgb')
+                             .colourspace(:srgb)
+                             .crop(x, y, width, height)
+          image.format == :uchar ? image : image.cast(:uchar)
+        end
+        transparent = transparent?(cropped.call)
+        image = cropped.call
+        image = image.extract_band(0, n: image.bands - 1) if image.has_alpha? && !transparent
+
+        keep = Vips.at_least_libvips?(8, 15) ? { keep: :none } : { strip: true }
+        extension = transparent ? 'png' : 'jpg'
+        output = Tempfile.new(['og-crop', ".#{extension}"], binmode: true)
+
+        if transparent
+          image.pngsave(output.path, compression: 6, **keep)
+        else
+          image.jpegsave(output.path, Q: 92, optimize_coding: true, interlace: true, **keep)
+        end
+
+        stem = File.basename(original.filename.to_s, '.*').presence || 'image'
+        blob = upload(site, output.path, filename: "#{stem}-crop-#{width}x#{height}.#{extension}",
+                                         content_type: transparent ? 'image/png' : 'image/jpeg')
+        blob.update!(metadata: blob.metadata.merge(
+          'og_crop' => { 'from' => original.key, 'x' => x, 'y' => y, 'width' => width, 'height' => height }
+        ))
+        blob
+      ensure
+        output&.close!
+      end
+    rescue Vips::Error => e
+      Rails.logger.info("[open_geographies] crop failed: #{e.message.lines.first&.strip}")
+      raise Unreadable, 'This image couldn\'t be read to crop it. Open it in an image editor, save it again as a JPEG or PNG, and upload that.'
+    end
+
+    # A copy for working on the image in the console (the cropper): the
+    # largest no wider than 1440 px, or the original when there are none.
+    def self.preview_path(blob)
+      entry = variant_entries(blob).select { |e| e['width'] <= 1440 }.last
+
+      entry ? Site.asset_path_for(entry['key'], entry['filename']) : Site.asset_path(blob)
+    end
+
     # True when TIFF uploads can be converted here.
     def self.converts_tiff?
       return @converts_tiff unless @converts_tiff.nil?

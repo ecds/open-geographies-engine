@@ -73,6 +73,7 @@ module OpenGeographiesPlatform
           patch 'categories/:term_id', to: 'categories#update', on: :member, as: :category
           post 'assets', action: :upload_asset, on: :member, as: :upload_asset
           delete 'assets/:key', action: :destroy_asset, on: :member, as: :destroy_asset
+          post 'assets/:key/crop', action: :crop_asset, on: :member, as: :crop_asset
         end
 
         # NOTE: the admin `projects/:id/descriptors` route is NOT added here — it

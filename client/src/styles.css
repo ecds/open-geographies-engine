@@ -351,3 +351,26 @@ td .status-pill { margin-left: 0; }
   .feedback-context-row { grid-template-columns: 1fr; gap: 0; }
   .feedback-report-head { flex-direction: column; }
 }
+
+/* Image cropper */
+.crop-dialog { width: min(900px, calc(100vw - 32px)); }
+.crop-shape { margin: 0; font-size: 13px; }
+.crop-stage { position: relative; align-self: center; max-width: 100%; line-height: 0; user-select: none; touch-action: none; overflow: hidden; border-radius: 4px; background: #1f2937; }
+.crop-stage img { display: block; max-width: 100%; max-height: 58vh; width: auto; height: auto; }
+.crop-box { position: absolute; box-sizing: border-box; border: 1px solid #fff; box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.55); cursor: move; outline: none;
+  background-image: linear-gradient(to right, transparent calc(33.33% - 0.5px), rgba(255, 255, 255, 0.45) calc(33.33% - 0.5px), rgba(255, 255, 255, 0.45) calc(33.33% + 0.5px), transparent calc(33.33% + 0.5px), transparent calc(66.66% - 0.5px), rgba(255, 255, 255, 0.45) calc(66.66% - 0.5px), rgba(255, 255, 255, 0.45) calc(66.66% + 0.5px), transparent calc(66.66% + 0.5px)),
+                    linear-gradient(to bottom, transparent calc(33.33% - 0.5px), rgba(255, 255, 255, 0.45) calc(33.33% - 0.5px), rgba(255, 255, 255, 0.45) calc(33.33% + 0.5px), transparent calc(33.33% + 0.5px), transparent calc(66.66% - 0.5px), rgba(255, 255, 255, 0.45) calc(66.66% - 0.5px), rgba(255, 255, 255, 0.45) calc(66.66% + 0.5px), transparent calc(66.66% + 0.5px)); }
+.crop-box:focus-visible { border: 2px solid #fbbf24; }
+.crop-handle { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; background: #fff; border: 1px solid #1f2937; border-radius: 2px; }
+.crop-handle-nw { left: 0; top: 0; cursor: nwse-resize; }
+.crop-handle-n { left: 50%; top: 0; cursor: ns-resize; }
+.crop-handle-ne { left: 100%; top: 0; cursor: nesw-resize; }
+.crop-handle-e { left: 100%; top: 50%; cursor: ew-resize; }
+.crop-handle-se { left: 100%; top: 100%; cursor: nwse-resize; }
+.crop-handle-s { left: 50%; top: 100%; cursor: ns-resize; }
+.crop-handle-sw { left: 0; top: 100%; cursor: nesw-resize; }
+.crop-handle-w { left: 0; top: 50%; cursor: ew-resize; }
+@media (pointer: coarse) { .crop-handle { width: 24px; height: 24px; margin: -12px 0 0 -12px; } }
+.crop-size { margin: 0; font-variant-numeric: tabular-nums; }
+.crop-warning { color: var(--og-warning); }
+.spacer { flex: 1; }

@@ -415,7 +415,7 @@ module OpenGeographiesPlatform
 
       group 'uploaded photos get web-sized copies' do
         if ::CoreDataConnector::SiteImages.available?
-          image_copies(a)
+          image_copies(a, b)
         else
           puts '  skip (libvips is not available to this host: images are served as uploaded)'
         end
@@ -670,7 +670,7 @@ module OpenGeographiesPlatform
       a.site.update!(slug: 'og-tenancy-probe-a') unless a.site.slug == 'og-tenancy-probe-a'
     end
 
-    def image_copies(a)
+    def image_copies(a, b)
       xyz = Vips::Image.xyz(2400, 1600)
       photo = (xyz[0] * (255.0 / 2400)).bandjoin([xyz[1] * (255.0 / 1600), xyz[0] * 0 + 128]).cast(:uchar)
                                        .copy(interpretation: :srgb).jpegsave_buffer(Q: 90)
@@ -702,10 +702,50 @@ module OpenGeographiesPlatform
       status 'too many pixels is refused',
              upload("/core_data/sites/#{a.site.id}/assets", 'huge.png', Vips::Image.black(11_000, 10_000).pngsave_buffer(compression: 9), a.token), '422'
 
+      image_crops(a, b, asset)
+
       status 'deleting the photo', delete("/core_data/sites/#{a.site.id}/assets/#{asset['key']}", a.token), '204'
       status 'deletes its copies', get(largest['path'].to_s), '404'
 
       tiff_copies(a, photo)
+    end
+
+    # Cropping an uploaded photo (the console's image picker): a new image of
+    # the atlas, cut from the original where asked, with its own copies; the
+    # original stays; nobody else's atlas can crop it.
+    def image_crops(a, b, asset)
+      crop = "/core_data/sites/#{a.site.id}/assets/#{asset['key']}/crop"
+      link_preview = { x: 100, y: 200, width: 1910, height: 1000 }
+
+      status 'anonymous can\'t crop it', post(crop, link_preview), '401'
+      status 'another tenant can\'t crop it', post(crop, link_preview, b.token), %w[401 404]
+      status 'nor through its own atlas', post("/core_data/sites/#{b.site.id}/assets/#{asset['key']}/crop", link_preview, b.token), '404'
+
+      res = post(crop, link_preview, a.token)
+      status 'the owner crops it to 1.91:1 (a link preview)', res, '200'
+      cropped = body(res)['asset'] || {}
+      check '... a new image of that size, with its own copies',
+            cropped['key'] && cropped['key'] != asset['key'] && [cropped['width'], cropped['height']] == [1910, 1000] &&
+            cropped['thumbnail_path'] != cropped['path'], cropped.slice('key', 'width', 'height').inspect
+      check '... recording what it was cut from', cropped['cropped_from'] == link_preview.transform_keys(&:to_s).merge('from' => asset['key']),
+            cropped['cropped_from'].inspect
+
+      # The photo's red rises with x and its green with y: the crop's first
+      # pixel must be the original's pixel at (100, 200).
+      served = Vips::Image.new_from_buffer(get(cropped['path'].to_s).body, '')
+      expected = [100 * 255.0 / 2400, 200 * 255.0 / 1600, 128]
+      pixel = served.getpoint(0, 0)
+      check '... cut where asked', pixel.zip(expected).all? { |got, want| (got - want).abs <= 6 }, "#{pixel.inspect} vs #{expected.map(&:round).inspect}"
+
+      keys = (body(get("/core_data/sites/#{a.site.id}/assets", a.token))['assets'] || []).map { |listed| listed['key'] }
+      check 'the original stays in the library', keys.include?(asset['key']) && keys.include?(cropped['key'])
+      status 'a crop outside the image is refused', post(crop, { x: 2000, y: 0, width: 500, height: 100 }, a.token), '422'
+      status 'and one that isn\'t whole pixels', post(crop, { x: '1.5', y: 0, width: 100, height: 100 }, a.token), '422'
+
+      res = post(crop, { x: 0, y: 0, width: 160, height: 160 }, login(Fixtures::EDITOR_EMAIL))
+      status 'an editor crops too', res, '200'
+
+      [cropped['key'], body(res).dig('asset', 'key')].compact.each { |key| delete("/core_data/sites/#{a.site.id}/assets/#{key}", a.token) }
     end
 
     # RemoteFiles (photo links in uploaded data are fetched by the server):

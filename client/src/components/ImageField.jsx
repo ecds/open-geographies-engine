@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react';
+import { useContext, useRef, useState } from 'react';
 import _ from 'underscore';
 import { errorMessages } from '../api';
+import ImageCropper, { CROPPABLE_TYPES, ImageCropContext } from './ImageCropper';
 import { Button, Field, Message } from './ui';
 
 const ACCEPT = 'image/png,image/jpeg,image/gif,image/webp,image/avif,image/svg+xml,image/x-icon,.ico,image/tiff,.tif,.tiff';
@@ -80,15 +81,41 @@ export const AssetPicker = ({ assets, onCancel, onPick, onUpload }) => {
 };
 
 /**
- * An image setting (logo, favicon, a section's image): a preview of the
- * current image with Change / Remove, and an optional alt text. `background`
- * previews the image on the color it will sit on (the logo on the header).
+ * Width / height as a short ratio for people: 1.333 → "4:3".
  */
-const ImageField = ({ alt, assets, background, hint, label, onAltChange, onChange, onUpload, value }) => {
+const ratioLabel = (width, height) => {
+  const ratio = width / height;
+  const known = [[1, '1:1'], [4 / 3, '4:3'], [3 / 2, '3:2'], [16 / 9, '16:9'], [1.91, '1.91:1'], [3, '3:1'], [3 / 4, '3:4'], [2 / 3, '2:3']];
+  const match = _.find(known, ([value]) => Math.abs(ratio - value) / value < 0.02);
+  return match ? match[1] : `${ratio.toFixed(2)}:1`;
+};
+
+/**
+ * An image setting (logo, favicon, a section's image): a preview of the
+ * current image with Change / Crop / Remove, and an optional alt text.
+ * `background` previews the image on the color it will sit on (the logo on
+ * the header). `crop` gives the shape the atlas shows it at, when it has one
+ * ({ aspect, aspectLabel, minWidth, minHeight }); an uploaded JPEG, PNG,
+ * WebP or AVIF can then be cropped to it.
+ */
+const ImageField = ({ alt, assets, background, crop = {}, hint, label, onAltChange, onChange, onUpload, value }) => {
   const [picking, setPicking] = useState(false);
+  const [cropping, setCropping] = useState(null);
+  const cropAsset = useContext(ImageCropContext);
+
+  const current = _.findWhere(assets, { path: value });
 
   // An uploaded image previews from its small copy.
-  const preview = _.findWhere(assets, { path: value })?.thumbnail_path || value;
+  const preview = current?.thumbnail_path || value;
+
+  // Cropping an earlier crop starts again from its original, at the earlier
+  // frame, when the original is still in the library.
+  const croppable = (asset) => asset && CROPPABLE_TYPES.includes(asset.content_type) && asset.width && asset.height;
+  const source = current?.cropped_from ? _.findWhere(assets, { key: current.cropped_from.from }) : null;
+  const target = croppable(source) ? { asset: source, initial: current.cropped_from } : (croppable(current) ? { asset: current } : null);
+
+  const mismatch = crop.aspect && croppable(current) &&
+    Math.abs(current.width / current.height - crop.aspect) / crop.aspect > 0.03;
 
   return (
     <div className='field'>
@@ -99,9 +126,26 @@ const ImageField = ({ alt, assets, background, hint, label, onAltChange, onChang
         </div>
         <div className='image-actions'>
           <Button onClick={() => setPicking(!picking)}>{ value ? 'Change…' : 'Add image…' }</Button>
+          { cropAsset && target && <Button onClick={() => setCropping(target)}>Crop…</Button> }
           { value && <Button onClick={() => onChange(undefined)} subtle>Remove</Button> }
         </div>
       </div>
+      { mismatch && (
+        <span className='field-hint'>
+          This image is { ratioLabel(current.width, current.height) }; { crop.mismatch }, so its edges are cut off.
+          { cropAsset ? ' Crop it to choose what shows.' : '' }
+        </span>
+      )}
+      { cropping && (
+        <ImageCropper
+          asset={cropping.asset}
+          crop={crop}
+          initial={cropping.initial}
+          label={label}
+          onCancel={() => setCropping(null)}
+          onCropped={(asset) => { onChange(asset.path); setCropping(null); }}
+        />
+      )}
       { picking && (
         <AssetPicker
           assets={assets}

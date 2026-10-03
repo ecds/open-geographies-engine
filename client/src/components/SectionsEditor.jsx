@@ -1,5 +1,6 @@
 import _ from 'underscore';
 import ImageField from './ImageField';
+import { CROP_SHAPES } from './ImageCropper';
 import MarkdownField from './MarkdownField';
 import { Button, Field, Select, Toggle } from './ui';
 
@@ -64,6 +65,7 @@ const SectionsEditor = ({ assets, fallbackTitle, onChange, onUpload, sections = 
     <ImageField
       alt={section.image_alt}
       assets={assets}
+      crop={section.type === 'hero' ? CROP_SHAPES.banner : undefined}
       label={label}
       onAltChange={(image_alt) => update(index, { image_alt })}
       onChange={(path) => update(index, { image: path })}
