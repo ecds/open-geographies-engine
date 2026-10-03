@@ -425,3 +425,6 @@ td .status-pill { margin-left: 0; }
 .markdown-images .field-hint { margin: 0; }
 .markdown-image { display: inline-flex; align-items: center; gap: 6px; }
 .markdown-image img { width: 48px; height: 36px; object-fit: cover; border-radius: 4px; border: 1px solid var(--og-border); }
+
+/* Settings → Topics: nested groups */
+.topic-group .topic-group { margin-left: 12px; border-left: 3px solid var(--og-border); }

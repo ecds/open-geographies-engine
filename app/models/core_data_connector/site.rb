@@ -125,6 +125,7 @@ module CoreDataConnector
     validate :validate_navigation
     validate :validate_domain
     validate :validate_locales, if: :will_save_change_to_config?
+    validate :validate_topics, if: :will_save_change_to_config?
 
     before_save :normalize_content
 
@@ -240,6 +241,10 @@ module CoreDataConnector
 
     # "Explore", the starter menu's link into the map, in each language.
     EXPLORE_LABELS = { 'en' => 'Explore', 'es' => 'Explorar', 'fr' => 'Explorer', 'de' => 'Erkunden', 'it' => 'Esplora', 'pt' => 'Explorar' }.freeze
+    # "Topics" (config.topics: the categories as pages), in each language.
+    TOPICS_LABELS = { 'en' => 'Topics', 'es' => 'Temas', 'fr' => 'Thèmes', 'de' => 'Themen', 'it' => 'Temi', 'pt' => 'Temas' }.freeze
+    TOPICS_MAX_DEPTH = 3
+    TOPICS_MAX_GROUPS = 200
 
     # The navbar document served to the renderer, in `locale` (one of the
     # atlas's languages): the stored items, or a default (Explore, then each
@@ -337,12 +342,15 @@ module CoreDataConnector
     end
 
     # The starter navbar for a site that hasn't customized navigation:
-    # Explore (the first search) and then every page, in order.
+    # Explore (the first search), Topics when they're on, then every page.
     def default_navigation_items(locale, pages)
       explore = default_search_href(locale)
+      topics = (config || {})['topics']
+      topics_label = (locale == default_locale && topics.is_a?(Hash) && topics['title'].presence) || TOPICS_LABELS[locale] || 'Topics'
 
       [
         (explore && { '_template' => 'URL', 'label' => EXPLORE_LABELS[locale] || 'Explore', 'href' => explore }),
+        (topics.is_a?(Hash) && topics['enabled'] == true && { '_template' => 'URL', 'label' => topics_label, 'href' => "/#{locale}/topics" }),
         *pages.map { |page| { '_template' => 'Page', 'page' => page['slug'] } }
       ].compact
     end
@@ -398,6 +406,40 @@ module CoreDataConnector
 
       default = i18n['default_locale'].to_s
       errors.add(:config, "The default language must be one of the atlas's languages.") if default.present? && listed.any? && !listed.include?(default)
+    end
+
+    # config.topics (the categories as pages, grouped by the curator): an
+    # object with a yes/no, a short title and intro, and groups of labels
+    # and category names, three levels deep at most.
+    def validate_topics
+      topics = (config || {})['topics']
+      return if topics.nil?
+
+      unless topics.is_a?(Hash)
+        errors.add(:config, 'Topics must be an object.')
+        return
+      end
+
+      errors.add(:config, 'Topics: "enabled" must be true or false.') unless [nil, true, false].include?(topics['enabled'])
+      errors.add(:config, 'Topics: the title can be at most 100 characters.') if topics['title'].present? && !(topics['title'].is_a?(String) && topics['title'].length <= 100)
+      errors.add(:config, 'Topics: the introduction can be at most 1,000 characters.') if topics['intro'].present? && !(topics['intro'].is_a?(String) && topics['intro'].length <= 1000)
+
+      count = 0
+      check = lambda do |groups, depth|
+        return true if groups.nil?
+        return false unless groups.is_a?(Array) && depth <= TOPICS_MAX_DEPTH
+
+        groups.all? do |group|
+          count += 1
+          group.is_a?(Hash) && group['label'].is_a?(String) && group['label'].strip.present? && group['label'].length <= 100 &&
+            (group['terms'].nil? || (group['terms'].is_a?(Array) && group['terms'].all? { |term| term.is_a?(String) && term.length <= 200 })) &&
+            check.call(group['groups'], depth + 1)
+        end
+      end
+
+      unless check.call(topics['groups'], 1) && count <= TOPICS_MAX_GROUPS
+        errors.add(:config, "Topics: each group needs a name (100 characters at most) and a list of categories; groups go #{TOPICS_MAX_DEPTH} levels deep and #{TOPICS_MAX_GROUPS} in all at most.")
+      end
     end
 
     def validate_domain

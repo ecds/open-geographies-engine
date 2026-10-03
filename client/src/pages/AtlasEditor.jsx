@@ -4,6 +4,7 @@ import {
   buildTiles,
   errorMessages,
   fetchSearchCollections,
+  fetchCategories,
   fetchSite,
   fetchSiteAssets,
   fetchSiteConfig,
@@ -29,6 +30,7 @@ import ImageField from '../components/ImageField';
 import { CROP_SHAPES, ImageCropContext } from '../components/ImageCropper';
 import PagesEditor from '../components/PagesEditor';
 import SectionsEditor from '../components/SectionsEditor';
+import TopicsEditor from '../components/TopicsEditor';
 import { Button, Field, Message, MultiSelect, onTabListKeyDown, Select, Tag } from '../components/ui';
 import { paths } from '../router';
 
@@ -41,11 +43,12 @@ const TABS = [
   { key: 'layers', label: 'Map layers' },
   { key: 'search', label: 'Search' },
   { key: 'detail', label: 'Detail pages' },
+  { key: 'topics', label: 'Topics' },
   { key: 'advanced', label: 'Advanced' }
 ];
 
 // Config sections with a dedicated editor; everything else is "advanced" JSON.
-const MANAGED_KEYS = ['layers', 'search'];
+const MANAGED_KEYS = ['layers', 'search', 'topics'];
 
 const FONTS = ['Afacad', 'Baskervville', 'Crimson Text SemiBold', 'DM Sans', 'DM Serif Display', 'Inter', 'Libre Bodoni', 'Open Sans'];
 
@@ -169,6 +172,8 @@ const AtlasEditor = ({ id, navigate }) => {
   const [fieldModels, setFieldModels] = useState([]);
   const [searchFields, setSearchFields] = useState([]);
   const [dateFields, setDateFields] = useState([]);
+  // The category values (Settings → Topics groups them).
+  const [categories, setCategories] = useState([]);
   const [tab, setTab] = useState('general');
   // The language the Home page and Pages & menu tabs are editing.
   const [contentLocale, setContentLocale] = useState(null);
@@ -199,7 +204,8 @@ const AtlasEditor = ({ id, navigate }) => {
           fetchSiteSearchFields(id).then((d) => {
             setSearchFields(d.search_fields || []);
             setDateFields(d.date_fields || []);
-          })
+          }),
+          fetchCategories(id).then((d) => setCategories(d.categories || []))
         ]);
       })
       .catch((error) => setErrors(errorMessages(error)));
@@ -985,6 +991,31 @@ const AtlasEditor = ({ id, navigate }) => {
     <ImageLibrary assets={assets} onChange={setAssets} onUpload={onUpload} savedSite={savedSite} site={site} />
   );
 
+  // Topics come from the canonical Types (the index's `types`), else the
+  // first category.
+  const topicCategories = _.findWhere(categories, { name: 'Types' }) || categories[0];
+  const menuItems = site?.navigation?.items || [];
+  // The Topics page's address: a draft's carries its preview token (the
+  // renderer keeps it in a cookie and drops it from the address).
+  const topicsPage = (() => {
+    const base = atlasLiveUrl(site)?.replace(/\/+$/, '');
+    if (!base) return null;
+    if (site.published) return `${base}/${locale}/topics`;
+    return site.preview_token ? `${base}/${locale}/topics?preview=${site.preview_token}` : null;
+  })();
+
+  const renderTopics = () => (
+    <TopicsEditor
+      categories={topicCategories}
+      menuCustomized={!_.isEmpty(menuItems)}
+      menuHasTopics={_.some(menuItems, (item) => /\/topics\/?$/.test(item.href || ''))}
+      onAddToMenu={() => update({ navigation: { ...(site.navigation || {}), items: [...menuItems, { _template: 'URL', label: siteConfig.topics?.title || 'Topics', href: `/${locale}/topics` }] } })}
+      onChange={(topics) => updateConfig({ topics })}
+      pageHref={topicsPage}
+      topics={siteConfig.topics}
+    />
+  );
+
   const renderers = {
     general: renderGeneral,
     branding: renderBranding,
@@ -994,6 +1025,7 @@ const AtlasEditor = ({ id, navigate }) => {
     layers: renderLayers,
     search: renderSearch,
     detail: renderDetail,
+    topics: renderTopics,
     advanced: renderAdvanced
   };
 

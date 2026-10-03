@@ -35,6 +35,7 @@ module CoreDataConnector
       { key: 'search', label: 'Search', column: 'config', path: 'search' },
       { key: 'detail_pages', label: 'Detail pages', column: 'config', path: 'detail_pages' },
       { key: 'languages', label: 'Languages and labels', column: 'config', path: 'i18n' },
+      { key: 'topics', label: 'Topics', column: 'config', path: 'topics' },
       { key: 'settings', label: 'Other settings', column: 'config', rest: true },
       { key: 'other_content', label: 'Other content', column: 'content', rest: true }
     ].freeze

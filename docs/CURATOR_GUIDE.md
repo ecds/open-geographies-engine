@@ -343,6 +343,18 @@ they show:
   own player near the top of the place's page, with "Open on …" beneath. Links from other sites aren't
   shown there (they stay an ordinary field). An upload with a column of such links sets this for you.
 
+### Topics
+
+**Settings → Topics** turns the atlas's categories into pages of their own. Tick **Show a Topics page**:
+visitors get a **Topics** page (in the menu, unless you've customized the menu — then the tab offers to
+add it) listing every category with its number of places, and a page for each category with its places on
+a map and as a list, and a link to the map search showing just them. Category names on place pages link to
+their topic page.
+
+Categories are a flat list in your data; **Groups** arrange them as a tree. Name a group ("Religious"),
+tick the categories in it, and add subgroups inside it ("Burial") — three levels at most. Categories in no
+group are listed after the groups. **Title** and **Introduction** head the Topics page.
+
 ## 12. Map layers and historic maps
 
 ### Historic maps
