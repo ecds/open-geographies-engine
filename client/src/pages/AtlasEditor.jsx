@@ -279,6 +279,28 @@ const AtlasEditor = ({ id, navigate }) => {
   };
 
   /**
+   * One setting of a model's detail page (detail_pages.models.<model>.<key>):
+   * the field its photo or its 360° view / video comes from. Blank removes
+   * it. Kept in step with the advanced text, as exclude is.
+   */
+  const updateModelSetting = (model, key, value) => {
+    const models = { ...(siteConfig.detail_pages?.models || {}) };
+    const settings = { ...(models[model] || {}) };
+
+    if (value) {
+      settings[key] = value;
+    } else {
+      delete settings[key];
+    }
+
+    models[model] = settings;
+
+    const next = { ...siteConfig, detail_pages: { ...(siteConfig.detail_pages || {}), models } };
+    update({ config: next });
+    setAdvancedText(JSON.stringify(_.omit(next, MANAGED_KEYS), null, 2));
+  };
+
+  /**
    * A relationship section's heading on detail pages and panels, per
    * language: config.i18n.strings[<locale>][<key>] (the renderer's
    * translation key for the relationship). Blank goes back to the FairData
@@ -881,6 +903,27 @@ const AtlasEditor = ({ id, navigate }) => {
               value={siteConfig.detail_pages?.models?.[entry.model]?.exclude || []}
             />
           </Field>
+          <div className='grid-2'>
+            <Field hint='A field of image addresses, shown as the record’s picture (when it has no media of its own).' label='Photo'>
+              <Select
+                onChange={(v) => updateModelSetting(entry.model, 'photo_field', v)}
+                options={_.map(_.where(entry.fields, { kind: 'user_defined' }), (f) => ({ value: f.key, text: f.label }))}
+                placeholder='None'
+                value={siteConfig.detail_pages?.models?.[entry.model]?.photo_field || ''}
+              />
+            </Field>
+            <Field
+              hint='A field of links to a 360° view, tour or video (Kuula, Momento360, Roundme, Panoee, Matterport, YouTube, Vimeo, Google Maps embeds), shown in its player on the record’s page.'
+              label='360° view or video'
+            >
+              <Select
+                onChange={(v) => updateModelSetting(entry.model, 'embed_field', v)}
+                options={_.map(_.where(entry.fields, { kind: 'user_defined' }), (f) => ({ value: f.key, text: f.label }))}
+                placeholder='None'
+                value={siteConfig.detail_pages?.models?.[entry.model]?.embed_field || ''}
+              />
+            </Field>
+          </div>
           { !_.isEmpty(entry.relationships) && (
             <div className='section-names'>
               <span className='field-label'>Section names</span>

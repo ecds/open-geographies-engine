@@ -49,11 +49,23 @@ module CoreDataConnector
 
       ACCURACY = { year: 0, month: 1, date: 2 }.freeze
 
+      # Links the atlas embeds as a 360° view, tour or video (the renderer's
+      # utils/embeds.ts allows the same hosts).
+      EMBED_LINK = %r{\Ahttps://(?:www\.)?(?:
+        kuula\.co/share/ | momento360\.com/e/u/ | panoee\.com/[\w-]+/?\z | roundme\.com/(?:tour|embed)/\d+ |
+        my\.matterport\.com/show/\?m= | (?:m\.)?youtube\.com/(?:watch\?v=|embed/|shorts/) | youtu\.be/[\w-]+ |
+        vimeo\.com/\d+/?\z | player\.vimeo\.com/video/\d+ | google\.com/maps/embed\?pb=
+      )}x
+
       # Words a category label keeps in lower case after its first word.
       WORD = /\p{L}[\p{L}\p{M}'’]*/
       MINOR_WORDS = %w[a an and as at but by de del des du for from in into la le nor of on or per the to via von].freeze
 
       module_function
+
+      def embed_link?(value)
+        value.is_a?(String) && value.strip.match?(EMBED_LINK)
+      end
 
       # The stored value for `value` as `data_type`, nil when blank, :invalid
       # when the text isn't one. `checkmarks: true` (a Boolean column of marks

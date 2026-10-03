@@ -446,6 +446,7 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
         { !_.isEmpty(searched) && <p className='muted'>The atlas’s search now also looks in: { searched.join(', ') }</p> }
         { !_.isEmpty(dated) && <p className='muted'>Visitors can now filter and sort by: { dated.join(', ') } (change in Settings → Search → Time)</p> }
         { !_.isEmpty(hidden) && <p className='muted'>Hidden on public pages: { hidden.join(', ') } (change in Settings → Detail pages)</p> }
+        { result.extra?.embed_field && <p className='muted'>Shown as a 360° view or video on place pages: { result.extra.embed_field } (change in Settings → Detail pages)</p> }
         { !_.isEmpty(overlaysAdded) && <p className='muted'>Added to the map layers: { overlaysAdded.join(', ') } (change in Settings → Map layers)</p> }
         { !_.isEmpty(overlayProblems) && (
           <Message header='Image overlays not added' list={_.map(overlayProblems, (p) => `${p.name}: ${p.message}`)} tone='warning' />

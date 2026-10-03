@@ -336,6 +336,12 @@ they show:
   "Contained In" or "Types". Type the name you want on the atlas ("County", "Kind of building") next
   to each, or leave it empty to keep FairData's. With more than one language, there's a box per
   language.
+- **Photo:** the field of image addresses shown as the place's picture (an upload's Photo column sets
+  it for you).
+- **360° view or video:** a field of links to a 360° panorama, virtual tour or video — from Kuula,
+  Momento360, Roundme, Panoee, Matterport, YouTube, Vimeo, or a Google Maps embed link — shown in its
+  own player near the top of the place's page, with "Open on …" beneath. Links from other sites aren't
+  shown there (they stay an ordinary field). An upload with a column of such links sets this for you.
 
 ## 12. Map layers and historic maps
 

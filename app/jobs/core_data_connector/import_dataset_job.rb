@@ -70,6 +70,7 @@ module CoreDataConnector
       @problems = []
 
       @fields = ensure_fields!(rows)
+      @rows_for_setup = rows
 
       # Yes/No columns of marks and blanks ("X" on 7 rows): blanks are No.
       @checkmark_columns = @fields.select { |_column, field| field.data_type == 'Boolean' }.keys.select do |column|
@@ -141,6 +142,7 @@ module CoreDataConnector
           'geocode_error' => @geocode_error,
           'reindex_job_id' => reindex&.id,
           'copy_photos_job_id' => copy&.id,
+          'embed_field' => @embed_field,
           'overlays_added' => @overlays_added.presence,
           'overlay_problems' => @overlay_problems.presence
         ).compact
@@ -324,6 +326,13 @@ module CoreDataConnector
       photo_key = @photo_column && @fields[@photo_column].column_name.parameterize.underscore
       hidden << photo_key if photo_key
 
+      # A column of 360° view, tour or video links (Kuula, YouTube…) shows as
+      # that view on the places' pages (embed_field; the field itself isn't
+      # listed there).
+      embed_column = @link_columns.find { |column| column != @photo_column && embed_column?(column) }
+      embed_key = embed_column && @fields[embed_column].column_name.parameterize.underscore
+      @embed_field = nil
+
       # The first date column dates the places: the year filter and date
       # sorts (search[].dates), on searches that have no dates yet.
       date_field = @fields.values.find { |field| ::OpenGeographiesPlatform::FacetCatalog.date_field?(field) }
@@ -366,6 +375,14 @@ module CoreDataConnector
 
               fields << path
               @searched_fields << label
+            end
+          end
+
+          if embed_key
+            places = ((config['detail_pages'] ||= {})['models'] ||= {})['places'] ||= {}
+            if places['embed_field'].blank?
+              places['embed_field'] = embed_key
+              @embed_field = @fields[embed_column].column_name
             end
           end
 
@@ -494,6 +511,12 @@ module CoreDataConnector
         extra: @job.extra.merge('progress' => { 'completed' => completed, 'total' => total }),
         updated_at: Time.current
       )
+    end
+
+    # True when every value of the column is a link the atlas embeds.
+    def embed_column?(column)
+      values = @rows_for_setup.filter_map { |row| row[:properties][column].presence }
+      values.any? && values.all? { |value| DatasetImports::Values.embed_link?(value) }
     end
 
     # --- Photos packed in a KMZ ---------------------------------------------------
