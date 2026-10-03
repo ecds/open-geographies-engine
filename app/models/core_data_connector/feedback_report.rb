@@ -12,11 +12,20 @@ module CoreDataConnector
 
     MAX_TEXT = 5000
     MAX_PAGE_URL = 2000
+    # The console page a report came from: a path on the console's own site
+    # ("/atlases/12/imports"), never another site's address — including
+    # "//host" and "/\host", which browsers read as one.
+    PAGE_PATH = %r{\A/(?![/\\])[^\s\\\x00-\x1f\x7f]*\z}
     MAX_SCREENSHOT_BYTES = 10.megabytes
+    # Postmark refuses a message over 10 MB counted after base64 encoding (a
+    # third larger); a bigger screenshot stays with the report in the console.
+    MAX_EMAILED_SCREENSHOT_BYTES = 5.megabytes
     SCREENSHOT_TYPES = %w[image/png image/jpeg image/webp].freeze
 
-    # Reports one person may send in an hour.
+    # Reports one person may send in an hour, counted under an advisory lock
+    # per sender (pg_advisory_xact_lock(LOCK_NAMESPACE, user id)).
     HOURLY_LIMIT = 20
+    LOCK_NAMESPACE = 0x4F46
 
     # What the console may put in `context`, each a short string.
     CONTEXT_KEYS = %w[source path error job_id user_agent viewport screen language].freeze
@@ -65,6 +74,7 @@ module CoreDataConnector
       self.what_happened = what_happened.to_s.strip
       self.expected = expected.to_s.strip.presence
       self.page_url = page_url.to_s.strip.presence
+      self.page_url = nil if page_url && !page_url.match?(PAGE_PATH)
       self.context = self.class.clean_context(context || {})
     end
   end

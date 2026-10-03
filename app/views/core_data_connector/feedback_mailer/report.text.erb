@@ -21,9 +21,12 @@ Where
 <% end %>
   Browser:  <%= @report.context['user_agent'] || '—' %>
   Window:   <%= @report.context['viewport'] || '—' %><%= @report.context['screen'].present? ? " (screen #{@report.context['screen']})" : '' %>
-<% if @report.screenshot.attached? %>
+<% if @screenshot_attached %>
 
 Screenshot attached.
+<% elsif @screenshot %>
+
+Screenshot: <%= (@screenshot.byte_size / 1024.0 / 1024).round(1) %> MB, too large to attach; it's with the report in the console.
 <% end %>
 
 Report #<%= @report.id %>, <%= @report.created_at.utc.strftime('%Y-%m-%d %H:%M UTC') %>. All reports: <%= @console_url %>/atlases/feedback

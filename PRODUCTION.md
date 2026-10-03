@@ -65,7 +65,8 @@ where they meet these. Today's reference deployment is the demo stack in [`demo/
   `POSTMARK_FROM`, which must be a Postmark sender signature; replies go to the curator. A
   delivery that fails is retried twice, then shown on the report as "Email failed" (the report
   itself is never lost). Screenshots (PNG/JPEG/WebP, 10 MB) are stored with the host's other
-  uploads and served only to their sender and admins.
+  uploads and served only to their sender and admins; the email attaches one up to 5 MB (Postmark's
+  10 MB limit counts the base64-encoded attachment) and says a larger one is in the console.
 
 ## 3. Proxy, CDN and caching
 

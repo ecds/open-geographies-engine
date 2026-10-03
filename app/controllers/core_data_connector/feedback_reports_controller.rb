@@ -12,7 +12,9 @@ module CoreDataConnector
   #
   # A report may name an atlas (site_id) only one the sender can see (404
   # otherwise, as for any atlas they can't); its project is taken from the
-  # atlas. Twenty reports an hour per person (429 past that).
+  # atlas. page_url is kept only when it's a path on the console's site.
+  # Twenty reports an hour per person (429 past that), counted under a lock
+  # so posts sent at once can't all slip under it.
   class FeedbackReportsController < ApplicationController
     PER_PAGE = 25
 
@@ -42,10 +44,6 @@ module CoreDataConnector
     def create
       authorize FeedbackReport.new, :create?
 
-      if FeedbackReport.where(user_id: current_user.id).where('created_at > ?', 1.hour.ago).count >= FeedbackReport::HOURLY_LIMIT
-        render json: { errors: [{ base: 'You’ve sent a lot of feedback in the last hour; please try again later.' }] }, status: :too_many_requests and return
-      end
-
       site = params[:site_id].present? ? policy_scope(Site).find_by(id: params[:site_id]) : nil
       render json: { errors: [{ base: 'That atlas was not found.' }] }, status: :not_found and return if params[:site_id].present? && site.nil?
 
@@ -63,7 +61,18 @@ module CoreDataConnector
         render json: { errors: [{ screenshot: [problem] }] }, status: :unprocessable_entity and return
       end
 
-      unless report.save
+      limited = false
+      saved = FeedbackReport.transaction do
+        FeedbackReport.connection.execute("SELECT pg_advisory_xact_lock(#{FeedbackReport::LOCK_NAMESPACE}, #{current_user.id.to_i})")
+        limited = FeedbackReport.where(user_id: current_user.id).where('created_at > ?', 1.hour.ago).count >= FeedbackReport::HOURLY_LIMIT
+        !limited && report.save
+      end
+
+      if limited
+        render json: { errors: [{ base: 'You’ve sent a lot of feedback in the last hour; please try again later.' }] }, status: :too_many_requests and return
+      end
+
+      unless saved
         render json: { errors: [report.errors.to_hash] }, status: :unprocessable_entity and return
       end
 
@@ -105,7 +114,8 @@ module CoreDataConnector
     private
 
     # Attaches the screenshot, or answers why it can't be: its type read from
-    # its bytes, a PNG, JPEG or WebP image of at most 10 MB.
+    # its bytes alone (not its name), a PNG, JPEG or WebP image of at most
+    # 10 MB.
     def attach_screenshot(report, upload)
       return nil if upload.blank?
       return 'Attach the screenshot as an image file.' unless upload.respond_to?(:tempfile)
@@ -115,7 +125,7 @@ module CoreDataConnector
       end
 
       filename = File.basename(upload.original_filename.to_s).presence || 'screenshot.png'
-      content_type = Marcel::MimeType.for(Pathname.new(upload.tempfile.path), name: filename)
+      content_type = Marcel::MimeType.for(Pathname.new(upload.tempfile.path))
       return 'The screenshot must be a PNG, JPEG or WebP image.' unless FeedbackReport::SCREENSHOT_TYPES.include?(content_type)
 
       report.screenshot.attach(io: File.open(upload.tempfile.path), filename:, content_type:, identify: false)
