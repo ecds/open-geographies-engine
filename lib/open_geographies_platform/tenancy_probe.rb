@@ -472,6 +472,26 @@ module OpenGeographiesPlatform
       status '... its version still opens', get("#{versions}/#{odd['id']}", a.token), '200'
       status '... and so does the first, compared with it', get("#{versions}/#{older['id']}", a.token), '200'
       patch(site, { site: { config: } }, a.token)
+
+      # Two curators: a save made on an older copy is refused, saying who and
+      # what, unless it's sent anyway; a publish since isn't a conflict.
+      loaded = body(get(site, a.token)).dig('site', 'version_id')
+      status 'the editor saves the branding', patch(site, { site: { branding: { primary_color: '#224466' } }, base_version_id: loaded }, editor_token), '200'
+      res = patch(site, { site: { branding: { primary_color: '#664422' } }, base_version_id: loaded }, a.token)
+      check 'the owner\'s save on the older copy is refused (409), naming the part', res.code == '409' && body(res).dig('conflict', 'parts') == ['Branding'],
+            "#{res.code} #{res.body[0, 160]}"
+      check '... and the editor\'s branding stays', a.site.reload.branding['primary_color'] == '#224466'
+      status '... unless saved anyway', patch(site, { site: { branding: { primary_color: '#664422' } }, base_version_id: loaded, force: true }, a.token), '200'
+
+      # Topics: validated, kept out of Advanced JSON's way, compared as a part.
+      bad = { enabled: true, groups: [{ label: 'a', groups: [{ label: 'b', groups: [{ label: 'c', groups: [{ label: 'd', terms: [] }] }] }] }] }
+      res = patch(site, { site: { config: config.merge('topics' => bad) } }, a.token)
+      check 'topics four levels deep are refused', %w[400 422].include?(res.code) && res.body.include?('Topics'), "#{res.code} #{res.body[0, 120]}"
+      good = { enabled: true, title: 'Themes', groups: [{ label: 'Religious', terms: ['Church'], groups: [] }] }
+      status 'topics in a tree save', patch(site, { site: { config: config.merge('topics' => good) } }, a.token), '200'
+      newest = Array(body(get(versions, a.token))['versions']).first || {}
+      check '... as their own part in History', newest['changed_parts'] == ['topics'], newest['changed_parts'].inspect
+      patch(site, { site: { config: } }, a.token)
     end
 
     # "Send feedback": who may send a report, about which atlas, and who may
@@ -609,6 +629,14 @@ module OpenGeographiesPlatform
       sparse = '<kml xmlns="http://www.opengis.net/kml/2.2"><Document>' +
                (0...600).map { |i| "<Placemark><name>P#{i}</name><ExtendedData><Data name=\"k#{i}\"><value>x</value></Data></ExtendedData></Placemark>" }.join +
                '</Document></kml>'
+      # A KMZ's image overlays are listed for the import to add as map layers.
+      overlays_fixture = OpenGeographiesPlatform::Engine.root.join('test/fixtures/datasets/savannah_overlays.kmz')
+      if File.exist?(overlays_fixture)
+        res = upload("#{project}/dataset_imports/preview", 'savannah_overlays.kmz', File.binread(overlays_fixture), token, content_type: 'application/vnd.google-earth.kmz')
+        overlays = Array(body(res).dig('dataset_import', 'overlays'))
+        check 'a KMZ\'s image overlays are listed (two with their image, one without)', res.code == '200' && overlays.count { |o| o['usable'] } == 2 && overlays.size == 3,
+              "#{res.code} #{overlays.map { |o| [o['name'], o['usable']] }.inspect}"
+      end
       started = Time.now
       res = upload("#{project}/dataset_imports/preview", 'sparse.kml', sparse, token, content_type: 'application/vnd.google-earth.kml+xml')
       check 'a KML with more than 500 columns is refused, at once', res.code == '422' && res.body.include?('500 columns') && Time.now - started < 5,
