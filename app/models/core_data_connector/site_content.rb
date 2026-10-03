@@ -58,6 +58,9 @@ module CoreDataConnector
     MAX_SECTIONS = 30
     MAX_MARKDOWN = 50_000
     MAX_STRING = 1_000
+    # All of it, every language, as stored: far above any real atlas (a few
+    # KB), and it keeps the public bundle and each History version bounded.
+    MAX_BYTES = 2 * 1024 * 1024
 
     SLUG_FORMAT = /\A[a-z0-9][a-z0-9-]*\z/
 
@@ -107,6 +110,12 @@ module CoreDataConnector
     # Messages for everything that can't be saved, phrased for the curator.
     def errors
       errors = []
+
+      size = @document.to_json.bytesize
+      if size > MAX_BYTES
+        return ["The atlas's pages are too large to save (#{(size / 1024.0 / 1024).round(1)} MB in all, at most " \
+                "#{MAX_BYTES / (1024 * 1024)} MB). Shorten or remove some pages, or link to longer texts."]
+      end
 
       home = @document['home']
       pages = @document['pages']

@@ -55,8 +55,9 @@ where they meet these. Today's reference deployment is the demo stack in [`demo/
   DNS, connecting late arrivals and disconnecting domains whose DNS moved away.
 - [ ] **Atlas history** (`core_data_connector_site_versions`, the console's History tab) is in the
   host's database: back it up with the rest (5). Each atlas keeps its last 100 versions and its
-  first, each a JSON copy of its pages and settings (a few KB to a few hundred KB), so the table
-  stays small.
+  first, each a JSON copy of its pages and settings: a few KB for a typical atlas (the rehearsal
+  atlases are 2–5 KB). Pages are capped at 2 MB in all, so the worst case is about 200 MB for one
+  atlas.
 - [ ] **Curator feedback** ("Send feedback" in the console) is always kept in the host's
   database and listed for FairData administrators at `/atlases/feedback`. To have each report
   emailed as well, set `OG_FEEDBACK_EMAIL` (comma-separated addresses). Mail goes through the
