@@ -32,6 +32,10 @@ module CoreDataConnector
       # something else (or keys that differ per row, as in a map export of
       # OpenStreetMap tags), and every column would become a field.
       MAX_COLUMNS = 500
+      # Rows × columns read at once. A table's file size bounds it already;
+      # KML and GeoJSON can give each place its own fields, mostly empty
+      # (50,000 placemarks over 495 fields took 21 s and 770 MB to preview).
+      MAX_CELLS = 5_000_000
 
       CSV_EXTENSIONS = %w[.csv .tsv .txt].freeze
       GEOJSON_EXTENSIONS = %w[.geojson .json].freeze
@@ -117,6 +121,14 @@ module CoreDataConnector
 
         raise Invalid, "The file has more than #{MAX_COLUMNS} columns; keep the ones the atlas needs (name, location, " \
                        'category and a few fields) and upload that.'
+      end
+
+      def check_cell_limit!(rows, columns)
+        return if rows * columns <= MAX_CELLS
+
+        raise Invalid, "The file's #{rows.to_fs(:delimited)} places have #{columns.to_fs(:delimited)} different fields between them " \
+                       '(most empty for any one place) — more than the upload reads at once. Keep the fields the atlas needs, ' \
+                       'or split the file, and upload that.'
       end
 
       # Unique, non-blank column names: an empty header becomes "Column 3",

@@ -137,6 +137,7 @@ module CoreDataConnector
         raise Invalid, 'The file has no placemarks (KML places), so there is nothing to import.' if @rows.empty?
 
         build_columns
+        check_cell_limit!(@rows.size, @columns.size)
         build_warnings
       end
 

@@ -48,6 +48,7 @@ module CoreDataConnector
           check_column_limit!(columns.size)
         end
         @columns = columns.keys
+        check_cell_limit!(@features.size, @columns.size)
       rescue JSON::ParserError => e
         raise Invalid, "The file is not valid JSON: #{e.message.truncate(160)}"
       end
