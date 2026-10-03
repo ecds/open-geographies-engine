@@ -159,10 +159,12 @@ const FeedbackDialog = ({ onClose, prefill, site }) => {
                 <Button onClick={() => setScreenshot(null)} subtle>Remove</Button>
               </div>
             ) : (
-              <div className='row'>
-                <Button onClick={() => fileInput.current?.click()}>Add a screenshot…</Button>
-                <span className='muted'>or paste one here (⌘V / Ctrl+V). PNG, JPEG or WebP, up to 10 MB.</span>
-              </div>
+              <>
+                <div>
+                  <Button onClick={() => fileInput.current?.click()}>Add a screenshot…</Button>
+                </div>
+                <span className='field-hint'>Or paste one here (⌘V / Ctrl+V). PNG, JPEG or WebP, up to 10 MB.</span>
+              </>
             )}
             <input
               accept={SCREENSHOT_TYPES.join(',')}

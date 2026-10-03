@@ -11,6 +11,8 @@ import { explain } from '../components/ReindexStatus';
 const JOB_LABELS = {
   provision_atlas: 'Provision atlas',
   import_places: 'Import places',
+  import_dataset: 'Import a file',
+  copy_photos: 'Copy photos',
   reindex: 'Reindex search',
   build_tiles: 'Build map tiles'
 };
