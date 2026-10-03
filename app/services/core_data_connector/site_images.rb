@@ -113,13 +113,25 @@ module CoreDataConnector
     # Opaque crops are stored as JPEG, transparent ones as PNG (lossless: a
     # logo's edges). Raises Error with a message for the curator.
     def self.crop(site, original, x:, y:, width:, height:)
+      # Checked here, outside crop_with_vips: without libvips there's no Vips
+      # constant, and evaluating its `rescue Vips::Error` would raise a
+      # NameError in place of this message.
       raise Error, 'Images can\'t be cropped on this server (libvips isn\'t available).' unless available?
       raise Error, 'Only JPEG, PNG, WebP and AVIF images can be cropped.' unless RESIZABLE_TYPES.include?(original.content_type)
 
+      crop_with_vips(site, original, x:, y:, width:, height:)
+    end
+
+    def self.crop_with_vips(site, original, x:, y:, width:, height:)
       original.open do |file|
         header = Vips::Image.new_from_file(file.path, access: :sequential, fail_on: :error)
         check_pixels!(header)
         raise Error, 'Animated images can\'t be cropped.' if animated?(header)
+
+        # Decode it all once, strictly, as an upload does: thumbnail only
+        # warns about a truncated file and would crop a half-grey picture
+        # (an original stored before libvips was there was never checked).
+        header.avg
 
         full_width, full_height = upright_size(header)
         unless [x, y, width, height].all?(Integer) && x >= 0 && y >= 0 && width >= MIN_CROP && height >= MIN_CROP &&
@@ -399,6 +411,6 @@ module CoreDataConnector
       end
     end
 
-    private_class_method :build, :store, :upright_size, :animated?, :upright_srgb, :transparent?, :encode
+    private_class_method :build, :store, :upright_size, :animated?, :upright_srgb, :transparent?, :encode, :crop_with_vips
   end
 end

@@ -175,12 +175,15 @@ module CoreDataConnector
       attachment = site.assets_attachments.joins(:blob).find_by(active_storage_blobs: { key: params[:key] })
       return head :not_found unless attachment
 
-      rect = %i[x y width height].to_h { |key| [key, Integer(params[key].to_s, 10)] }
+      rect = begin
+        %i[x y width height].to_h { |key| [key, Integer(params[key].to_s, 10)] }
+      rescue ArgumentError
+        return render json: { errors: [{ base: 'The crop needs whole-pixel x, y, width and height.' }] }, status: :unprocessable_entity
+      end
+
       blob = SiteImages.crop(site, attachment.blob, **rect)
 
       render json: { asset: asset_json(blob) }, status: :ok
-    rescue ArgumentError
-      render json: { errors: [{ base: 'The crop needs whole-pixel x, y, width and height.' }] }, status: :unprocessable_entity
     rescue SiteImages::Error => e
       render json: { errors: [{ base: e.message }] }, status: :unprocessable_entity
     end
