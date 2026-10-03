@@ -288,6 +288,9 @@ keeps it:
 | Favicon | Square |
 | Logo, section images, partner logos | Any shape |
 
+Images placed inside page text (with the text box's **Image** button) are listed under the box with
+their own **Crop…**; the cropped copy replaces the image in the text.
+
 **Save cropped copy** adds the cropped image to your images and uses it there; the original stays, so
 you can crop it again differently. Cropping a cropped image starts from its original at the earlier
 frame. When an image's shape doesn't match where it's used, the field says so ("This image is 3:2;

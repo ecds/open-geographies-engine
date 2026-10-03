@@ -419,3 +419,9 @@ td .status-pill { margin-left: 0; }
 }
 
 .translated-page .h-sub { margin: 0; }
+
+/* Markdown fields: the uploaded images the text shows, with Crop… */
+.markdown-images { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 6px; }
+.markdown-images .field-hint { margin: 0; }
+.markdown-image { display: inline-flex; align-items: center; gap: 6px; }
+.markdown-image img { width: 48px; height: 36px; object-fit: cover; border-radius: 4px; border: 1px solid var(--og-border); }

@@ -81,6 +81,20 @@ export const AssetPicker = ({ assets, onCancel, onPick, onUpload }) => {
 };
 
 /**
+ * What Crop… opens for an uploaded image (an asset): an earlier crop
+ * reopens its original at the earlier frame, when the original is still in
+ * the library; an image the server can crop opens as itself; else nothing
+ * (an https:// address, a GIF or SVG, an upload without known size).
+ */
+export const cropTargetFor = (asset, assets) => {
+  const croppable = (candidate) => candidate && CROPPABLE_TYPES.includes(candidate.content_type) && candidate.width && candidate.height;
+  const source = asset?.cropped_from ? _.findWhere(assets, { key: asset.cropped_from.from }) : null;
+
+  if (croppable(source)) return { asset: source, initial: asset.cropped_from };
+  return croppable(asset) ? { asset } : null;
+};
+
+/**
  * Text that reads on a hex background (the logo previewed on the header's
  * color): white on dark, the console's text color on light.
  */
@@ -124,13 +138,9 @@ const ImageField = ({ alt, assets, background, crop = {}, hint, label, onAltChan
   // An uploaded image previews from its small copy.
   const preview = current?.thumbnail_path || value;
 
-  // Cropping an earlier crop starts again from its original, at the earlier
-  // frame, when the original is still in the library.
-  const croppable = (asset) => asset && CROPPABLE_TYPES.includes(asset.content_type) && asset.width && asset.height;
-  const source = current?.cropped_from ? _.findWhere(assets, { key: current.cropped_from.from }) : null;
-  const target = croppable(source) ? { asset: source, initial: current.cropped_from } : (croppable(current) ? { asset: current } : null);
+  const target = cropTargetFor(current, assets);
 
-  const mismatch = crop.aspect && croppable(current) &&
+  const mismatch = crop.aspect && current && CROPPABLE_TYPES.includes(current.content_type) && current.width && current.height &&
     Math.abs(current.width / current.height - crop.aspect) / crop.aspect > 0.03;
 
   return (

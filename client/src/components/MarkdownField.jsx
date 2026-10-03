@@ -1,7 +1,13 @@
 import { micromark } from 'micromark';
 import { gfm, gfmHtml } from 'micromark-extension-gfm';
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { AssetPicker } from './ImageField';
+import { useContext, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import _ from 'underscore';
+import ImageCropper, { ImageCropContext } from './ImageCropper';
+import { AssetPicker, cropTargetFor } from './ImageField';
+import { Button } from './ui';
+
+// ![description](address "optional title")
+const IMAGE = /!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
 
 /**
  * Page text in Markdown: a textarea with a small formatting toolbar and a
@@ -12,7 +18,38 @@ import { AssetPicker } from './ImageField';
 const MarkdownField = ({ assets, hint, label, onChange, onUpload, rows = 8, value }) => {
   const [preview, setPreview] = useState(false);
   const [picking, setPicking] = useState(false);
+  const [cropping, setCropping] = useState(null);
+  const cropAsset = useContext(ImageCropContext);
   const textarea = useRef();
+
+  // The uploaded images this text shows, each croppable as in an image
+  // field; the crop's new address replaces the old one in the text.
+  const images = useMemo(() => {
+    if (!cropAsset) return [];
+
+    const found = _.uniq([...(value || '').matchAll(IMAGE)].map((match) => ({ alt: match[1], path: match[2] })), false, (image) => image.path);
+    return _.compact(_.map(found, ({ alt, path }) => {
+      const asset = _.findWhere(assets, { path });
+      const target = asset && cropTargetFor(asset, assets);
+      return target && { alt, asset, path, target };
+    }));
+  }, [assets, cropAsset, value]);
+
+  // The new address in place of the old; focus goes back to the text with
+  // the image's markup selected (the Crop… button that opened the cropper
+  // belonged to the old address and is gone).
+  const onCropped = (asset) => {
+    const next = (value || '').split(`](${cropping.path}`).join(`](${asset.path}`);
+    const at = next.indexOf(`](${asset.path}`);
+    const start = next.lastIndexOf('![', at);
+
+    if (at >= 0 && start >= 0) {
+      pendingSelection.current = [start, next.indexOf(')', at + 2 + asset.path.length) + 1];
+    }
+
+    onChange(next);
+    setCropping(null);
+  };
 
   // The selection to restore once an edit has rendered. Restored in a layout
   // effect (right after React writes the new value, before anything else can
@@ -128,6 +165,26 @@ const MarkdownField = ({ assets, hint, label, onChange, onUpload, rows = 8, valu
             />
           )}
       </div>
+      { !preview && !_.isEmpty(images) && (
+        <div className='markdown-images'>
+          <span className='field-hint'>Images in this text:</span>
+          { _.map(images, (image) => (
+            <span className='markdown-image' key={image.path}>
+              <img alt='' src={image.asset.thumbnail_path || image.path} />
+              <Button aria-label={`Crop ${image.alt || image.asset.filename}`} onClick={() => setCropping(image)} subtle>Crop…</Button>
+            </span>
+          ))}
+        </div>
+      )}
+      { cropping && (
+        <ImageCropper
+          asset={cropping.target.asset}
+          initial={cropping.target.initial}
+          label={cropping.alt || `${label}: image`}
+          onCancel={() => setCropping(null)}
+          onCropped={onCropped}
+        />
+      )}
       { hint && <span className='field-hint'>{ hint }</span> }
     </div>
   );
