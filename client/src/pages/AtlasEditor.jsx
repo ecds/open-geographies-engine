@@ -69,14 +69,21 @@ const LAYER_TYPE_LABELS = {
   raster: 'Raster tiles',
   pmtiles: 'PMTiles archive',
   geojson: 'GeoJSON',
-  georeference: 'Historic map (Allmaps)'
+  georeference: 'Historic map (Allmaps)',
+  image: 'Image on the map (from a KML file)'
 };
+// Overlays whose opacity the atlas applies; unset, a georeferenced map draws
+// at half (the modern map shows through) and the others fully — as the
+// renderer does (utils/overlays.ts). Visitors can change it on the map.
+const OPACITY_TYPES = ['raster', 'georeference', 'image', 'pmtiles'];
+const defaultOpacity = (layer) => (layer.layer_type === 'georeference' ? 0.5 : 1);
 const LAYER_URL_LABELS = {
   vector: 'Style address',
   raster: 'Tile address ({z}/{x}/{y})',
   pmtiles: 'Archive address (.pmtiles)',
   geojson: 'GeoJSON address',
-  georeference: 'Allmaps annotation address'
+  georeference: 'Allmaps annotation address',
+  image: 'Image address'
 };
 // How a search shows its results (the renderer's search `type`); no type
 // is the map, offered as the select's empty choice.
@@ -651,10 +658,18 @@ const AtlasEditor = ({ id, navigate }) => {
               <input className='input' onChange={(e) => updateLayer(index, { name: e.target.value })} value={layer.name || ''} />
             </Field>
             <Field label='Type'>
-              <Select onChange={(v) => updateLayer(index, { layer_type: v })} options={_.map(LAYER_TYPES, (t) => ({ value: t, text: LAYER_TYPE_LABELS[t] }))} placeholder='Select a type' value={layer.layer_type || ''} />
+              <Select
+                onChange={(v) => updateLayer(index, { layer_type: v })}
+                options={_.map(layer.layer_type === 'image' ? [...LAYER_TYPES, 'image'] : LAYER_TYPES, (t) => ({ value: t, text: LAYER_TYPE_LABELS[t] }))}
+                placeholder='Select a type'
+                value={layer.layer_type || ''}
+              />
             </Field>
           </div>
-          <Field label={LAYER_URL_LABELS[layer.layer_type] || 'Address'}>
+          <Field
+            hint={layer.layer_type === 'image' ? 'Laid on the map where the KML file put it (its four corners come from the file).' : undefined}
+            label={LAYER_URL_LABELS[layer.layer_type] || 'Address'}
+          >
             <input className='input' onChange={(e) => updateLayer(index, { url: e.target.value })} value={layer.url || ''} />
           </Field>
           { layer.overlay === true && (
@@ -678,9 +693,20 @@ const AtlasEditor = ({ id, navigate }) => {
               />
             </div>
           )}
-          { layer.layer_type === 'georeference' && (
-            <Field label={`Opacity: ${Math.round((layer.opacity ?? 1) * 100)}%`}>
-              <input max='1' min='0.2' onChange={(e) => updateLayer(index, { opacity: Number(e.target.value) })} step='0.05' type='range' value={layer.opacity ?? 1} />
+          { layer.overlay === true && OPACITY_TYPES.includes(layer.layer_type) && (
+            <Field
+              hint='How opaque it draws at first; visitors can change it from the map’s layers button.'
+              label={`Opacity: ${Math.round((layer.opacity ?? defaultOpacity(layer)) * 100)}%`}
+            >
+              <input
+                aria-label='Opacity'
+                max='1'
+                min='0.2'
+                onChange={(e) => updateLayer(index, { opacity: Number(e.target.value) })}
+                step='0.05'
+                type='range'
+                value={layer.opacity ?? defaultOpacity(layer)}
+              />
             </Field>
           )}
           <div className='row'>

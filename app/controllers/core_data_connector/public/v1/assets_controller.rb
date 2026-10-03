@@ -37,6 +37,9 @@ module CoreDataConnector
           response.headers['X-Content-Type-Options'] = 'nosniff'
           response.headers['Content-Security-Policy'] = "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox"
           response.headers['Cross-Origin-Resource-Policy'] = 'cross-origin'
+          # Public images, readable by the map from the atlas's own origin
+          # (a KML overlay is drawn on a canvas, which needs CORS).
+          response.headers['Access-Control-Allow-Origin'] = '*'
           expires_in 1.year, public: true, immutable: true
 
           return unless stale?(etag: blob.checksum, public: true)

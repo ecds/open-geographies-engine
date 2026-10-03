@@ -46,7 +46,7 @@ module CoreDataConnector
           rows = []
           reader.each_row { |row| rows << row }
 
-          run(job, model, columns, reader.format, rows)
+          run(job, model, columns, reader.format, rows, reader)
         end
       rescue StandardError => error
         log_error error
@@ -57,7 +57,7 @@ module CoreDataConnector
 
     private
 
-    def run(job, model, columns, format, rows)
+    def run(job, model, columns, format, rows, reader = nil)
       @job = job
       @model = model
       @columns = columns
@@ -118,6 +118,8 @@ module CoreDataConnector
       # photos an earlier run couldn't.
       copy = queue_copy_photos
 
+      add_overlays(reader) if reader.respond_to?(:overlays)
+
       job.update(
         status: Job::JOB_STATUS_COMPLETED,
         extra: job.extra.merge(
@@ -132,7 +134,9 @@ module CoreDataConnector
           'problems' => @problems.presence,
           'geocode_error' => @geocode_error,
           'reindex_job_id' => reindex&.id,
-          'copy_photos_job_id' => copy&.id
+          'copy_photos_job_id' => copy&.id,
+          'overlays_added' => @overlays_added.presence,
+          'overlay_problems' => @overlay_problems.presence
         ).compact
       )
     end
@@ -484,6 +488,108 @@ module CoreDataConnector
         extra: @job.extra.merge('progress' => { 'completed' => completed, 'total' => total }),
         updated_at: Time.current
       )
+    end
+
+    # --- KML image overlays ----------------------------------------------------
+
+    OVERLAY_TYPES = %w[image/jpeg image/png image/webp image/gif image/tiff].freeze
+    # Wider than this, the layer draws the largest web-sized copy (a map
+    # texture past 4096 px fails on many screens; the copies stop at 2000).
+    OVERLAY_MAX_WIDTH = 4096
+
+    # A KML/KMZ's GroundOverlays (a scanned map or plan laid over the earth):
+    # each image stored with the atlas's images (with its copies) and added to
+    # the atlas's map layers as an image layer on its four corners — dated as
+    # the overlay was, as transparent as the file drew it. Unless the curator
+    # unticked it (`overlays: false`). A re-run leaves a layer it added from
+    # the same image alone, so nothing doubles.
+    def add_overlays(reader)
+      return if @job.extra['overlays'] == false
+
+      overlays = reader.overlays.select { |overlay| overlay[:source] && overlay[:corners] }
+      sites = Site.where(project_id: @model.project_id).to_a
+      return if overlays.empty? || sites.empty?
+
+      @overlays_added = []
+      @overlay_problems = []
+
+      overlays.each do |overlay|
+        pending = sites.reject { |site| overlay_layer?(site, overlay) }
+        next if pending.empty?
+
+        download = overlay_file(reader, overlay)
+        pending.each do |site|
+          blob = SiteImages.upload(site, download[:path], filename: download[:filename], content_type: download[:content_type])
+          add_overlay_layer!(site, overlay, blob)
+        end
+        @overlays_added << overlay[:name]
+      rescue RemoteFiles::Error, SiteImages::Error, OverlayError => e
+        @overlay_problems << { 'name' => overlay[:name], 'message' => e.message }
+      ensure
+        download&.dig(:file)&.close!
+      end
+    end
+
+    class OverlayError < StandardError; end
+
+    # The overlay's image as a temp file: read from the KMZ, or fetched from
+    # the web (RemoteFiles: public addresses only), its type from its bytes.
+    def overlay_file(reader, overlay)
+      file = Tempfile.new(['og-overlay', File.extname(overlay[:href].to_s)], binmode: true)
+
+      if overlay.dig(:source, :entry)
+        bytes = reader.overlay_image(overlay)
+        raise OverlayError, "its image couldn't be read from the KMZ (or is over #{DatasetImports::KmlReader::MAX_OVERLAY_IMAGE_BYTES / 1.megabyte} MB)" unless bytes
+
+        file.write(bytes)
+        file.flush
+      else
+        remote = RemoteFiles.fetch(overlay.dig(:source, :url))
+        IO.copy_stream(remote.file.path, file.path)
+        remote.close!
+      end
+
+      content_type = Marcel::MimeType.for(Pathname.new(file.path))
+      raise OverlayError, 'its image is not a JPEG, PNG, WebP, GIF or TIFF' unless OVERLAY_TYPES.include?(content_type)
+
+      stem = overlay[:name].parameterize.presence || 'overlay'
+      { file:, path: file.path, content_type:, filename: "#{stem}#{File.extname(overlay[:href].to_s).presence || '.jpg'}" }
+    rescue StandardError
+      file&.close!
+      raise
+    end
+
+    # True when the site has a layer this importer added from the same image.
+    def overlay_layer?(site, overlay)
+      names = [overlay[:name], "#{overlay[:name]} (KML)"]
+      Array(site.config&.dig('layers')).any? { |layer| layer['generated'] == 'kml' && layer['kml_href'] == overlay[:href] && names.include?(layer['name']) }
+    end
+
+    def add_overlay_layer!(site, overlay, blob)
+      largest = SiteImages.variant_entries(blob).max_by { |entry| entry['width'].to_i }
+      wide = blob.metadata['width'].to_i > OVERLAY_MAX_WIDTH && largest
+      url = wide ? Site.asset_path_for(largest['key'], largest['filename']) : Site.asset_path(blob)
+
+      site.with_lock do
+        config = (site.config || {}).deep_dup
+        layers = Array(config['layers'])
+        taken = layers.any? { |layer| layer['name'] == overlay[:name] }
+
+        layers << {
+          'name' => taken ? "#{overlay[:name]} (KML)" : overlay[:name],
+          'layer_type' => 'image',
+          'url' => url,
+          'coordinates' => overlay[:corners],
+          'overlay' => true,
+          'opacity' => overlay[:opacity],
+          'start_year' => overlay[:start_year],
+          'end_year' => overlay[:end_year] == overlay[:start_year] ? nil : overlay[:end_year],
+          'generated' => 'kml',
+          'kml_href' => overlay[:href]
+        }.compact
+
+        SiteVersion::Context.set(user: @job.user, source: 'import') { site.update!(config: config.merge('layers' => layers)) }
+      end
     end
 
     def queue_copy_photos

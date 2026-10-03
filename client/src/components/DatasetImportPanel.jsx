@@ -155,6 +155,8 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
   const [geocodeConfig, setGeocodeConfig] = useState({});
   const [geocodeResult, setGeocodeResult] = useState(null);
   const [useGeocode, setUseGeocode] = useState(false);
+  // A KML's image overlays become map layers (untick to leave them out).
+  const [addOverlays, setAddOverlays] = useState(true);
 
   const job = useJobPolling(jobId);
   const importing = !!jobId;
@@ -231,11 +233,12 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
       blob_id: preview.blob_id,
       project_model_id: preview.project_model_id,
       columns: _.map(columns, (c) => _.pick(c, 'name', 'role', 'label', 'data_type', 'capitalize', 'copy')),
-      geocode: useGeocode && geocodeResult ? _.pick(geocodeConfig, (value) => value === true || (_.isString(value) && value !== '')) : undefined
+      geocode: useGeocode && geocodeResult ? _.pick(geocodeConfig, (value) => value === true || (_.isString(value) && value !== '')) : undefined,
+      overlays: _.some(preview.overlays, (o) => o.usable) ? addOverlays : undefined
     })
       .then((data) => setJobId(data.job.id))
       .catch((error) => setErrors(errorMessages(error)));
-  }, [columns, geocodeConfig, geocodeResult, preview, projectId, useGeocode]);
+  }, [addOverlays, columns, geocodeConfig, geocodeResult, preview, projectId, useGeocode]);
 
   useEffect(() => {
     if (!job || !isTerminal(job.status)) {
@@ -417,7 +420,9 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
       dates_added: dated,
       hidden_fields: hidden,
       problems: rowProblems,
-      geocode_error: geocodeError
+      geocode_error: geocodeError,
+      overlays_added: overlaysAdded,
+      overlay_problems: overlayProblems
     } = result.extra || {};
 
     return (
@@ -440,6 +445,10 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
         { !_.isEmpty(searched) && <p className='muted'>The atlas’s search now also looks in: { searched.join(', ') }</p> }
         { !_.isEmpty(dated) && <p className='muted'>Visitors can now filter and sort by: { dated.join(', ') } (change in Settings → Search → Time)</p> }
         { !_.isEmpty(hidden) && <p className='muted'>Hidden on public pages: { hidden.join(', ') } (change in Settings → Detail pages)</p> }
+        { !_.isEmpty(overlaysAdded) && <p className='muted'>Added to the map layers: { overlaysAdded.join(', ') } (change in Settings → Map layers)</p> }
+        { !_.isEmpty(overlayProblems) && (
+          <Message header='Image overlays not added' list={_.map(overlayProblems, (p) => `${p.name}: ${p.message}`)} tone='warning' />
+        )}
         { !_.isEmpty(rowProblems) && <Message header='Rows to check' list={rowProblems} tone='warning' /> }
         { result.status === JobStatuses.completed && counts.imported > 0 && (
           result.extra?.reindex_job_id
@@ -481,6 +490,19 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
             { geometryCounts.invalid > 0 && <Stat label='Unusable location' tone='negative' value={geometryCounts.invalid} /> }
           </div>
           { !_.isEmpty(preview.warnings) && <Message list={preview.warnings} tone='warning' /> }
+          { _.some(preview.overlays, (o) => o.usable) && (
+            <div className='field'>
+              <label className='check'>
+                <input checked={addOverlays} onChange={(e) => setAddOverlays(e.target.checked)} type='checkbox' />
+                Add the image overlays to the atlas’s map layers
+              </label>
+              <span className='field-hint'>
+                { _.map(_.filter(preview.overlays, (o) => o.usable), (o) => (o.start_year ? `${o.name} (${o.start_year})` : o.name)).join(', ') }:
+                each image is stored with the atlas’s images and laid on the map where the file puts it. Visitors can show it
+                and fade it from the map’s layers button; dated ones join the year slider.
+              </span>
+            </div>
+          )}
           { !_.isEmpty(preview.geometry?.problems) && (
             <Message header='Rows whose location can’t be used (they import without one)' list={preview.geometry.problems} tone='warning' />
           )}

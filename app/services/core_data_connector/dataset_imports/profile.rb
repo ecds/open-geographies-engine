@@ -122,11 +122,28 @@ module CoreDataConnector
           'geocoding' => summary['counts']['missing'].positive? && Geocoder.available? ? {
             'provider' => Geocoder::PROVIDER,
             'suggested' => Geocoder.suggest(columns)
-          } : nil
+          } : nil,
+          # A KML's image overlays, which the import adds as map layers.
+          'overlays' => overlays
         }.compact
       end
 
       private
+
+      def overlays
+        return nil unless reader.respond_to?(:overlays) && reader.overlays.any?
+
+        reader.overlays.map do |overlay|
+          {
+            'name' => overlay[:name],
+            'image' => if overlay[:source].nil? then 'missing' else (overlay.dig(:source, :entry) ? 'in the file' : 'on the web') end,
+            'corners' => overlay[:corners],
+            'start_year' => overlay[:start_year],
+            'end_year' => overlay[:end_year],
+            'usable' => overlay[:source].present? && overlay[:corners].present?
+          }.compact
+        end
+      end
 
       def column_stats(columns, rows)
         columns.to_h do |column|

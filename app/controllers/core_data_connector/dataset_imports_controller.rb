@@ -139,7 +139,7 @@ module CoreDataConnector
       project = Project.find(params[:project_id])
       authorize project, :import?, policy_class: AtlasProjectPolicy
 
-      attributes = params.require(:dataset_import).permit(:blob_id, :project_model_id, columns: [:name, :role, :label, :data_type, :capitalize, :copy])
+      attributes = params.require(:dataset_import).permit(:blob_id, :project_model_id, :overlays, columns: [:name, :role, :label, :data_type, :capitalize, :copy])
       model = place_model(project, attributes[:project_model_id])
       blob = ActiveStorage::Blob.find_signed(attributes[:blob_id])
 
@@ -161,6 +161,8 @@ module CoreDataConnector
       geocode = geocode_params
       extra = { 'filename' => blob.filename.to_s, 'project_model_id' => model.id, 'columns' => columns }
       extra['geocode'] = geocode if DatasetImports::Geocoder.usable?(geocode)
+      # A KML's image overlays become map layers unless the curator unticked it.
+      extra['overlays'] = false if attributes.key?(:overlays) && ActiveModel::Type::Boolean.new.cast(attributes[:overlays]) == false
 
       job = Job.new(
         project_id: project.id,

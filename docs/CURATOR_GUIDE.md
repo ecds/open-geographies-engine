@@ -96,10 +96,13 @@ Choose your file and **Preview**. Nothing is imported until you review it and pr
   *Data* in Google Earth's "Get Info" (ExtendedData) as a column of its own. A placemark's time
   (TimeStamp or TimeSpan) becomes a **Dates** column ("1819–1886"). The folder each placemark is in
   becomes a **Folder** column, proposed as the category when folders sort the places into kinds
-  ("Churches", "Squares"); choose **Don't import** if they don't. Image overlays (a scanned map laid
-  over Google Earth) are not imported — add a scanned map under
-  [Historic maps](#12-map-layers-and-historic-maps) instead — and network links to files on the web
-  are not followed; the preview says when a file has either. A KMZ that links to its own layers
+  ("Churches", "Squares"); choose **Don't import** if they don't. **Image overlays** (a scanned map
+  or plan laid over Google Earth, a GroundOverlay) become map layers: the preview lists them with
+  **Add the image overlays to the atlas's map layers** ticked; each image is stored with the atlas's
+  images and laid on the map where the file puts it, as transparent as the file drew it, dated when
+  the file dates it (so it joins the year slider). Save the project as a **KMZ** so the images travel
+  with it; an overlay whose image isn't in the upload is listed and left out. Network links to files
+  on the web are not followed; the preview says so. A KMZ that links to its own layers
   inside the zip (as GDAL and QGIS write them) is read whole. A single shape larger than 25 MB as written, or a
   file with more than 3 million points in its shapes, is refused with steps to simplify it in QGIS.
 - **Converting other files:**
@@ -350,7 +353,8 @@ the scan to the same places on today's map. Under **Settings → Map layers → 
 3. If it isn't georeferenced yet, or Allmaps can't look the address up, choose **Open in the Allmaps
    Editor**. Place your points there, then paste the Allmaps link it gives you.
 
-Visitors switch historic maps on and off with the layers button on the map.
+Visitors switch historic maps on and off with the layers button on the map, and fade each one with
+its **Opacity** slider there to read the modern streets beneath.
 
 **Maps from different years.** Give each map its **Year** in the **Layers** list below (when you
 add a historic map, a year in its title is filled in for you; **Until** is for a map that stands
@@ -361,8 +365,11 @@ The map marked **Visible by default** is where the slider starts.
 ### Other layers
 
 The **Layers** list below holds the base maps visitors choose from and any other overlays: map
-tiles, a PMTiles archive, GeoJSON. Each has a name, a type, its address, and whether it's an
-**Overlay** and **Visible by default**.
+tiles, a PMTiles archive, GeoJSON, and images laid on the map from a KML/KMZ upload. Each has a
+name, a type, its address, and whether it's an **Overlay** and **Visible by default**. An overlay
+of map tiles, a historic map, a PMTiles archive or a KML image also has an **Opacity**: how it draws
+when the map opens (a historic map starts at 50% unless you set it). Visitors can change it from
+the layers button.
 
 ## 13. Languages
 

@@ -31,7 +31,10 @@ module CoreDataConnector
     # DTDs: a file declaring one is refused (KML never does), and entities are
     # never expanded. In a KMZ, network links to other .kml files inside the
     # same zip are followed (GDAL writes one file per layer that way); links to
-    # the web are not, and image overlays are skipped — each with a warning.
+    # the web are not, with a warning. GroundOverlays (a scanned map or plan
+    # laid over the earth) are collected as `overlays` — name, image, corners,
+    # years, opacity — for the import to add as map layers; Screen and Photo
+    # overlays are skipped with a warning.
     class KmlReader < Reader
       PARSE_OPTIONS = Nokogiri::XML::ParseOptions::STRICT | Nokogiri::XML::ParseOptions::NONET
       FRAGMENT_OPTIONS = Nokogiri::XML::ParseOptions::RECOVER | Nokogiri::XML::ParseOptions::NONET
@@ -58,7 +61,9 @@ module CoreDataConnector
       # Network links followed inside a KMZ, nested.
       MAX_LINK_DEPTH = 5
 
-      OVERLAYS = %w[GroundOverlay ScreenOverlay PhotoOverlay].freeze
+      OTHER_OVERLAYS = %w[ScreenOverlay PhotoOverlay].freeze
+      # An overlay's image, read from the KMZ for the map layer.
+      MAX_OVERLAY_IMAGE_BYTES = 50 * 1024 * 1024
       BLOCK_TAGS = %w[p div li tr h1 h2 h3 h4 h5 h6 blockquote table ul ol dl dt dd pre].freeze
 
       class LimitedStream
@@ -89,6 +94,34 @@ module CoreDataConnector
       def warnings
         load!
         @warnings
+      end
+
+      # The GroundOverlays: [{ name:, folder:, href:, source: { entry: } (in the
+      # KMZ) | { url: } (on the web) | nil (not in the upload), corners: [top
+      # left, top right, bottom right, bottom left] as [lon, lat] or nil,
+      # start_year:, end_year:, opacity: }].
+      def overlays
+        load!
+        @overlays
+      end
+
+      # The bytes of an overlay's image inside the KMZ, or nil.
+      def overlay_image(overlay)
+        name = overlay.dig(:source, :entry)
+        return nil unless @kmz && name
+
+        Zip::File.open(path) do |zip|
+          entry = zip.find_entry(name)
+          return nil unless entry && entry.size <= MAX_OVERLAY_IMAGE_BYTES
+
+          stream = entry.get_input_stream
+          bytes = stream.read(MAX_OVERLAY_IMAGE_BYTES + 1)
+          bytes && bytes.bytesize <= MAX_OVERLAY_IMAGE_BYTES ? bytes : nil
+        ensure
+          stream&.close
+        end
+      rescue Zip::Error
+        nil
       end
 
       # Each row's properties are built as it's yielded: the rows are kept
@@ -122,6 +155,7 @@ module CoreDataConnector
         @rows = []
         @data_columns = {} # an ordered set of ExtendedData keys
         @counts = Hash.new(0)
+        @overlays = []
         @unpacked = 0
         @positions = 0
         @placemark_start = nil
@@ -212,8 +246,11 @@ module CoreDataConnector
           when 'NetworkLink'
             network_link(fragment(node), current, entry, depth)
             skip_to = node.depth unless node.empty_element?
-          when *OVERLAYS
-            @counts[:overlays] += 1
+          when 'GroundOverlay'
+            @overlays << ground_overlay(fragment(node), current, entry)
+            skip_to = node.depth unless node.empty_element?
+          when *OTHER_OVERLAYS
+            @counts[:other_overlays] += 1
             skip_to = node.depth unless node.empty_element?
           end
         end
@@ -479,6 +516,84 @@ module CoreDataConnector
         end
       end
 
+      # --- overlays ------------------------------------------------------------
+
+      def ground_overlay(element, folder, entry)
+        href = clean(child(child(element, 'Icon'), 'href')&.text)
+        dates = (value = time_text(element)) && Values.fuzzy_date(value)
+        dates = nil if dates == :invalid
+
+        {
+          name: clean(child(element, 'name')&.text) || "Overlay #{@overlays.size + 1}",
+          folder:,
+          href:,
+          source: overlay_source(href, entry),
+          corners: overlay_corners(element),
+          start_year: dates && Date.parse(dates['start_date']).year,
+          end_year: dates && dates['end_date'] && Date.parse(dates['end_date']).year,
+          opacity: overlay_opacity(child(element, 'color')&.text)
+        }
+      end
+
+      def overlay_source(href, entry)
+        return nil if href.nil?
+        return { url: href } if href.match?(%r{\Ahttps?://}i)
+        return nil unless @kmz
+
+        target = resolve(entry, href)
+        target && @zip.find_entry(target) ? { entry: target } : nil
+      end
+
+      # Where the image's corners go. A LatLonBox (north, south, east, west and
+      # a rotation, degrees counter-clockwise about its centre — turned in a
+      # plane scaled by the latitude's cosine, as the earth is there), or a
+      # gx:LatLonQuad's four corners (lower left, lower right, upper right,
+      # upper left). nil when neither is readable or a corner is off the earth.
+      def overlay_corners(element)
+        quad = child(element, 'LatLonQuad')
+        corners = if quad
+                    points = coordinates(quad)
+                    points.size == 4 ? [points[3], points[2], points[1], points[0]] : nil
+                  else
+                    box_corners(child(element, 'LatLonBox'))
+                  end
+
+        return nil unless corners&.all? { |lon, lat| lon.is_a?(Numeric) && lat.is_a?(Numeric) && lon.abs <= 180 && lat.abs <= 90 }
+
+        corners.map { |lon, lat| [lon.round(7), lat.round(7)] }
+      end
+
+      def box_corners(box)
+        return nil unless box
+
+        north, south, east, west = %w[north south east west].map { |side| number(child(box, side)&.text.to_s.strip) }
+        return nil unless [north, south, east, west].all?(Numeric)
+
+        rotation = number(child(box, 'rotation')&.text.to_s.strip)
+        corners = [[west, north], [east, north], [east, south], [west, south]]
+        return corners unless rotation.is_a?(Numeric) && !rotation.zero?
+
+        cx = (east + west) / 2.0
+        cy = (north + south) / 2.0
+        scale = Math.cos(cy * Math::PI / 180)
+        angle = rotation * Math::PI / 180
+
+        corners.map do |lon, lat|
+          dx = (lon - cx) * scale
+          dy = lat - cy
+          [cx + ((dx * Math.cos(angle)) - (dy * Math.sin(angle))) / scale, cy + (dx * Math.sin(angle)) + (dy * Math.cos(angle))]
+        end
+      end
+
+      # KML colors are aabbggrr: the alpha is how opaque the image draws.
+      def overlay_opacity(color)
+        hex = clean(color)
+        return nil unless hex&.match?(/\A\h{8}\z/)
+
+        alpha = hex[0, 2].to_i(16) / 255.0
+        alpha >= 1 ? nil : alpha.round(2)
+      end
+
       # --- columns and warnings ------------------------------------------------
 
       # The columns in file terms: the placemark's own values that any
@@ -540,8 +655,18 @@ module CoreDataConnector
           @warnings << "#{pluralize(deep, 'layer')} linked more than #{MAX_LINK_DEPTH} levels deep #{were(deep)} not read; " \
                        'upload those .kml files on their own.'
         end
-        if @counts[:overlays].positive?
-          @warnings << "#{pluralize(@counts[:overlays], 'image overlay')} (GroundOverlay) #{were(@counts[:overlays])} not imported; a scanned map goes under Settings → Map layers → Add a historic map."
+        usable = @overlays.count { |overlay| overlay[:source] && overlay[:corners] }
+        if usable.positive?
+          @warnings << "#{pluralize(usable, 'image overlay')} (GroundOverlay: a scanned map or plan laid over the map) " \
+                       "will be added to the atlas's map layers when you import."
+        end
+        unusable = @overlays.size - usable
+        if unusable.positive?
+          @warnings << "#{pluralize(unusable, 'image overlay')} can't be added: its image isn't in the upload or its corners " \
+                       "can't be read. Save the project as a KMZ (which carries the images) and upload that."
+        end
+        if @counts[:other_overlays].positive?
+          @warnings << "#{pluralize(@counts[:other_overlays], 'screen or photo overlay')} #{were(@counts[:other_overlays])} not imported."
         end
         @warnings << "#{pluralize(@counts[:models], 'placemark')} with a 3D model instead of a point or shape #{@counts[:models] == 1 ? 'is' : 'are'} imported without a location." if @counts[:models].positive?
       end

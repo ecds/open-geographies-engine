@@ -144,7 +144,10 @@ core-data-cloud's bundle; neither reader needs a GIS library. KML (`KmlReader`):
 Placemark — name, description (HTML to text), address, ExtendedData `Data`/`SimpleData` as
 columns, TimeStamp/TimeSpan as a fuzzy-date "Dates" column, the innermost folder as "Folder"
 (proposed as the category when it repeats); Point, LineString, Polygon with holes,
-MultiGeometry and gx:Track; read one placemark at a time, DOCTYPEs refused, no network. In a
+MultiGeometry and gx:Track; GroundOverlays (box with rotation, or gx:LatLonQuad) become image map
+layers at import (`ImportDatasetJob#add_overlays`: image stored as a site asset, `layer_type:
+"image"` with its four corners, KML color alpha as opacity, dates as the year; off with
+`overlays: false`); read one placemark at a time, DOCTYPEs refused, no network. In a
 KMZ, network links to .kml files inside the zip are followed (GDAL's per-layer KMZ), others
 and image overlays are reported (as are links nested more than 5 deep); reading stops past 250 MB unpacked,
 a placemark over 25 MB as written, or 3 million points in all, and rows keep only their own ExtendedData
