@@ -43,19 +43,26 @@ module CoreDataConnector
         after = SiteVersion.part_value(b, part)
         next if SiteVersion.comparable(before) == SiteVersion.comparable(after)
 
-        lines = case part[:key]
-                when 'name' then ["“#{before}” → “#{after}”"]
-                when 'home' then home(before, after)
-                when 'pages' then pages(before, after)
-                when 'translations' then translations(before, after)
-                when 'menu' then menu(before, after)
-                when 'branding' then branding(before, after)
-                when 'layers' then named_list(before, after, 'Map layer')
-                when 'search' then searches(before, after)
-                when 'detail_pages' then detail_pages(before, after)
-                when 'languages' then languages(before, after)
-                else keys_changed(before, after)
-                end
+        lines = begin
+          case part[:key]
+          when 'name' then ["“#{before}” → “#{after}”"]
+          when 'home' then home(before, after)
+          when 'pages' then pages(before, after)
+          when 'translations' then translations(before, after)
+          when 'menu' then menu(before, after)
+          when 'branding' then branding(before, after)
+          when 'layers' then named_list(before, after, 'Map layer')
+          when 'search' then searches(before, after)
+          when 'detail_pages' then detail_pages(before, after)
+          when 'languages' then languages(before, after)
+          else keys_changed(before, after)
+          end
+        rescue StandardError => e
+          # Stored values in a shape these summaries don't expect (hand-edited
+          # JSON, an older layout): the part still shows, just without detail.
+          Rails.logger.warn("[open_geographies] history summary of #{part[:key]}: #{e.class}: #{e.message}")
+          []
+        end
 
         lines = ['Changed'] if lines.empty?
         lines = lines.first(MAX_LINES) + ["and #{lines.size - MAX_LINES} more"] if lines.size > MAX_LINES + 1
@@ -63,19 +70,25 @@ module CoreDataConnector
       end
     end
 
+    # Values as the summaries read them, whatever was stored: an object, or a
+    # list of objects.
+    def object(value) = value.is_a?(Hash) ? value : {}
+
+    def objects(value) = Array(value).grep(Hash)
+
     # --- content ---------------------------------------------------------------
 
     def home(before, after, prefix = '')
-      before ||= {}
-      after ||= {}
+      before = object(before)
+      after = object(after)
       lines = []
       lines << "#{prefix}Description changed" if before['description'] != after['description']
       lines + sections(before['sections'], after['sections'], prefix)
     end
 
     def pages(before, after, prefix = '')
-      before = Array(before).index_by { |page| page['slug'] }
-      after = Array(after).index_by { |page| page['slug'] }
+      before = objects(before).index_by { |page| page['slug'] }
+      after = objects(after).index_by { |page| page['slug'] }
       lines = []
 
       after.each do |slug, page|
@@ -98,8 +111,8 @@ module CoreDataConnector
     end
 
     def translations(before, after)
-      before ||= {}
-      after ||= {}
+      before = object(before)
+      after = object(after)
 
       (before.keys | after.keys).flat_map do |locale|
         name = LANGUAGES[locale] || locale
@@ -107,6 +120,9 @@ module CoreDataConnector
         new = after[locale]
         next ["#{name} added"] if old.nil?
         next ["#{name} removed"] if new.nil?
+
+        old = object(old)
+        new = object(new)
 
         lines = []
         if old['home'] != new['home']
@@ -120,8 +136,8 @@ module CoreDataConnector
     end
 
     def sections(before, after, prefix = '')
-      before = Array(before)
-      after = Array(after)
+      before = objects(before)
+      after = objects(after)
       old_by_id = before.index_by { |section| section['id'] }
       new_by_id = after.index_by { |section| section['id'] }
       lines = []
@@ -154,9 +170,9 @@ module CoreDataConnector
     # --- menu, branding -----------------------------------------------------------
 
     def menu(before, after)
-      before ||= {}
-      after ||= {}
-      labels = ->(nav) { Array(nav['items']).map { |item| item['label'].presence || item['page'].presence || item['href'] || '…' } }
+      before = object(before)
+      after = object(after)
+      labels = ->(nav) { objects(nav['items']).map { |item| item['label'].presence || item['page'].presence || item['href'] || '…' } }
       lines = []
 
       if labels.(before) != labels.(after)
@@ -171,8 +187,8 @@ module CoreDataConnector
     end
 
     def branding(before, after)
-      before ||= {}
-      after ||= {}
+      before = object(before)
+      after = object(after)
 
       (before.keys | after.keys).sort_by { |key| BRANDING.keys.index(key) || 99 }.flat_map do |key|
         old = before[key]
@@ -183,8 +199,10 @@ module CoreDataConnector
         if IMAGES.include?(key)
           [old.blank? ? "#{label} added" : (new.blank? ? "#{label} removed" : "#{label} changed")]
         elsif key == 'footer' || key == 'header'
-          sub = ((old || {}).keys | (new || {}).keys).select { |k| (old || {})[k] != (new || {})[k] }
-          ["#{label}: #{sub.map { |k| FOOTER[k] || k.humanize(capitalize: false) }.join(', ')} changed"]
+          old = object(old)
+          new = object(new)
+          sub = (old.keys | new.keys).select { |k| old[k] != new[k] }
+          [sub.any? ? "#{label}: #{sub.map { |k| FOOTER[k] || k.humanize(capitalize: false) }.join(', ')} changed" : "#{label} changed"]
         else
           # Unset branding is the atlas's default (Site::DEFAULT_BRANDING).
           ["#{label}: #{short(old, 'default')} → #{short(new, 'default')}"]
@@ -195,8 +213,8 @@ module CoreDataConnector
     # --- settings -----------------------------------------------------------------
 
     def named_list(before, after, noun)
-      before = Array(before)
-      after = Array(after)
+      before = objects(before)
+      after = objects(after)
       name = ->(item, index) { item['name'].presence || "#{index + 1}" }
       old = before.each_with_index.to_h { |item, i| [name.(item, i), item] }
       new = after.each_with_index.to_h { |item, i| [name.(item, i), item] }
@@ -216,8 +234,8 @@ module CoreDataConnector
     end
 
     def searches(before, after)
-      before = Array(before).index_by { |search| search['name'] }
-      after = Array(after).index_by { |search| search['name'] }
+      before = objects(before).index_by { |search| search['name'] }
+      after = objects(after).index_by { |search| search['name'] }
       lines = []
 
       after.each do |name, search|
@@ -232,13 +250,13 @@ module CoreDataConnector
     end
 
     def detail_pages(before, after)
-      before ||= {}
-      after ||= {}
-      models = (before['models'] || {}).keys | (after['models'] || {}).keys
+      before = object(before)
+      after = object(after)
+      models = object(before['models']).keys | object(after['models']).keys
 
       lines = models.flat_map do |model|
-        old = before.dig('models', model) || {}
-        new = after.dig('models', model) || {}
+        old = object(object(before['models'])[model])
+        new = object(object(after['models'])[model])
         model_lines = []
         hidden = Array(new['exclude']) - Array(old['exclude'])
         shown = Array(old['exclude']) - Array(new['exclude'])
@@ -254,8 +272,8 @@ module CoreDataConnector
     end
 
     def languages(before, after)
-      before ||= {}
-      after ||= {}
+      before = object(before)
+      after = object(after)
       names = ->(locales) { Array(locales).map { |l| LANGUAGES[l] || l }.join(', ').presence || 'none' }
       lines = []
       lines << "Languages: #{names.(before['locales'])} → #{names.(after['locales'])}" if before['locales'] != after['locales']
