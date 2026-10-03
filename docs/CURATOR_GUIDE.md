@@ -125,8 +125,8 @@ The **Columns** table lists every column with examples. Under **Use as**, choose
   such as "Year built" is suggested as a date.
 - **Exact date (YYYY-MM-DD)**.
 
-The first date column dates your places: visitors get a date filter (and, on a list or grid of
-results, can sort oldest or newest first). You can change which field that is, or turn on a timeline, under **Settings → Search → Time**
+The first date column dates your places: visitors get a date filter and can sort the results
+oldest or newest first. You can change which field that is, or turn on a timeline, under **Settings → Search → Time**
 (see [Search and filters](#10-search-and-filters)).
 
 If some values don't fit the type you chose, the console says how many would be left empty and
@@ -270,12 +270,15 @@ changes you haven't saved yet.
 - **Also search in**: the search box always looks at names and descriptions; add other text fields
   such as an address.
 - **Time → Dates from**: the field that places your records in time (a date, or a number field
-  named for a year, such as "Year built"). Visitors get a date filter, a range of years; when
-  results show as a list or a grid they can also sort **Oldest first** or **Newest first**. A
+  named for a year, such as "Year built"). Visitors get a date filter, a range of years, and
+  two more ways to sort the results: **Oldest first** and **Newest first**. A
   record dated as a range (1861–1865) or a decade
   shows up for any year it covers. Records with no date stay in the results until a visitor narrows
   the years. **Filter name** is what visitors see above the filter. **Show a timeline** adds a
   **Timeline** button above the map that lays the results out by date.
+- Every search can be sorted by visitors (**Sort by** above the results, beside the map too):
+  by relevance, A–Z, Z–A, and oldest/newest first when the search has dates. The choice is part
+  of the address, so a link to a sorted search opens sorted.
 - **Result card attributes**: what each search result shows under the name.
 - **Shows results as**: a map with the results beside it (the usual), or without a map: a list,
   a grid of cards, or an image gallery.
@@ -429,6 +432,6 @@ Someone invited by email can work on the atlases they've been added to, but can'
 | Images | PNG, JPEG, GIF, WebP, AVIF, SVG, ICO up to 10 MB; TIFF up to 100 MB |
 | Languages | English, Spanish, French, German, Italian, Portuguese |
 | Historic maps | Georeferenced in Allmaps (allmaps.org), from a IIIF scan; give each a Year for the slider |
-| Dates | Settings → Search → Time: a date filter, oldest/newest sorts (list and grid), an optional timeline |
+| Dates | Settings → Search → Time: a date filter, oldest/newest sorts, an optional timeline |
 | Draft → public | Settings → General → Visibility → **Publish atlas** (owners) |
 | Changes live | Within 30 seconds of **Save** |
