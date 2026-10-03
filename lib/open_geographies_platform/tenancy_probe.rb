@@ -463,6 +463,15 @@ module OpenGeographiesPlatform
             restored.inspect[0, 160]
       status 'a restore can\'t touch what owners decide', post("#{versions}/#{older['id']}/restore", { parts: %w[published slug domain] }, editor_token), '422'
       check '... the atlas stays published at its address', a.site.reload.published == true && a.site.slug == 'og-tenancy-probe-a'
+
+      # Advanced JSON can hold shapes the summaries don't expect; History
+      # still opens (it answered 500).
+      config = a.site.reload.config
+      status 'a hand-typed config in an odd shape saves', patch(site, { site: { config: config.merge('detail_pages' => { 'models' => [] }) } }, a.token), '200'
+      odd = Array(body(get(versions, a.token))['versions']).first || {}
+      status '... its version still opens', get("#{versions}/#{odd['id']}", a.token), '200'
+      status '... and so does the first, compared with it', get("#{versions}/#{older['id']}", a.token), '200'
+      patch(site, { site: { config: } }, a.token)
     end
 
     # "Send feedback": who may send a report, about which atlas, and who may
@@ -498,6 +507,8 @@ module OpenGeographiesPlatform
       status 'an owner can\'t mark even their own resolved', patch("#{path}/#{mine['id']}", { status: 'resolved' }, a.token), %w[401 403]
       check '... and it stays new', ::CoreDataConnector::FeedbackReport.find(mine['id']).status == 'new'
       status 'a blank report is refused', post(path, report.merge(what_happened: '  '), a.token), '422'
+      res = post(path, report.merge(page_url: '//evil.example/phish'), a.token)
+      check 'a page address on another site is not kept', res.code == '201' && body(res).dig('feedback_report', 'page_url').nil?, res.body[0, 120]
 
       res = multipart(path, { what_happened: 'Probe: with a screenshot', site_id: a.site.id.to_s }, { screenshot: ['shot.png', PNG, 'image/png'] }, a.token)
       status 'a screenshot is attached', res, '201'
@@ -593,6 +604,15 @@ module OpenGeographiesPlatform
       # its input, never 401/403/404.
       res = post("#{project}/dataset_imports/preview", {}, token)
       check 'can upload a dataset (gets past authorization)', !REFUSED.include?(res.code), "got #{res.code}"
+      # A KML whose placemarks each carry their own ExtendedData key: refused
+      # at the column limit, not read into rows × columns.
+      sparse = '<kml xmlns="http://www.opengis.net/kml/2.2"><Document>' +
+               (0...600).map { |i| "<Placemark><name>P#{i}</name><ExtendedData><Data name=\"k#{i}\"><value>x</value></Data></ExtendedData></Placemark>" }.join +
+               '</Document></kml>'
+      started = Time.now
+      res = upload("#{project}/dataset_imports/preview", 'sparse.kml', sparse, token, content_type: 'application/vnd.google-earth.kml+xml')
+      check 'a KML with more than 500 columns is refused, at once', res.code == '422' && res.body.include?('500 columns') && Time.now - started < 5,
+            "#{res.code} in #{(Time.now - started).round(1)} s: #{res.body[0, 120]}"
       res = post("#{project}/dataset_imports", { dataset_import: { columns: [] } }, token)
       check 'can import one', !REFUSED.include?(res.code), "got #{res.code}"
       res = post("#{project}/place_imports/preview", { place_import: { source: 'nowhere', area: {}, filters: {} } }, token)
@@ -897,13 +917,13 @@ module OpenGeographiesPlatform
       Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https') { |http| http.request(req) }
     end
 
-    # A multipart file upload (the console's image upload).
-    def upload(path, filename, bytes, token = nil)
+    # A multipart file upload (the console's image upload, a dataset preview).
+    def upload(path, filename, bytes, token = nil, content_type: 'image/png')
       uri = URI.join(@host, path)
       req = Net::HTTP::Post.new(uri)
       req['Accept'] = 'application/json'
       req['Authorization'] = token if token
-      req.set_form([['file', StringIO.new(bytes), { filename:, content_type: 'image/png' }]], 'multipart/form-data')
+      req.set_form([['file', StringIO.new(bytes), { filename:, content_type: }]], 'multipart/form-data')
 
       Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https') { |http| http.request(req) }
     end
