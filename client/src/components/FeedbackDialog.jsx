@@ -31,6 +31,9 @@ const gatherContext = (prefill) => _.pick({
 const FeedbackDialog = ({ onClose, prefill, site }) => {
   const dialog = useRef();
   const fileInput = useRef();
+  // What had focus when the form opened (Send feedback, Tell us what went
+  // wrong): read on the first render, before the dialog takes focus.
+  const opener = useRef(document.activeElement);
   const [whatHappened, setWhatHappened] = useState('');
   const [expected, setExpected] = useState('');
   const [screenshot, setScreenshot] = useState(null);
@@ -41,10 +44,17 @@ const FeedbackDialog = ({ onClose, prefill, site }) => {
 
   const context = useMemo(() => gatherContext(prefill), [prefill]);
 
+  // The dialog is removed while still open (its parent stops rendering it),
+  // which leaves focus on the page itself; it goes back to the opener.
   useEffect(() => {
     const element = dialog.current;
+    const returnTo = opener.current;
     element?.showModal();
-    return () => element?.open && element.close();
+
+    return () => {
+      if (element?.open) element.close();
+      if (returnTo instanceof HTMLElement && returnTo.isConnected) returnTo.focus();
+    };
   }, []);
 
   useEffect(() => {

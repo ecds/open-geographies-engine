@@ -148,6 +148,8 @@ const ImageCropper = ({ asset, crop = {}, initial, label, onCancel, onCropped })
   const dialog = useRef();
   const image = useRef();
   const drag = useRef(null);
+  // The Crop… button, to give focus back to when the dialog goes.
+  const opener = useRef(document.activeElement);
   const cropAsset = useContext(ImageCropContext);
   const W = asset.width;
   const H = asset.height;
@@ -160,8 +162,13 @@ const ImageCropper = ({ asset, crop = {}, initial, label, onCancel, onCropped })
 
   useEffect(() => {
     const element = dialog.current;
+    const returnTo = opener.current;
     element?.showModal();
-    return () => element?.open && element.close();
+
+    return () => {
+      if (element?.open) element.close();
+      if (returnTo instanceof HTMLElement && returnTo.isConnected) returnTo.focus();
+    };
   }, []);
 
   // Image pixels per screen pixel: measured when the image loads, and kept
