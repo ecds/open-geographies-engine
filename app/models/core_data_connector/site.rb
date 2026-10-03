@@ -88,6 +88,13 @@ module CoreDataConnector
     # Relationships
     belongs_to :project
 
+    # Its history: a version per save of its content, branding, menu and
+    # settings (SiteVersion), deleted with it.
+    has_many :versions, -> { order(id: :desc) }, class_name: 'CoreDataConnector::SiteVersion', dependent: :delete_all
+
+    after_create { SiteVersion.record!(self, created: true) }
+    after_update { SiteVersion.record!(self) }
+
     # Uploaded images for the atlas's pages and branding, and the web-sized
     # copies made of them (SiteImages).
     has_many_attached :assets

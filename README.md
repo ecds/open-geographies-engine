@@ -277,6 +277,17 @@ colors, sizes and fonts to their formats, since they end up in the renderer's CS
   image. Truncated files and images over 100 megapixels are refused. Needs libvips (already
   in FairData's Dockerfile) through `ruby-vips`; without it images are served as uploaded.
   `bin/rails open_geographies:image_copies [SITE=id]` makes copies for earlier uploads.
+- History (`SiteVersion`, `core_data_connector_site_versions`): every save of a site's
+  name, content, branding, navigation or config — from the console, a restore, an import
+  (`SiteVersion::Context` source/user), a tile build — keeps a JSON snapshot of those columns,
+  the parts that changed (`SiteVersion::PARTS`: home, pages, translations, menu, branding,
+  layers, search, detail pages, languages, other) and owner-only changes (published, slug,
+  domain) as `events`. The first update of an atlas without history also keeps its previous
+  state (`baseline`). The newest 100 and the first are kept; versions go with the site.
+  `GET /core_data/sites/:id/versions`, `GET …/versions/:version_id` (with
+  `SiteVersionSummary` lines: what the save changed, what restoring would change),
+  `POST …/versions/:version_id/restore { parts }` — members (`SitePolicy#update?`); a restore
+  writes content parts only and is itself a new version. Console: the atlas's History tab.
 - Cropping (`POST /core_data/sites/:id/assets/:key/crop` `{ x, y, width, height }`, pixels
   of the upright image; `SiteImages.crop`): a cropped copy stored as a new asset with its own
   web-sized copies (JPEG when opaque, PNG when transparent), the original kept; the new blob's

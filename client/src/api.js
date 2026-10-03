@@ -175,6 +175,13 @@ export const uploadSiteAsset = (id, file) => {
  */
 export const cropSiteAsset = (id, key, rect) => request('POST', `/core_data/sites/${id}/assets/${encodeURIComponent(key)}/crop`, { body: rect });
 
+// An atlas's history (SiteVersionsController).
+export const fetchSiteVersions = (id, page = 1) => request('GET', `/core_data/sites/${id}/versions`, { params: { page } });
+
+export const fetchSiteVersion = (id, versionId) => request('GET', `/core_data/sites/${id}/versions/${versionId}`);
+
+export const restoreSiteVersion = (id, versionId, parts) => request('POST', `/core_data/sites/${id}/versions/${versionId}/restore`, { body: { parts } });
+
 export const deleteSiteAsset = (id, key) => request('DELETE', `/core_data/sites/${id}/assets/${encodeURIComponent(key)}`);
 
 export const buildTiles = (id) => request('POST', `/core_data/sites/${id}/build_tiles`, { body: {} });

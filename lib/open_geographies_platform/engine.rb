@@ -74,6 +74,9 @@ module OpenGeographiesPlatform
           post 'assets', action: :upload_asset, on: :member, as: :upload_asset
           delete 'assets/:key', action: :destroy_asset, on: :member, as: :destroy_asset
           post 'assets/:key/crop', action: :crop_asset, on: :member, as: :crop_asset
+          get :versions, to: 'site_versions#index', on: :member
+          get 'versions/:version_id', to: 'site_versions#show', on: :member, as: :version
+          post 'versions/:version_id/restore', to: 'site_versions#restore', on: :member, as: :restore_version
         end
 
         # NOTE: the admin `projects/:id/descriptors` route is NOT added here — it

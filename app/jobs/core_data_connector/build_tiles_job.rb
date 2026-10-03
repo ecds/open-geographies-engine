@@ -55,7 +55,8 @@ module CoreDataConnector
         stored = store(site, archive)
 
         step job, 'update_config'
-        url = update_site_config(site)
+        # Recorded in the atlas's history as the tile build's.
+        url = SiteVersion::Context.set(user: job.user, source: 'tiles') { update_site_config(site) }
 
         job.update(
           status: Job::JOB_STATUS_COMPLETED,

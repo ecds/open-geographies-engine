@@ -409,6 +409,10 @@ module OpenGeographiesPlatform
         remote_files_refusals
       end
 
+      group 'an atlas\'s history: its project reads it; editors restore content, never what owners decide' do
+        history(a, b)
+      end
+
       group 'feedback reports: anyone signed in sends them; only admins read others\'' do
         feedback(a, b)
       end
@@ -423,6 +427,43 @@ module OpenGeographiesPlatform
     end
 
     private
+
+    # The atlas's history (SiteVersion): saves become versions; who can read
+    # and restore them; a restore puts back content only.
+    def history(a, b)
+      site = "/core_data/sites/#{a.site.id}"
+      versions = "#{site}/versions"
+      branding = (a.site.reload.branding || {}).merge('primary_color' => '#123456')
+
+      status 'the owner saves the branding', patch(site, { site: { branding: } }, a.token), '200'
+      res = get(versions, a.token)
+      status 'the owner lists the versions', res, '200'
+      list = Array(body(res)['versions'])
+      newest = list.first || {}
+      check '... the save, by them, with what changed', newest['source'] == 'console' && newest.dig('user', 'id') == a.user.id &&
+                                                         newest['changed_parts'] == ['branding'], newest.inspect[0, 160]
+      check '... and the atlas as it was before, to go back to', list.size >= 2 && %w[baseline created].include?(list.last['source']), list.map { |v| v['source'] }.inspect
+      older = list.last
+
+      refused 'anonymous can\'t list them', get(versions)
+      status 'another tenant can\'t list them', get(versions, b.token), %w[401 404]
+      status 'nor read one', get("#{versions}/#{older['id']}", b.token), %w[401 404]
+      status 'nor restore one', post("#{versions}/#{older['id']}/restore", { parts: ['branding'] }, b.token), %w[401 404]
+      status 'nor through its own atlas', post("/core_data/sites/#{b.site.id}/versions/#{older['id']}/restore", { parts: ['branding'] }, b.token), '404'
+      check '... and the branding is unchanged', a.site.reload.branding['primary_color'] == '#123456', a.site.branding['primary_color']
+
+      res = get("#{versions}/#{older['id']}", a.token)
+      check 'a version says what restoring it would change', body(res).dig('differences', 'branding').to_a.any? { |line| line.include?('#123456') }, res.body[0, 200]
+
+      editor_token = login(Fixtures::EDITOR_EMAIL)
+      status 'an editor restores the branding', post("#{versions}/#{older['id']}/restore", { parts: ['branding'] }, editor_token), '200'
+      check '... put back', a.site.reload.branding['primary_color'] != '#123456'
+      restored = Array(body(get(versions, a.token))['versions']).first || {}
+      check '... as a new version, by them, from the old one', restored['source'] == 'restore' && restored['restored_from_id'] == older['id'],
+            restored.inspect[0, 160]
+      status 'a restore can\'t touch what owners decide', post("#{versions}/#{older['id']}/restore", { parts: %w[published slug domain] }, editor_token), '422'
+      check '... the atlas stays published at its address', a.site.reload.published == true && a.site.slug == 'og-tenancy-probe-a'
+    end
 
     # "Send feedback": who may send a report, about which atlas, and who may
     # read it, its screenshot and its status.

@@ -79,6 +79,7 @@ module CoreDataConnector
         # and a way into the map) is stored rather than left to the default,
         # so the console opens on a page the curator owns and edits.
         # A draft: private until the curator publishes it from the console.
+        SiteVersion::Context.user = current_user
         site = Site.create!(
           project:,
           name:,

@@ -6,6 +6,10 @@ module CoreDataConnector
     # Preloads
     preloads :project
 
+    # Saves made here are the console's, by the signed-in curator, in the
+    # atlas's history (SiteVersion).
+    before_action -> { SiteVersion::Context.user = current_user; SiteVersion::Context.source = 'console' }, only: %i[update update_domain]
+
     # PATCH /core_data/sites/:id
     #
     # Any member of the project (owner or editor) saves the atlas's

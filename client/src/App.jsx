@@ -18,6 +18,7 @@ import AtlasEditor from './pages/AtlasEditor';
 import AtlasImports from './pages/AtlasImports';
 import AtlasJobs from './pages/AtlasJobs';
 import AtlasPlaces from './pages/AtlasPlaces';
+import AtlasHistory from './pages/AtlasHistory';
 import AtlasList from './pages/AtlasList';
 import FeedbackList from './pages/FeedbackList';
 import FeedbackContext from './feedback';
@@ -412,6 +413,7 @@ const App = () => {
     imports: () => <AtlasImports id={route.id} key={route.id} navigate={navigate} />,
     jobs: () => <AtlasJobs id={route.id} key={route.id} navigate={navigate} />,
     places: () => <AtlasPlaces id={route.id} key={route.id} navigate={navigate} />,
+    history: () => <AtlasHistory id={route.id} key={route.id} navigate={navigate} />,
     feedback: () => <FeedbackList navigate={navigate} />
   }[route.name];
 

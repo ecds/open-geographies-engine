@@ -54,6 +54,7 @@ const AtlasHeader = ({ active, navigate, site }) => {
           { tab(paths.places(site.id), 'Places', 'places') }
           { tab(paths.imports(site.id), 'Imports', 'imports') }
           { tab(paths.jobs(site.id), 'Jobs', 'jobs') }
+          { tab(paths.history(site.id), 'History', 'history') }
           { site.permissions?.manage !== false && (
           <a
             className='tab tab-external'

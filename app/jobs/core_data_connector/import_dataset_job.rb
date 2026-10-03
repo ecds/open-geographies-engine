@@ -374,7 +374,8 @@ module CoreDataConnector
             end
           end
 
-          site.update!(config:) unless config == site.config
+          # Recorded in the atlas's history as the import's, by whoever ran it.
+          SiteVersion::Context.set(user: @job.user, source: 'import') { site.update!(config:) } unless config == site.config
         end
       end
 

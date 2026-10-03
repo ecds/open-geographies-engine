@@ -453,6 +453,21 @@ Someone invited by email can work on the atlases they've been added to, but can'
   - Placed places and category renames: within a minute or so.
   - Copied photos: about one a second.
 
+### History: undoing a change
+
+**History** (beside Jobs) keeps every save of the atlas's pages, branding, menu and settings — the
+last 100, and the first — newest first: when, who, how (saved in Settings, restored, set up by an
+import, map tiles built) and which parts changed (Home page, Pages, Translations, Menu, Branding, Map
+layers, Search, Detail pages, Languages and labels, Name). Publishing, unpublishing and changes to the
+atlas's address or domain are listed too.
+
+Open a version to see **what that save changed** and **what restoring it would change now**, part by
+part ("Primary color: #1d4e5f → #0a3a4d", "Section “Plan your visit” removed"). Tick the parts to put
+back and **Restore**. A restore is saved as a new version, so the state you replaced stays in the
+history and can be restored in turn. Owners and editors can restore; a restore never publishes or
+unpublishes the atlas or changes its address or domain. The first time an existing atlas is saved,
+History also keeps how it was just before, so that first save can be undone.
+
 ### Send feedback
 
 **Send feedback** at the top of every console page opens a short form: what happened, what you
@@ -477,3 +492,4 @@ another atlas sees it.
 | Draft → public | Settings → General → Visibility → **Publish atlas** (owners) |
 | Changes live | Within 30 seconds of **Save** |
 | Stuck? | **Send feedback** (top of the console), or **Tell us what went wrong** beside a failure |
+| Undo a change | **History**: open a version, tick the parts, **Restore** |

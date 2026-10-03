@@ -1,0 +1,46 @@
+From 0b98b7b8530d762f9d3ad7728dc279a312b93d8e Mon Sep 17 00:00:00 2001
+From: terminusfilms <steve@terminusfilms.com>
+Date: Fri, 2 Oct 2026 22:19:14 -0400
+Subject: [PATCH] Copy the platform engine's history migration (atlas versions
+ and restore)
+
+---
+ ...site_versions.open_geographies_platform.rb | 26 +++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+ create mode 100644 db/migrate/20261003021503_create_core_data_connector_site_versions.open_geographies_platform.rb
+
+diff --git a/db/migrate/20261003021503_create_core_data_connector_site_versions.open_geographies_platform.rb b/db/migrate/20261003021503_create_core_data_connector_site_versions.open_geographies_platform.rb
+new file mode 100644
+index 0000000..64c9674
+--- /dev/null
++++ b/db/migrate/20261003021503_create_core_data_connector_site_versions.open_geographies_platform.rb
+@@ -0,0 +1,26 @@
++# This migration comes from open_geographies_platform (originally 20261003130000)
++# An atlas's history: every save of its content (home page, pages,
++# translations), branding, menu and settings keeps a version — a snapshot of
++# those parts as saved, who saved it, how (the console, a restore, an import,
++# a tile build) and which parts changed. Changes to what only owners decide
++# (published, the slug, the domain) are recorded with the version as events;
++# a restore never changes them. The last 100 versions of each atlas are kept
++# (and its first). Versions go with their atlas.
++class CreateCoreDataConnectorSiteVersions < ActiveRecord::Migration[8.1]
++  def change
++    create_table :core_data_connector_site_versions do |t|
++      t.references :site, null: false, foreign_key: { to_table: :core_data_connector_sites, on_delete: :cascade }
++      t.bigint :project_id, null: false
++      t.references :user, foreign_key: { to_table: :core_data_connector_users, on_delete: :nullify }
++      t.string :source, null: false
++      t.jsonb :changed_parts, null: false, default: []
++      t.jsonb :events, null: false, default: {}
++      t.jsonb :snapshot, null: false, default: {}
++      t.bigint :restored_from_id
++      t.datetime :created_at, null: false
++    end
++
++    add_index :core_data_connector_site_versions, [:site_id, :id]
++    add_index :core_data_connector_site_versions, :project_id
++  end
++end
+-- 
+2.49.0
+
