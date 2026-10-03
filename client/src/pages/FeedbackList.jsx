@@ -33,12 +33,27 @@ const CONTEXT_LABELS = {
 };
 
 /**
+ * True when a report's page is a path on this console's own site ("//host"
+ * and "/\host" start with a slash too, and browsers read them as another
+ * site). The server keeps only such paths; older reports may not be.
+ */
+const isConsolePath = (url) => {
+  if (!/^\/(?![/\\])/.test(url)) return false;
+
+  try {
+    return new URL(url, window.location.origin).origin === window.location.origin;
+  } catch (error) {
+    return false;
+  }
+};
+
+/**
  * The details sent with a report, as [label, value] rows: the page (a link
  * within the console), then what the form gathered, then a failed email's
  * error.
  */
 const contextRows = (report) => _.compact([
-  report.page_url && ['Page', report.page_url.startsWith('/') ? <a href={report.page_url}>{ report.page_url }</a> : report.page_url],
+  report.page_url && ['Page', isConsolePath(report.page_url) ? <a href={report.page_url}>{ report.page_url }</a> : report.page_url],
   ..._.map(CONTEXT_LABELS, (label, key) => report.context?.[key] && [label, report.context[key]]),
   report.email_status === 'failed' && report.email_error && ['Email error', report.email_error]
 ]);
@@ -56,7 +71,16 @@ const Screenshot = ({ id }) => {
     let active = true;
 
     fetchFeedbackScreenshot(id)
-      .then((value) => { objectUrl = value; if (active) setUrl(value); })
+      .then((value) => {
+        // Arrived after the list moved on: nothing will show it.
+        if (!active) {
+          URL.revokeObjectURL(value);
+          return;
+        }
+
+        objectUrl = value;
+        setUrl(value);
+      })
       .catch(() => active && setFailed(true));
 
     return () => { active = false; if (objectUrl) URL.revokeObjectURL(objectUrl); };
