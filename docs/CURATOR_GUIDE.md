@@ -463,8 +463,9 @@ layers, Search, Detail pages, Languages and labels, Name). Publishing, unpublish
 atlas's address or domain are listed too.
 
 Open a version to see **what that save changed** and **what restoring it would change now**, part by
-part ("Primary color: #1d4e5f → #0a3a4d", "Section “Plan your visit” removed"). Tick the parts to put
-back and **Restore**. A restore is saved as a new version, so the state you replaced stays in the
+part ("Primary color: #1d4e5f → #0a3a4d", "Section “Plan your visit” removed"). The parts that save
+changed are ticked; tick or untick others, then **Restore**. (For the oldest saves kept, "what changed"
+covers the saves no longer kept before it, and says so.) A restore is saved as a new version, so the state you replaced stays in the
 history and can be restored in turn. Owners and editors can restore; a restore never publishes or
 unpublishes the atlas or changes its address or domain. The first time an existing atlas is saved,
 History also keeps how it was just before, so that first save can be undone.

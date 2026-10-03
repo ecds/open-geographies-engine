@@ -62,9 +62,12 @@ const VersionDetail = ({ canRestore, labels, onRestored, siteId, version }) => {
   const [restoring, setRestoring] = useState(false);
   const [errors, setErrors] = useState([]);
 
+  // Ticked to start with: the parts this save changed, where they differ
+  // now — not everything that differs, which would also undo every later
+  // save of the other parts.
   useEffect(() => {
     fetchSiteVersion(siteId, version.id)
-      .then((data) => { setDetail(data); setChosen(_.keys(data.differences)); })
+      .then((data) => { setDetail(data); setChosen(_.intersection(version.changed_parts || [], _.keys(data.differences))); })
       .catch((error) => setErrors(errorMessages(error)));
   }, [siteId, version.id]);
 
@@ -89,7 +92,11 @@ const VersionDetail = ({ canRestore, labels, onRestored, siteId, version }) => {
     <div className='history-detail'>
       { !_.isEmpty(detail.changes) && (
         <>
-          <h4>What this save changed</h4>
+          <h4>
+            { detail.changes_since?.gap
+              ? `What changed since ${when(detail.changes_since.at)} (the saves in between are no longer kept)`
+              : 'What this save changed' }
+          </h4>
           <Summary labels={labels} summary={detail.changes} />
         </>
       )}
@@ -164,11 +171,16 @@ const AtlasHistory = ({ id, navigate }) => {
   const pages = data ? Math.max(1, Math.ceil(data.total / data.per_page)) : 1;
   const canRestore = site?.permissions?.edit !== false;
 
+  // Back to the first page (the new version is at its top): one load, by
+  // the page change, or now when already there.
   const onRestored = (parts) => {
     setNotice(`Restored: ${parts.join(', ')}. The atlas shows it within 30 seconds.`);
     setOpen(null);
-    setPage(1);
-    load();
+    if (page === 1) {
+      load();
+    } else {
+      setPage(1);
+    }
   };
 
   return (
