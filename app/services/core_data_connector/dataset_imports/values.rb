@@ -42,7 +42,9 @@ module CoreDataConnector
       # Two dates as a span: "1819-03-01 – 1886-05", "1819-03/1886" (ISO 8601's
       # interval), "March 1819 to 1886" is not read. Each end a year, a month
       # or a day; a dash between them needs spaces around it, an en/em dash
-      # or slash doesn't.
+      # or slash doesn't. A span ending more than SPAN_FUTURE_YEARS from now
+      # is a code ("4521/9876"), not dates.
+      SPAN_FUTURE_YEARS = 50
       DATE_SPAN = %r{\A(\d{4}[-/\d]*?)\s*(?:–|—|/(?=\d{4})|\s-\s|\sto\s)\s*(\d{4}[-/\d]*)\z}
 
       ACCURACY = { year: 0, month: 1, date: 2 }.freeze
@@ -160,6 +162,7 @@ module CoreDataConnector
           from = date_end(match[1])
           to = date_end(match[2])
           return :invalid unless from && to && to[1] >= from[0]
+          return :invalid if to[1].year > Date.current.year + SPAN_FUTURE_YEARS
 
           # The coarser end says how exact the span is.
           accuracy = [from[2], to[2]].min_by { |a| ACCURACY.fetch(a) }
