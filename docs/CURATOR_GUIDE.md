@@ -93,7 +93,9 @@ Choose your file and **Preview**. Nothing is imported until you review it and pr
 - **KML and KMZ:** each placemark is a place: its name, its description (Google Earth's formatted
   descriptions become plain text, links kept as "text (address)"), its address, its points, lines
   or shapes (holes and multi-part shapes included; GPS tracks as lines), and every value under
-  *Data* in Google Earth's "Get Info" (ExtendedData) as a column of its own. A placemark's time
+  *Data* in Google Earth's "Get Info" (ExtendedData) as a column of its own. The first picture in a
+  placemark's description becomes a **Photo** column (proposed as the place's photo): a web address
+  as written, or — in a KMZ — the picture itself, stored with the atlas's images. A placemark's time
   (TimeStamp or TimeSpan) becomes a **Dates** column ("1819–1886"). The folder each placemark is in
   becomes a **Folder** column, proposed as the category when folders sort the places into kinds
   ("Churches", "Squares"); choose **Don't import** if they don't. **Image overlays** (a scanned map

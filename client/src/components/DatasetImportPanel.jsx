@@ -435,6 +435,7 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
             { counts.skipped > 0 && <Stat label='Already in the atlas' value={counts.skipped} /> }
             { counts.shared_identifier > 0 && <Stat label='Shared an identifier' value={counts.shared_identifier} /> }
             { counts.located_from_address > 0 && <Stat label='Placed from an address' value={counts.located_from_address} /> }
+            { counts.photos_stored > 0 && <Stat label='Photos from the KMZ stored' value={counts.photos_stored} /> }
             { counts.without_geometry > 0 && <Stat label='No location' value={counts.without_geometry} /> }
             { counts.failed > 0 && <Stat label='Failed' tone='negative' value={counts.failed} /> }
           </div>

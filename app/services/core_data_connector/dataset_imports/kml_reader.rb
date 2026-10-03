@@ -9,6 +9,9 @@ module CoreDataConnector
     # QGIS and GDAL exports. Each Placemark is a row:
     #
     # - Name, Description (HTML turned into text), Address;
+    # - Photo: the first image in the description — a web address, or a
+    #   picture inside the KMZ (Google Earth's "files/…"), which the import
+    #   stores with the atlas's images;
     # - Dates, from a TimeStamp (one date) or a TimeSpan ("1819–1886"), read
     #   as a fuzzy date; the time of day is dropped;
     # - every ExtendedData value, typed (SchemaData/SimpleData) or not
@@ -44,11 +47,13 @@ module CoreDataConnector
       NAME = 'Name'
       DESCRIPTION = 'Description'
       ADDRESS = 'Address'
+      PHOTO = 'Photo'
       # Not "Date": a field labelled that collides with the index's own
       # `date` property.
       DATES = 'Dates'
       FOLDER = 'Folder'
-      BUILT_IN = [NAME, DESCRIPTION, ADDRESS, DATES, FOLDER].freeze
+      BUILT_IN = [NAME, DESCRIPTION, ADDRESS, PHOTO, DATES, FOLDER].freeze
+      IMAGE_EXTENSIONS = %w[.jpg .jpeg .png .gif .webp .tif .tiff].freeze
 
       # A KMZ may unpack to much more than its 50 MB; reading stops past this.
       MAX_UNPACKED_BYTES = 250 * 1024 * 1024
@@ -107,7 +112,18 @@ module CoreDataConnector
 
       # The bytes of an overlay's image inside the KMZ, or nil.
       def overlay_image(overlay)
-        name = overlay.dig(:source, :entry)
+        entry_bytes(overlay.dig(:source, :entry))
+      end
+
+      # True when a Photo value names a picture inside this KMZ (not a web
+      # address); its bytes come from #entry_bytes.
+      def packed_photo?(value)
+        @kmz && value.is_a?(String) && !value.match?(%r{\A[a-z][a-z0-9+.-]*://}i) && IMAGE_EXTENSIONS.include?(File.extname(value).downcase)
+      end
+
+      # The bytes of a file inside the KMZ (at most MAX_OVERLAY_IMAGE_BYTES),
+      # or nil.
+      def entry_bytes(name)
         return nil unless @kmz && name
 
         Zip::File.open(path) do |zip|
@@ -241,7 +257,7 @@ module CoreDataConnector
             raise Invalid, @limit_error if @limit_error
 
             @placemark_start = nil
-            @rows << placemark(element, current)
+            @rows << placemark(element, current, entry)
             skip_to = node.depth unless node.empty_element?
           when 'NetworkLink'
             network_link(fragment(node), current, entry, depth)
@@ -310,11 +326,13 @@ module CoreDataConnector
 
       # --- placemarks ----------------------------------------------------------
 
-      def placemark(element, folder)
+      def placemark(element, folder, entry = nil)
         properties = {}
+        description = child(element, 'description')&.text
         properties[NAME] = clean(child(element, 'name')&.text)
-        properties[DESCRIPTION] = description_text(child(element, 'description')&.text)
+        properties[DESCRIPTION] = description_text(description)
         properties[ADDRESS] = clean(child(element, 'address')&.text)
+        properties[PHOTO] = description_photo(description, entry)
 
         properties[DATES] = time_text(element)
         properties[FOLDER] = folder
@@ -478,6 +496,21 @@ module CoreDataConnector
         value
       end
 
+      # The first image in a description: a web address as written, or a
+      # picture inside the KMZ as its path in the zip; nil otherwise.
+      def description_photo(value, entry)
+        text = clean(value)
+        return nil unless text&.match?(/<img\b/i)
+
+        src = Nokogiri::HTML4::DocumentFragment.parse(text).at_css('img[src]')&.[]('src').to_s.strip
+        return nil if src.empty?
+        return src if src.match?(%r{\Ahttps?://}i)
+        return nil unless @kmz && IMAGE_EXTENSIONS.include?(File.extname(src.sub(/[?#].*\z/, '')).downcase)
+
+        target = resolve(entry, src)
+        target && @zip.find_entry(target) ? target : nil
+      end
+
       # --- text ----------------------------------------------------------------
 
       # A description as plain text: KML descriptions are often HTML (Google
@@ -630,7 +663,7 @@ module CoreDataConnector
 
         @column_names = @data_columns.keys.to_h { |key| [key, names[key]] }
 
-        leading = [NAME, DESCRIPTION, ADDRESS] & used
+        leading = [NAME, DESCRIPTION, ADDRESS, PHOTO] & used
         trailing = [DATES, FOLDER] & used
         @built_in_columns = leading + trailing
         @columns = leading + @column_names.values + trailing

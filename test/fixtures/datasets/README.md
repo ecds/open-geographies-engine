@@ -20,7 +20,7 @@ this is test data, not a gazetteer.
 | `savannah_layers.kmz` | The same as a KMZ from GDAL's LIBKML driver with `LIBKML_USE_SIMPLEFIELD=NO`: `doc.kml` holds only `NetworkLink`s to `layers/<layer>.kml` inside the zip; untyped `Data`/`value`; altitudes |
 | `walking_tour_google_earth.kml` | Written by hand in Google Earth Pro's shape: nested folders (Walking tour → Day 1 / Day 2) and a placemark outside any folder, styles, `Data` with `displayName`, a CDATA HTML description (link, image), a plain two-line description, `<address>`, `TimeSpan` and `TimeStamp`, a `gx:Track` (undeclared-prefix tolerant), an open polygon ring, unreadable coordinates (`-81.09,north`), a `NetworkLink` to the web (reported, not followed) and a `GroundOverlay` whose image isn't in the file (reported, left out) |
 | `walking_tour_google_earth.kmz` | The same zipped as `doc.kml` |
-| `savannah_overlays.kmz` | Two placemarks and three GroundOverlays: a rotated `LatLonBox` (12°, 60% alpha color, TimeStamp 1853) and a `gx:LatLonQuad`, each with its image inside the zip (drawn with libvips), and one whose image is missing. Built by a script, test data only |
+| `savannah_overlays.kmz` | Two placemarks whose descriptions show a picture packed in the KMZ (`files/johnson.jpg`, `files/reynolds.png`) and three GroundOverlays: a rotated `LatLonBox` (12°, 60% alpha color, TimeStamp 1853) and a `gx:LatLonQuad`, each with its image inside the zip (drawn with libvips), and one whose image is missing. Built by a script, test data only |
 
 Every KML/KMZ placemark's geometry was checked against GDAL's own reading of the same file
 (`ogr2ogr -f GeoJSON`, GDAL 3.14): identical once GDAL's altitudes are dropped and its open

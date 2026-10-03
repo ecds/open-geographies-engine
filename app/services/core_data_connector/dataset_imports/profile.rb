@@ -245,7 +245,9 @@ module CoreDataConnector
 
         @photo_column = columns.find do |column|
           stat = stats[column]
-          (stat[:links] && column.match?(PHOTO)) || stat[:image_links]
+          (stat[:links] && column.match?(PHOTO)) || stat[:image_links] ||
+            # A KML's Photo column also holds pictures packed in the KMZ.
+            (reader.format == 'kml' && column == KmlReader::PHOTO && stat[:filled].positive?)
         end
       end
 

@@ -110,7 +110,7 @@ module CoreDataConnector
     end
 
     def copy(place, url, linked)
-      return @counts['not_a_link'] += 1 unless url.match?(%r{\Ahttps?://}i)
+      return @counts['not_a_link'] += 1 unless url.match?(%r{\Ahttps?://}i) || own_asset(url)
       if linked && linked[:urls].include?(url)
         # Copied by an earlier run whose manifest wasn't built: build it now.
         @linked_places << place.id unless Manifest.exists?(manifestable: place, project_model_relationship_id: @relationship.id)
@@ -186,6 +186,15 @@ module CoreDataConnector
     # Busy answers are waited out a few times; a source that was slow once
     # (the LOC's image server stalls now and then) gets one more try.
     def download(url)
+      # One of the atlas's own images (a photo packed in a KMZ, stored at
+      # import): read from storage, not fetched.
+      if (blob = own_asset(url))
+        file = Tempfile.new(['og-photo', File.extname(blob.filename.to_s)], binmode: true)
+        blob.download { |chunk| file.write(chunk) }
+        file.flush
+        return RemoteFiles::Download.new(file:, content_type: blob.content_type, url:)
+      end
+
       attempts = 0
       timed_out = false
 
@@ -205,6 +214,14 @@ module CoreDataConnector
         sleep(TIMEOUT_PAUSE)
         retry
       end
+    end
+
+    def own_asset(url)
+      key = url.to_s[%r{\A/core_data/public/v1/assets/([^/?#]+)/}, 1]
+      return nil unless key
+
+      blob = ActiveStorage::Blob.find_by(key:)
+      blob if blob && ActiveStorage::Attachment.exists?(blob_id: blob.id, record_type: Site.name, name: 'assets')
     end
 
     # At most one request a second to each source host.

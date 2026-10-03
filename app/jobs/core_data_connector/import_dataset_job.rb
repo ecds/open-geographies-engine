@@ -81,6 +81,12 @@ module CoreDataConnector
         values = rows.filter_map { |row| row[:properties][column].presence }
         values.any? && values.all? { |value| value.match?(DatasetImports::Profile::URL_LIKE) }
       end
+      # A KMZ's packed photos get the atlas's addresses for them; the column
+      # is a link column either way (never searched).
+      if @photo_column && reader.respond_to?(:packed_photo?)
+        store_packed_photos!(rows, reader)
+        @link_columns |= [@photo_column] if @fields[@photo_column]
+      end
       @types = ensure_types! if columns.any? { |c| c['role'] == 'types' }
       if @types
         @spellings = category_spellings(rows)
@@ -488,6 +494,48 @@ module CoreDataConnector
         extra: @job.extra.merge('progress' => { 'completed' => completed, 'total' => total }),
         updated_at: Time.current
       )
+    end
+
+    # --- Photos packed in a KMZ ---------------------------------------------------
+
+    # A KMZ's placemark pictures (Google Earth's "files/…", named in the
+    # Photo column) have no web address: each is stored once with the images
+    # of the project's atlas, and the column's value becomes its address
+    # there (the atlas shows it; Copy to the image server reads it from
+    # there). One that can't be read leaves the place without a photo.
+    def store_packed_photos!(rows, reader)
+      site = Site.where(project_id: @model.project_id).order(:id).first
+      stored = {}
+
+      rows.each do |row|
+        value = row[:properties][@photo_column]
+        next unless reader.packed_photo?(value)
+
+        path = stored.fetch(value) { stored[value] = store_packed_photo(site, reader, value) }
+        row[:properties][@photo_column] = path
+        @problems << "#{@row_label} #{row[:line]}: its photo (#{value}) couldn't be read from the KMZ." unless path
+      end
+
+      @counts['photos_stored'] = stored.values.compact.size if stored.values.any?
+    end
+
+    def store_packed_photo(site, reader, name)
+      return nil unless site
+
+      bytes = reader.entry_bytes(name)
+      return nil unless bytes
+
+      file = Tempfile.new(['og-photo', File.extname(name)], binmode: true)
+      file.write(bytes)
+      file.flush
+      content_type = Marcel::MimeType.for(Pathname.new(file.path))
+      return nil unless OVERLAY_TYPES.include?(content_type)
+
+      Site.asset_path(SiteImages.upload(site, file.path, filename: File.basename(name), content_type:))
+    rescue SiteImages::Error
+      nil
+    ensure
+      file&.close!
     end
 
     # --- KML image overlays ----------------------------------------------------

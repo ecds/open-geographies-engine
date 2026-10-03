@@ -141,7 +141,9 @@ file, KML or KMZ, or a zipped shapefile (.shp + .dbf, with .prj/.cpg when presen
 only — projected files are refused with re-export steps), up to 50 MB / 50,000 rows / 500 columns.
 Workbooks use roo, shapefiles and KMZ rubyzip, KML Nokogiri's pull reader — all already in
 core-data-cloud's bundle; neither reader needs a GIS library. KML (`KmlReader`): a row per
-Placemark — name, description (HTML to text), address, ExtendedData `Data`/`SimpleData` as
+Placemark — name, description (HTML to text), address, the description's first picture as "Photo"
+(a KMZ's packed pictures stored as site assets at import; CopyPhotosJob reads those from storage),
+ExtendedData `Data`/`SimpleData` as
 columns, TimeStamp/TimeSpan as a fuzzy-date "Dates" column, the innermost folder as "Folder"
 (proposed as the category when it repeats); Point, LineString, Polygon with holes,
 MultiGeometry and gx:Track; GroundOverlays (box with rotation, or gx:LatLonQuad) become image map
