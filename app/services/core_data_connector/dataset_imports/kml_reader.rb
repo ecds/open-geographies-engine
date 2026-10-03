@@ -24,7 +24,9 @@ module CoreDataConnector
     # a location.
     #
     # The file is read one placemark at a time (Nokogiri's pull reader), so a
-    # large file is never held as a whole document. Nokogiri comes with Rails
+    # large file is never held as a whole document; rows keep only their own
+    # values. What one file can cost is bounded: 500 columns, 25 MB for one
+    # placemark as written, 3 million points in all. Nokogiri comes with Rails
     # (rails-html-sanitizer), so the gemspec declares nothing new. No network access, no
     # DTDs: a file declaring one is refused (KML never does), and entities are
     # never expanded. In a KMZ, network links to other .kml files inside the
@@ -47,6 +49,12 @@ module CoreDataConnector
 
       # A KMZ may unpack to much more than its 50 MB; reading stops past this.
       MAX_UNPACKED_BYTES = 250 * 1024 * 1024
+      # The work a file can cause is bounded by its points, not its bytes: a
+      # small KMZ can unpack to one enormous shape. One placemark may be this
+      # large as written (a detailed outline of a county is a few MB)…
+      MAX_PLACEMARK_BYTES = 25 * 1024 * 1024
+      # …and the whole file may hold this many points.
+      MAX_POSITIONS = 3_000_000
       # Network links followed inside a KMZ, nested.
       MAX_LINK_DEPTH = 5
 
@@ -83,17 +91,27 @@ module CoreDataConnector
         @warnings
       end
 
+      # Each row's properties are built as it's yielded: the rows are kept
+      # with only their own values, since placemarks whose ExtendedData keys
+      # differ would otherwise hold every column each (rows × columns).
       def each_row
         load!
 
         @rows.each_with_index do |row, index|
-          yield({ index:, line: index + 1, properties: row[:properties], geometry: row[:geometry] })
+          properties = @columns.to_h { |column| [column, nil] }
+          @built_in_columns.each { |column| properties[column] = row[:properties][column] }
+          row[:data].each { |key, value| properties[@column_names[key]] = value }
+
+          yield({ index:, line: index + 1, properties:, geometry: row[:geometry] })
         end
       end
 
+      # Counts what the parser reads (a KMZ entry unpacking, or the file),
+      # against the unpacked limit and the size of the placemark being read.
       def count_unpacked!(bytes)
         @unpacked += bytes
-        raise Invalid, unpacked_message if @unpacked > MAX_UNPACKED_BYTES
+        limit!(unpacked_message) if @unpacked > MAX_UNPACKED_BYTES
+        limit!(placemark_message) if @placemark_start && @unpacked - @placemark_start > MAX_PLACEMARK_BYTES
       end
 
       private
@@ -102,14 +120,18 @@ module CoreDataConnector
         return if @rows
 
         @rows = []
-        @data_columns = []
+        @data_columns = {} # an ordered set of ExtendedData keys
         @counts = Hash.new(0)
         @unpacked = 0
+        @positions = 0
+        @placemark_start = nil
+        @limit_error = nil
+        @deep_targets = Set.new
 
         if @kmz
           read_kmz
         else
-          File.open(path, 'rb') { |file| read_document(file, folder: nil, entry: nil, depth: 0) }
+          File.open(path, 'rb') { |file| read_document(LimitedStream.new(file, self), folder: nil, entry: nil, depth: 0) }
         end
 
         raise Invalid, 'The file has no placemarks (KML places), so there is nothing to import.' if @rows.empty?
@@ -177,7 +199,14 @@ module CoreDataConnector
             top[:name] = clean(element_text(node)) if top && top[:name].nil? && node.depth == top[:depth] + 1
           when 'Placemark'
             check_row_limit!(@rows.size)
-            @rows << placemark(fragment(node), current)
+            @placemark_start = @unpacked
+            element = fragment(node)
+            # The size check fires inside the parser's read, which the
+            # subtree read may report as no XML rather than an error.
+            raise Invalid, @limit_error if @limit_error
+
+            @placemark_start = nil
+            @rows << placemark(element, current)
             skip_to = node.depth unless node.empty_element?
           when 'NetworkLink'
             network_link(fragment(node), current, entry, depth)
@@ -188,9 +217,9 @@ module CoreDataConnector
           end
         end
       rescue Nokogiri::XML::SyntaxError => e
-        # The size check raises inside the parser's read, which libxml2
+        # The size checks raise inside the parser's read, which libxml2
         # reports as an I/O error.
-        raise Invalid, unpacked_message if @unpacked > MAX_UNPACKED_BYTES
+        raise Invalid, @limit_error if @limit_error
 
         where = entry && @kmz ? " (#{entry})" : ''
         raise Invalid, "The KML#{where} is not valid XML: #{e.message.to_s.strip.truncate(160)}"
@@ -209,9 +238,17 @@ module CoreDataConnector
           target = resolve(entry, href)
           linked = target && @zip.find_entry(target)
 
-          if linked.nil? || !target.downcase.end_with?('.kml')
+          if linked.nil?
             @counts[:local_links] += 1
-          elsif depth < MAX_LINK_DEPTH && @visited.add?(target)
+          elsif !target.downcase.end_with?('.kml')
+            @counts[:other_links] += 1
+          elsif @visited.include?(target)
+            # Read already (or a cycle): nothing more to read.
+          elsif depth >= MAX_LINK_DEPTH
+            # Reported unless a shallower link reaches it after all.
+            @deep_targets << target
+          else
+            @visited << target
             read_entry(linked, folder: name || folder, depth: depth + 1)
           end
         end
@@ -245,7 +282,12 @@ module CoreDataConnector
         properties[FOLDER] = folder
 
         data = extended_data(element).to_h
-        data.each_key { |key| @data_columns << key unless @data_columns.include?(key) }
+        data.each_key do |key|
+          next if @data_columns.key?(key)
+
+          @data_columns[key] = true
+          check_column_limit!(@data_columns.size + BUILT_IN.size)
+        end
 
         { properties:, data:, geometry: placemark_geometry(element) }
       end
@@ -366,16 +408,30 @@ module CoreDataConnector
       # a number is kept as written, so the import reports the row.
       def coordinates(element)
         text = child(element, 'coordinates')&.text.to_s
-        text.gsub(/\s*,\s*/, ',').split(/\s+/).reject(&:empty?).map do |tuple|
+        tuples = text.gsub(/\s*,\s*/, ',').split(/\s+/).reject(&:empty?)
+        count_positions!(tuples.size)
+
+        tuples.map do |tuple|
           tuple.split(',').first(2).map { |value| number(value) }
         end
       end
 
       # gx:Track: <gx:coord>lon lat alt</gx:coord> per point.
       def track_positions(element)
-        element.element_children.select { |c| local_name(c) == 'coord' }.map do |coord|
+        coords = element.element_children.select { |c| local_name(c) == 'coord' }
+        count_positions!(coords.size)
+
+        coords.map do |coord|
           coord.text.split(/\s+/).reject(&:empty?).first(2).map { |value| number(value) }
         end
+      end
+
+      def count_positions!(count)
+        @positions += count
+        return if @positions <= MAX_POSITIONS
+
+        raise Invalid, "The file's shapes have more than #{MAX_POSITIONS.to_fs(:delimited)} points in all. Simplify them " \
+                       '(in QGIS: Vector → Geometry Tools → Simplify) or split the file, and upload that.'
       end
 
       def number(value)
@@ -425,25 +481,44 @@ module CoreDataConnector
       # --- columns and warnings ------------------------------------------------
 
       # The columns in file terms: the placemark's own values that any
-      # placemark has, then its ExtendedData. An ExtendedData key that is also
-      # a placemark value the file uses (a Data "address" beside <address>)
-      # is told apart as "address (data)"; otherwise it keeps its name.
+      # placemark has, then its ExtendedData. Column names are unique,
+      # ignoring case (one field each). An ExtendedData key keeps its name
+      # when it's free; one that is also a placemark value the file uses (a
+      # Data "address" beside <address>), or another key's name in other
+      # case, is told apart as "address (data)", then "address (data 2)".
       def build_columns
         filled = ->(column) { @rows.any? { |row| row[:properties][column] } }
         used = BUILT_IN.select(&filled)
-        names = @data_columns.to_h { |key| [key, used.any? { |b| b.casecmp?(key) } ? "#{key} (data)" : key] }
+        taken = used.to_set { |column| column.downcase }
+        names = {}
+
+        @data_columns.each_key do |key|
+          next if taken.include?(key.downcase)
+
+          names[key] = key
+          taken << key.downcase
+        end
+
+        @data_columns.each_key do |key|
+          next if names.key?(key)
+
+          name = "#{key} (data)"
+          number = 2
+          while taken.include?(name.downcase)
+            name = "#{key} (data #{number})"
+            number += 1
+          end
+          names[key] = name
+          taken << name.downcase
+        end
+
+        @column_names = @data_columns.keys.to_h { |key| [key, names[key]] }
 
         leading = [NAME, DESCRIPTION, ADDRESS] & used
         trailing = [DATES, FOLDER] & used
-        @columns = leading + names.values + trailing
+        @built_in_columns = leading + trailing
+        @columns = leading + @column_names.values + trailing
         @columns.unshift(NAME) unless @columns.any? { |column| column.casecmp?(NAME) }
-
-        @rows.each do |row|
-          properties = @columns.to_h { |column| [column, nil] }
-          (leading + trailing).each { |column| properties[column] = row[:properties][column] }
-          row[:data].each { |key, value| properties[names[key]] = value }
-          row[:properties] = properties
-        end
       end
 
       def build_warnings
@@ -455,6 +530,15 @@ module CoreDataConnector
           @warnings << "The file links to #{pluralize(@counts[:local_links], 'other file')} that #{@counts[:local_links] == 1 ? 'isn’t' : 'aren’t'} in the upload; " \
                        'save the whole project as a KMZ (or upload each .kml) to include them.'
         end
+        if @counts[:other_links].positive?
+          @warnings << "#{pluralize(@counts[:other_links], 'link')} to other kinds of file inside the KMZ #{were(@counts[:other_links])} not followed " \
+                       '(only .kml files inside it are read); upload those files on their own.'
+        end
+        deep = (@deep_targets - @visited.to_a).size
+        if deep.positive?
+          @warnings << "#{pluralize(deep, 'layer')} linked more than #{MAX_LINK_DEPTH} levels deep #{were(deep)} not read; " \
+                       'upload those .kml files on their own.'
+        end
         if @counts[:overlays].positive?
           @warnings << "#{pluralize(@counts[:overlays], 'image overlay')} (GroundOverlay) #{were(@counts[:overlays])} not imported; a scanned map goes under Settings → Map layers → Add a historic map."
         end
@@ -463,6 +547,19 @@ module CoreDataConnector
 
       def unpacked_message
         "The KMZ unpacks to more than #{MAX_UNPACKED_BYTES / (1024 * 1024)} MB; split it into smaller files."
+      end
+
+      def placemark_message
+        "Placemark #{@rows.size + 1} is larger than #{MAX_PLACEMARK_BYTES / (1024 * 1024)} MB as written (a shape with " \
+          'hundreds of thousands of points). Simplify it (in QGIS: Vector → Geometry Tools → Simplify) or split the file, ' \
+          'and upload that.'
+      end
+
+      # Stops the read with `message`. Raised inside the parser's read, it
+      # surfaces as an XML error, so the message is kept to report instead.
+      def limit!(message)
+        @limit_error ||= message
+        raise Invalid, @limit_error
       end
 
       def pluralize(count, word)

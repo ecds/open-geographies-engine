@@ -89,7 +89,7 @@ Choose your file and **Preview**. Nothing is imported until you review it and pr
 
 - **Files read:** Excel `.xlsx`, OpenDocument `.ods`, CSV or tab-separated text (`.csv`, `.tsv`,
   `.txt`), GeoJSON (`.geojson` or `.json`), KML or KMZ (`.kml`, `.kmz`: Google Earth, Google My Maps,
-  QGIS), and a shapefile zipped with its `.dbf`, `.shx` and `.prj`. Up to 50 MB and 50,000 rows.
+  QGIS), and a shapefile zipped with its `.dbf`, `.shx` and `.prj`. Up to 50 MB, 50,000 rows and 500 columns.
 - **KML and KMZ:** each placemark is a place: its name, its description (Google Earth's formatted
   descriptions become plain text, links kept as "text (address)"), its address, its points, lines
   or shapes (holes and multi-part shapes included; GPS tracks as lines), and every value under
@@ -100,7 +100,8 @@ Choose your file and **Preview**. Nothing is imported until you review it and pr
   over Google Earth) are not imported — add a scanned map under
   [Historic maps](#12-map-layers-and-historic-maps) instead — and network links to files on the web
   are not followed; the preview says when a file has either. A KMZ that links to its own layers
-  inside the zip (as GDAL and QGIS write them) is read whole.
+  inside the zip (as GDAL and QGIS write them) is read whole. A single shape larger than 25 MB as written, or a
+  file with more than 3 million points in its shapes, is refused with steps to simplify it in QGIS.
 - **Converting other files:**
   - **Older `.xls`:** save it as `.xlsx` or CSV in Excel first.
   - **Shapefiles:** they must be in latitude/longitude (WGS 84). The console explains how to
@@ -483,7 +484,7 @@ another atlas sees it.
 
 | | |
 |---|---|
-| Data files | .xlsx, .ods, .csv, GeoJSON, KML/KMZ, zipped shapefile (WGS 84); up to 50 MB and 50,000 rows |
+| Data files | .xlsx, .ods, .csv, GeoJSON, KML/KMZ, zipped shapefile (WGS 84); up to 50 MB, 50,000 rows and 500 columns |
 | Address lookup | U.S. street addresses |
 | Images | PNG, JPEG, GIF, WebP, AVIF, SVG, ICO up to 10 MB; TIFF up to 100 MB |
 | Languages | English, Spanish, French, German, Italian, Portuguese |

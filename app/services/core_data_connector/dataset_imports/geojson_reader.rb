@@ -38,9 +38,16 @@ module CoreDataConnector
 
         raise Invalid, 'The GeoJSON has no features.' if @features.empty?
 
-        @columns = @features.each_with_object([]) do |feature, columns|
-          (feature['properties'] || {}).each_key { |key| columns << key.to_s unless columns.include?(key.to_s) }
+        # An ordered set of every feature's property names.
+        columns = {}
+        @features.each do |feature|
+          properties = feature['properties']
+          next unless properties.is_a?(Hash)
+
+          properties.each_key { |key| columns[key.to_s] = true }
+          check_column_limit!(columns.size)
         end
+        @columns = columns.keys
       rescue JSON::ParserError => e
         raise Invalid, "The file is not valid JSON: #{e.message.truncate(160)}"
       end

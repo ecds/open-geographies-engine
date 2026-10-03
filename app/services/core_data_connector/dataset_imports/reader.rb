@@ -28,6 +28,10 @@ module CoreDataConnector
 
       MAX_ROWS = 50_000
       MAX_BYTES = 50 * 1024 * 1024
+      # Far more than a gazetteer of places has; past it a file is a table of
+      # something else (or keys that differ per row, as in a map export of
+      # OpenStreetMap tags), and every column would become a field.
+      MAX_COLUMNS = 500
 
       CSV_EXTENSIONS = %w[.csv .tsv .txt].freeze
       GEOJSON_EXTENSIONS = %w[.geojson .json].freeze
@@ -108,9 +112,19 @@ module CoreDataConnector
         raise Invalid, "The file has more than #{MAX_ROWS} rows; split it and upload the parts." if index >= MAX_ROWS
       end
 
+      def check_column_limit!(count)
+        return if count <= MAX_COLUMNS
+
+        raise Invalid, "The file has more than #{MAX_COLUMNS} columns; keep the ones the atlas needs (name, location, " \
+                       'category and a few fields) and upload that.'
+      end
+
       # Unique, non-blank column names: an empty header becomes "Column 3",
       # a repeated one "Name (2)".
       def normalize_headers(headers)
+        # Blank headers after the last named one (a spreadsheet's formatted
+        # but empty columns) don't count toward the limit.
+        check_column_limit!((headers.rindex { |header| clean(header) } || -1) + 1)
         seen = Hash.new(0)
 
         headers.each_with_index.map do |header, index|
