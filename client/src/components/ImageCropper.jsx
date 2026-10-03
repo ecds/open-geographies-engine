@@ -64,6 +64,25 @@ export const largestCentered = (W, H, aspect) => {
 };
 
 /**
+ * Where a re-crop starts: the earlier frame when it already has `aspect` (or
+ * the field takes any shape); else the largest rectangle of `aspect` inside
+ * it, centred — an earlier square crop opened for a 3:1 banner keeps its
+ * middle, at the banner's shape. The whole image when that would be tiny.
+ */
+export const startingRect = (initial, W, H, aspect) => {
+  if (!initial) return largestCentered(W, H, aspect);
+
+  const r = { x: initial.x, y: initial.y, w: initial.width, h: initial.height };
+  if (!aspect || Math.abs(r.w / r.h - aspect) / aspect <= 0.01) return r;
+
+  const w = Math.min(r.w, r.h * aspect);
+  const h = w / aspect;
+  if (w < MIN || h < MIN) return largestCentered(W, H, aspect);
+
+  return { x: r.x + (r.w - w) / 2, y: r.y + (r.h - h) / 2, w, h };
+};
+
+/**
  * A rectangle after dragging `mode` (move, or an edge/corner: n, s, e, w, ne,
  * nw, se, sw) by dx, dy image pixels, kept inside the image, at least MIN
  * pixels, and at `aspect` when there is one (the edge or corner opposite the
@@ -155,7 +174,7 @@ const ImageCropper = ({ asset, crop = {}, initial, label, onCancel, onCropped })
   const H = asset.height;
   const { aspect } = crop;
 
-  const [rect, setRect] = useState(() => (initial ? { x: initial.x, y: initial.y, w: initial.width, h: initial.height } : largestCentered(W, H, aspect)));
+  const [rect, setRect] = useState(() => startingRect(initial, W, H, aspect));
   const [scale, setScale] = useState(0);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState([]);
