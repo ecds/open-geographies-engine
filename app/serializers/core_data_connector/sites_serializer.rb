@@ -23,6 +23,9 @@ module CoreDataConnector
                     platform_url: ->(site, *) { site.platform_url },
                     # The FairData project the atlas's records live in (they
                     # stay there if the atlas is deleted).
-                    project_name: ->(site, *) { site.project&.name }
+                    project_name: ->(site, *) { site.project&.name },
+                    # Its latest History version: sent back with a save as
+                    # base_version_id, so a save over someone else's is caught.
+                    version_id: ->(site, *) { site.versions.pick(:id) }
   end
 end

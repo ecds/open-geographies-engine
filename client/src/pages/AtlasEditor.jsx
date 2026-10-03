@@ -172,6 +172,9 @@ const AtlasEditor = ({ id, navigate }) => {
   const [saved, setSaved] = useState(false);
   const [notice, setNotice] = useState(null);
   const [errors, setErrors] = useState([]);
+  // Someone else's save since this copy was loaded (a refused save's 409).
+  const [conflict, setConflict] = useState(null);
+  const [reloads, setReloads] = useState(0);
 
   useEffect(() => {
     fetchSite(id)
@@ -193,7 +196,7 @@ const AtlasEditor = ({ id, navigate }) => {
         ]);
       })
       .catch((error) => setErrors(errorMessages(error)));
-  }, [id]);
+  }, [id, reloads]);
 
   const siteConfig = site?.config || {};
   const branding = site?.branding || {};
@@ -320,12 +323,18 @@ const AtlasEditor = ({ id, navigate }) => {
     }
   };
 
-  const onSave = useCallback(() => {
+  // Sent with the version this copy was loaded at: a save over someone
+  // else's (pages or settings saved since) is refused with who and what,
+  // and the curator chooses — reload, or save anyway (`force`).
+  const onSave = useCallback((force = false) => {
     setSaving(true);
     setErrors([]);
     setSaved(false);
+    setConflict(null);
 
-    updateSite(site.id, _.pick(site, 'name', 'slug', 'config', 'area', 'branding', 'navigation', 'content'))
+    const options = { base_version_id: site.version_id ?? null, ...(force ? { force: true } : {}) };
+
+    updateSite(site.id, _.pick(site, 'name', 'slug', 'config', 'area', 'branding', 'navigation', 'content'), options)
       .then((data) => {
         setSite(data.site);
         setSavedSite(data.site);
@@ -333,9 +342,22 @@ const AtlasEditor = ({ id, navigate }) => {
         setSaved(true);
         setPreview(null);
       })
-      .catch((error) => setErrors(errorMessages(error)))
+      .catch((error) => {
+        if (error.status === 409 && error.data?.conflict) {
+          setConflict(error.data.conflict);
+        } else {
+          setErrors(errorMessages(error));
+        }
+      })
       .finally(() => setSaving(false));
   }, [site]);
+
+  // Their version, in place of this copy (the unsaved changes here go).
+  const onReload = () => {
+    setConflict(null);
+    setSaved(false);
+    setReloads((n) => n + 1);
+  };
 
   const onBuildTiles = () => buildTiles(site.id)
     .then(() => setNotice('Tile generation queued — watch the Jobs tab.'))
@@ -920,8 +942,26 @@ const AtlasEditor = ({ id, navigate }) => {
             ))}
           </div>
           { renderers[tab]() }
+          { conflict && (
+            <Message header='Someone else saved this atlas while you were editing' tone='warning'>
+              <p>
+                { conflict.source === 'import' ? 'An import set it up' : (conflict.source === 'tiles' ? 'A map tile build changed it' : `${conflict.by || 'Someone'} saved it`) }
+                { ' ' }
+                at { new Date(conflict.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) }
+                { conflict.parts?.length ? ` (${conflict.parts.join(', ')})` : '' }.
+                { ' ' }
+                <strong>Reload</strong> shows that version (your unsaved changes here are lost);
+                { ' ' }
+                <strong>Save anyway</strong> replaces it with yours, and History keeps theirs to restore.
+              </p>
+              <div className='actions'>
+                <Button onClick={onReload}>Reload</Button>
+                <Button loading={saving} onClick={() => onSave(true)}>Save anyway</Button>
+              </div>
+            </Message>
+          )}
           <div className='actions'>
-            <Button loading={saving} onClick={onSave} primary>Save</Button>
+            <Button loading={saving} onClick={() => onSave()} primary>Save</Button>
             { saved && <span className='muted'>Saved. The atlas shows the changes within 30 seconds.</span> }
           </div>
         </section>

@@ -4,13 +4,15 @@ import { getToken } from './session';
 /**
  * A thin client for the engine's admin API. Errors carry the server's
  * `errors` array (Core Data's `{ base: '…' }` / `{ field: '…' }` shape) as
- * `error.errors`, plus `error.status`.
+ * `error.errors`, plus `error.status` and the whole answer as `error.data`
+ * (a save's edit conflict, for one).
  */
 export class ApiError extends Error {
-  constructor(message, status, errors) {
+  constructor(message, status, errors, data) {
     super(message);
     this.status = status;
     this.errors = errors || [];
+    this.data = data;
   }
 }
 
@@ -54,7 +56,7 @@ const request = async (method, path, { body, form, params } = {}) => {
       ? 'You are not allowed to do that. Sign in to the console with an account that can create projects.'
       : `${response.status} ${response.statusText}`;
 
-    throw new ApiError(message, response.status, data?.errors);
+    throw new ApiError(message, response.status, data?.errors, data);
   }
 
   return data;
@@ -139,7 +141,12 @@ export const fetchSites = () => request('GET', '/core_data/sites', { params: { p
 
 export const fetchSite = (id) => request('GET', `/core_data/sites/${id}`);
 
-export const updateSite = (id, site) => request('PATCH', `/core_data/sites/${id}`, { body: { site } });
+/**
+ * Saves an atlas. `options`: { base_version_id } — the version the copy was
+ * loaded at, so a save over someone else's answers 409 with `conflict` —
+ * and { force: true } to save anyway.
+ */
+export const updateSite = (id, site, options = {}) => request('PATCH', `/core_data/sites/${id}`, { body: { site, ...options } });
 
 export const regeneratePreviewToken = (id) => request('POST', `/core_data/sites/${id}/preview_token`);
 

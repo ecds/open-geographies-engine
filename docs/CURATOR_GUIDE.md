@@ -240,7 +240,10 @@ readers, or leave the description empty if the image is decorative.
 - **Menu:** by default it shows Explore (the map) and then every page in order. **Customize the menu**
   lets you choose items, rename them and add links.
 
-Press **Save** at the bottom of Settings; the atlas shows your changes within 30 seconds.
+Press **Save** at the bottom of Settings; the atlas shows your changes within 30 seconds. If someone else
+saved the atlas's pages or settings while you had it open, Save says who and what instead of saving:
+**Reload** shows their version (your unsaved changes are lost), **Save anyway** replaces it with yours
+(theirs stays in [History](#history-undoing-a-change)).
 
 ## 8. Branding
 

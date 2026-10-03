@@ -16,11 +16,24 @@ module CoreDataConnector
     # content; publishing, unpublishing and changing the slug are the
     # owners' (SitePolicy#manage?). A value sent unchanged — the console
     # saves the slug with everything else — needs no more than editing.
+    #
+    # base_version_id (optional): the History version the sender's copy was
+    # loaded at (the site JSON's version_id). When someone else has saved
+    # pages or settings since, nothing is saved: 409 with { conflict: { by,
+    # at, parts, version_id } }, so the console can offer to reload or to
+    # save anyway (force: true). Publishing or a domain change since isn't a
+    # conflict (they change no content). Checked under the row's lock.
     def update
       site = Site.find(params[:id])
       authorize site, :manage? if owner_change?(site)
 
-      super
+      site.with_lock do
+        if (conflict = edit_conflict(site))
+          return render json: { errors: [{ base: conflict[:message] }], conflict: }, status: :conflict
+        end
+
+        super
+      end
     end
 
     # GET /core_data/sites/:id/facets
@@ -262,6 +275,32 @@ module CoreDataConnector
 
     # True when an update would publish or unpublish the site, or change
     # its slug.
+    # Content saved by others since the sender's copy: the versions after
+    # base_version_id that changed a part (not only an owner attribute).
+    def edit_conflict(site)
+      return nil unless params.key?(:base_version_id)
+      return nil if ActiveModel::Type::Boolean.new.cast(params[:force])
+
+      since = SiteVersion.where(site_id: site.id).where('id > ?', params[:base_version_id].to_i)
+                         .where("changed_parts <> '[]'::jsonb").includes(:user).order(:id).to_a
+      return nil if since.empty?
+
+      latest = since.last
+      keys = since.flat_map(&:changed_parts).uniq
+      parts = SiteVersion::PARTS.select { |part| keys.include?(part[:key]) }.map { |part| part[:label] }
+      by = latest.user&.name.presence || (latest.source == 'console' ? 'Someone' : nil)
+
+      {
+        version_id: latest.id,
+        by:,
+        source: latest.source,
+        at: latest.created_at,
+        parts:,
+        message: "This atlas was saved #{by ? "by #{by} " : ''}after you opened it (#{parts.join(', ')}). " \
+                 'Reload to see those changes, or save anyway to replace them.'
+      }
+    end
+
     def owner_change?(site)
       attributes = params[:site]
       return false unless attributes.respond_to?(:key?)
