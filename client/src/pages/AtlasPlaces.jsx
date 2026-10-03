@@ -4,7 +4,7 @@ import { errorMessages, fetchSite } from '../api';
 import AtlasHeader from '../components/AtlasHeader';
 import CategoryValues from '../components/CategoryValues';
 import UnlocatedPlaces from '../components/UnlocatedPlaces';
-import { Message } from '../components/ui';
+import { Message, onTabListKeyDown } from '../components/ui';
 
 const TABS = [
   { key: 'unlocated', label: 'Without a location' },
@@ -31,9 +31,9 @@ const AtlasPlaces = ({ id, navigate }) => {
       { site && (
         <section className='panel'>
           { TABS.length > 1 && (
-            <div className='tabs' role='tablist'>
+            <div aria-label='Places' className='tabs' onKeyDown={onTabListKeyDown} role='tablist'>
               { _.map(TABS, (t) => (
-                <button aria-selected={tab === t.key} className='tab' key={t.key} onClick={() => setTab(t.key)} role='tab' type='button'>
+                <button aria-selected={tab === t.key} className='tab' key={t.key} onClick={() => setTab(t.key)} role='tab' tabIndex={tab === t.key ? 0 : -1} type='button'>
                   { t.label }
                 </button>
               ))}

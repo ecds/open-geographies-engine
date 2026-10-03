@@ -55,7 +55,7 @@ const TranslatedPagesEditor = ({
         return (
           <div className='card translated-page' key={page.slug}>
             <div className='row'>
-              <strong>{ translation?.title || page.title }</strong>
+              <h2 className='h-sub'>{ translation?.title || page.title }</h2>
               <span className={`status-pill ${translation ? 'status-published' : 'status-draft'}`}>{ translation ? 'Translated' : `Shows in ${defaultName}` }</span>
               { !translation && <Button onClick={() => translate(page)}>Translate (start from the {defaultName} version)</Button> }
               { translation && open !== page.slug && <Button onClick={() => setOpen(page.slug)}>Edit</Button> }
@@ -86,37 +86,39 @@ const TranslatedPagesEditor = ({
         );
       })}
 
-      <h3>Menu in {name}</h3>
+      <h2 className='h-section'>Menu in {name}</h2>
       { _.isEmpty(items) ? (
         <Message>
           The menu follows the pages: each shows with its {name} title once translated, and “Explore” reads in {name}.
         </Message>
       ) : (
-        <table className='table'>
-          <thead>
-            <tr><th>{ defaultName }</th><th>{ name }</th></tr>
-          </thead>
-          <tbody>
-            { _.map(items, (item, index) => {
-              const fallback = item.label || (item._template === 'Page' ? (bySlug[item.page]?.title || pageTitle(item.page)) : '');
+        <div className='table-scroll'>
+          <table className='table'>
+            <thead>
+              <tr><th>{ defaultName }</th><th>{ name }</th></tr>
+            </thead>
+            <tbody>
+              { _.map(items, (item, index) => {
+                const fallback = item.label || (item._template === 'Page' ? (bySlug[item.page]?.title || pageTitle(item.page)) : '');
 
-              return (
-                <tr key={index}>
-                  <td>{ item.label || (item._template === 'Page' ? pageTitle(item.page) : item.href) }</td>
-                  <td>
-                    <input
-                      aria-label={`Menu label in ${name}`}
-                      className='input'
-                      onChange={(e) => setLabel(index, e.target.value)}
-                      placeholder={fallback}
-                      value={item.labels?.[locale] || ''}
-                    />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                return (
+                  <tr key={index}>
+                    <td>{ item.label || (item._template === 'Page' ? pageTitle(item.page) : item.href) }</td>
+                    <td>
+                      <input
+                        aria-label={`Menu label in ${name}`}
+                        className='input'
+                        onChange={(e) => setLabel(index, e.target.value)}
+                        placeholder={fallback}
+                        value={item.labels?.[locale] || ''}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </>
   );

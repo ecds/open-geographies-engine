@@ -70,7 +70,7 @@ const HistoricMapPanel = ({ onAdd }) => {
 
   return (
     <section className='card historic-map-panel'>
-      <h4>Add a historic map</h4>
+      <h2 className='h-sub'>Add a historic map</h2>
       <p className='muted'>
         Lay a scanned historical map over the atlas’s map. The scan has to be georeferenced in
         {' '}<a href='https://allmaps.org' rel='noreferrer' target='_blank'>Allmaps</a> (free: you match a few points on the

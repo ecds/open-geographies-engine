@@ -266,7 +266,7 @@ const PlaceImportPanel = ({ area: initialArea, onImported, projectId }) => {
 
     return (
       <div className='card' key={resultJob.id}>
-        <h4>{ SOURCE_LABELS[source] } <JobStatus status={resultJob.status} /></h4>
+        <h3 className='h-sub'>{ SOURCE_LABELS[source] } <JobStatus status={resultJob.status} /></h3>
         { counts && (
           <div className='stats'>
             <Stat label='Imported' tone='positive' value={counts.imported} />
@@ -280,7 +280,7 @@ const PlaceImportPanel = ({ area: initialArea, onImported, projectId }) => {
         { !_.isEmpty(warnings) && <Message header='Warnings' list={warnings} tone='warning' /> }
         { !_.isEmpty(duplicates) && (
           <>
-            <h5>Possible cross-source duplicates</h5>
+            <h4 className='h-minor'>Possible cross-source duplicates</h4>
             <ul>
               { _.map(_.first(duplicates, 25), (duplicate, index) => (
                 <li key={index}>{ duplicate.name } (#{ duplicate.imported_id } / #{ duplicate.existing_id })</li>
@@ -298,10 +298,10 @@ const PlaceImportPanel = ({ area: initialArea, onImported, projectId }) => {
     <div className='import-panel'>
       { !_.isEmpty(errors) && <Message list={errors} tone='negative' /> }
 
-      <h3>Import area</h3>
+      <h2 className='h-section'>Import area</h2>
       <AtlasAreaForm onChange={setArea} projectId={projectId} value={area} />
 
-      <h3>Sources</h3>
+      <h2 className='h-section'>Sources</h2>
       <div className='card'>
         <Toggle
           checked={geonames.enabled}
@@ -373,7 +373,7 @@ const PlaceImportPanel = ({ area: initialArea, onImported, projectId }) => {
 
       { preview && (
         <div className='card'>
-          <h4>Preview</h4>
+          <h3 className='h-sub'>Preview</h3>
           <div className='stats'>
             <Stat label='Places match' value={previewTotal} />
             { _.map(_.keys(preview), (source) => (
@@ -406,7 +406,7 @@ const PlaceImportPanel = ({ area: initialArea, onImported, projectId }) => {
 
       { !_.isEmpty(results) && (
         <>
-          <h3>Import results</h3>
+          <h2 className='h-section'>Import results</h2>
           { _.map(results, renderResult) }
           { !importing && _.every(results, (r) => !r.job.extra?.reindex_job_id) && (
             <Message tone='positive'>

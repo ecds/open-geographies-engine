@@ -18,6 +18,24 @@ export const Message = ({ action, children, header, list, tone = 'info' }) => (
   </div>
 );
 
+/**
+ * Arrow keys in a tab list (role="tablist"), as the ARIA tabs pattern has
+ * it: Left/Right move to the previous/next tab and open it, Home/End the
+ * first/last. Only the open tab is in the Tab order (each tab sets
+ * tabIndex={selected ? 0 : -1}).
+ */
+export const onTabListKeyDown = (e) => {
+  const tabs = [...e.currentTarget.querySelectorAll('[role="tab"]')];
+  const index = tabs.indexOf(document.activeElement);
+  const target = { ArrowRight: index + 1, ArrowLeft: index - 1, Home: 0, End: tabs.length - 1 }[e.key];
+  if (index < 0 || target === undefined) return;
+
+  e.preventDefault();
+  const tab = tabs[(target + tabs.length) % tabs.length];
+  tab.focus();
+  tab.click();
+};
+
 export const Button = ({ children, loading, primary, subtle, ...props }) => (
   <button
     {...props}
@@ -103,7 +121,7 @@ export const MultiSelect = ({ allowAdditions, disabled, onChange, options, place
       )}
       { allowAdditions && !disabled && (
         <form className='addition' onSubmit={onAdd}>
-          <input className='input' name='addition' placeholder={placeholder} />
+          <input aria-label={placeholder || 'Add a value'} className='input' name='addition' placeholder={placeholder} />
           <Button subtle type='submit'>Add</Button>
         </form>
       )}
@@ -115,7 +133,7 @@ export const Tag = ({ children, onRemove, tone }) => (
   <span className={['tag', tone && `tag-${tone}`].filter(Boolean).join(' ')}>
     { children }
     { onRemove && (
-      <button aria-label='Remove' className='tag-remove' onClick={onRemove} type='button'>×</button>
+      <button aria-label={typeof children === 'string' ? `Remove ${children}` : 'Remove'} className='tag-remove' onClick={onRemove} type='button'>×</button>
     )}
   </span>
 );

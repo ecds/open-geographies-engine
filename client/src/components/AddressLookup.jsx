@@ -62,7 +62,7 @@ const AddressLookup = ({ blobId, columns, config, missing, onConfigChange, onRes
 
   return (
     <div className='address-lookup'>
-      <h4>Find locations from addresses</h4>
+      <h3 className='h-sub'>Find locations from addresses</h3>
       <p className='muted'>
         { missing } { missing === 1 ? 'row has' : 'rows have' } no coordinates. Rows with a street address can be
         placed by looking the address up with { provider } (U.S. addresses only). Anything not found is imported

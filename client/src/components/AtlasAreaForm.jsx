@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import _ from 'underscore';
 import { fetchAdminChildren } from '../api';
 import AreaMap from './AreaMap';
-import { Button, Field, Message, Select, Tag } from './ui';
+import { Button, Field, Message, onTabListKeyDown, Select, Tag } from './ui';
 
 const Tabs = {
   adminUnits: 'adminUnits',
@@ -135,12 +135,13 @@ const AtlasAreaForm = ({ onChange, projectId, value }) => {
 
   return (
     <div className='area-form'>
-      <div className='tabs' role='tablist'>
+      <div aria-label='How to set the area' className='tabs' onKeyDown={onTabListKeyDown} role='tablist'>
         <button
           aria-selected={tab === Tabs.adminUnits}
           className='tab'
           onClick={() => setTab(Tabs.adminUnits)}
           role='tab'
+          tabIndex={tab === Tabs.adminUnits ? 0 : -1}
           type='button'
         >
           Administrative units
@@ -150,6 +151,7 @@ const AtlasAreaForm = ({ onChange, projectId, value }) => {
           className='tab'
           onClick={() => setTab(Tabs.draw)}
           role='tab'
+          tabIndex={tab === Tabs.draw ? 0 : -1}
           type='button'
         >
           Draw on map

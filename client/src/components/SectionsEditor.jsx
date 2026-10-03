@@ -21,7 +21,10 @@ const LINK_HINT = 'A page on this atlas (/en/search/places) or a full address (h
  * The ordered sections of a page (the home page or a standalone page), each
  * with the fields its type has, and buttons to add, move and remove them.
  */
-const SectionsEditor = ({ assets, fallbackTitle, onChange, onUpload, sections = [] }) => {
+const SectionsEditor = ({ assets, fallbackTitle, level = 3, onChange, onUpload, sections = [] }) => {
+  // Each section's heading, one level below the heading the editor sits under.
+  const Heading = `h${level}`;
+
   const update = (index, changes) => onChange(sections.map((s, i) => (i === index ? { ...s, ...changes } : s)));
   const remove = (index) => onChange(_.reject(sections, (s, i) => i === index));
 
@@ -150,7 +153,7 @@ const SectionsEditor = ({ assets, fallbackTitle, onChange, onUpload, sections = 
       { _.map(sections, (section, index) => (
         <div className='card section-card' key={section.id || index}>
           <div className='section-head'>
-            <h4>{ LABELS[section.type] || section.type }</h4>
+            <Heading className='h-sub'>{ LABELS[section.type] || section.type }</Heading>
             <div className='section-controls'>
               <Button aria-label='Move up' disabled={index === 0} onClick={() => move(index, -1)} subtle>↑</Button>
               <Button aria-label='Move down' disabled={index === sections.length - 1} onClick={() => move(index, 1)} subtle>↓</Button>

@@ -422,7 +422,7 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
 
     return (
       <div className='card'>
-        <h4>{ result.extra?.filename } <JobStatus status={result.status} /></h4>
+        <h2 className='h-sub'>{ result.extra?.filename } <JobStatus status={result.status} /></h2>
         { error && <Message action={<FeedbackLink error={error} jobId={result.id} />} tone='negative'>{ error }</Message> }
         { result.status === JobStatuses.completed && (
           <div className='stats'>
@@ -471,7 +471,7 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
 
       { preview && (
         <div className='card'>
-          <h4>{ preview.filename }</h4>
+          <h2 className='h-sub'>{ preview.filename }</h2>
           <div className='stats'>
             <Stat label='Rows' value={preview.row_count} />
             { _.map(_.omit(geometryCounts, 'missing', 'invalid'), (n, type) => (
@@ -517,7 +517,7 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
             />
           )}
 
-          <h4>Columns</h4>
+          <h3 className='h-sub'>Columns</h3>
           <p className='muted'>
             Each row becomes a place in { preview.project_model_name }. A <strong>Category</strong> column becomes the
             atlas’s place-type filter (separate several values with “;”). An <strong>Identifier</strong> is a unique id
@@ -538,20 +538,22 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
             <span className='muted'>Then set the columns you want back to Field.</span>
           </div>
           <div className='scroll-x'>
-            <table className='table'>
-              <thead>
-                <tr>
-                  <th>Column</th>
-                  <th>Examples</th>
-                  <th>Use as</th>
-                  <th>Field name</th>
-                  <th>Type</th>
-                </tr>
-              </thead>
-              <tbody>
-                { _.map(columns, renderColumn) }
-              </tbody>
-            </table>
+            <div className='table-scroll'>
+              <table className='table'>
+                <thead>
+                  <tr>
+                    <th>Column</th>
+                    <th>Examples</th>
+                    <th>Use as</th>
+                    <th>Field name</th>
+                    <th>Type</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  { _.map(columns, renderColumn) }
+                </tbody>
+              </table>
+            </div>
           </div>
 
           { !_.isEmpty(problems) && <Message list={problems} tone='warning' /> }

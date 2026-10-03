@@ -135,7 +135,7 @@ const PagesEditor = ({ assets, items = [], liveUrl, locale, onChange, onUpload, 
 
   return (
     <>
-      <h3>Pages</h3>
+      <h2 className='h-section'>Pages</h2>
       <p className='muted'>Standalone pages such as About, Credits or How to cite, each at /{ locale }/pages/&lt;address&gt;.</p>
       { _.isEmpty(pages) && <p className='muted'>No pages yet.</p> }
       { _.map(pages, (p, index) => (
@@ -158,7 +158,7 @@ const PagesEditor = ({ assets, items = [], liveUrl, locale, onChange, onUpload, 
 
       { page && (
         <div className='page-editor'>
-          <h3>Editing “{ page.title || 'Untitled page' }”</h3>
+          <h2 className='h-section'>Editing “{ page.title || 'Untitled page' }”</h2>
           <div className='grid-2'>
             <Field label='Title' required>
               <input className='input' onChange={(e) => updatePage(selected, { title: e.target.value })} value={page.title || ''} />
@@ -175,8 +175,9 @@ const PagesEditor = ({ assets, items = [], liveUrl, locale, onChange, onUpload, 
           <Field hint='Shown by search engines and link previews.' label='Description'>
             <input className='input' onChange={(e) => updatePage(selected, { description: e.target.value })} value={page.description || ''} />
           </Field>
-          <h4>Sections</h4>
+          <h3 className='h-sub'>Sections</h3>
           <SectionsEditor
+            level={4}
             assets={assets}
             fallbackTitle={page.title}
             onChange={(sections) => updatePage(selected, { sections })}
@@ -189,7 +190,7 @@ const PagesEditor = ({ assets, items = [], liveUrl, locale, onChange, onUpload, 
         </div>
       )}
 
-      <h3>Menu</h3>
+      <h2 className='h-section'>Menu</h2>
       { !menuCustomized && (
         <div className='card row'>
           <p className='muted'>The menu shows Explore, then every page in the order above. The site title always links to the home page.</p>

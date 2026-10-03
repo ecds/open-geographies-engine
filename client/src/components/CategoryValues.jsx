@@ -118,7 +118,7 @@ const CategoryValues = ({ site }) => {
       </p>
       { _.map(categories, (category) => (
         <section key={category.id}>
-          <h3>{ category.name } <span className='muted'>({ category.terms.length })</span></h3>
+          <h2 className='h-section'>{ category.name } <span className='muted'>({ category.terms.length })</span></h2>
           { category.terms.length > FILTER_AT && (
             <input
               aria-label={`Find in ${category.name}`}
@@ -128,16 +128,18 @@ const CategoryValues = ({ site }) => {
               value={filters[category.id] || ''}
             />
           )}
-          <table className='table'>
-            <thead>
-              <tr><th>Value</th><th className='numeric'>Places</th><th /></tr>
-            </thead>
-            <tbody>
-              { _.map(visible[category.id], (term) => (
-                <ValueRow key={term.id} onRename={onRename} others={_.without(category.terms, term)} term={term} />
-              ))}
-            </tbody>
-          </table>
+          <div className='table-scroll'>
+            <table className='table'>
+              <thead>
+                <tr><th>Value</th><th className='numeric'>Places</th><th><span className='visually-hidden'>Actions</span></th></tr>
+              </thead>
+              <tbody>
+                { _.map(visible[category.id], (term) => (
+                  <ValueRow key={term.id} onRename={onRename} others={_.without(category.terms, term)} term={term} />
+                ))}
+              </tbody>
+            </table>
+          </div>
           { _.isEmpty(visible[category.id]) && <p className='muted'>Nothing matches.</p> }
         </section>
       ))}

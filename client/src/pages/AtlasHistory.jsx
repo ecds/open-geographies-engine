@@ -92,15 +92,15 @@ const VersionDetail = ({ canRestore, labels, onRestored, siteId, version }) => {
     <div className='history-detail'>
       { !_.isEmpty(detail.changes) && (
         <>
-          <h4>
+          <h2 className='h-sub'>
             { detail.changes_since?.gap
               ? `What changed since ${when(detail.changes_since.at)} (the saves in between are no longer kept)`
               : 'What this save changed' }
-          </h4>
+          </h2>
           <Summary labels={labels} summary={detail.changes} />
         </>
       )}
-      <h4>Compared with the atlas now</h4>
+      <h2 className='h-sub'>Compared with the atlas now</h2>
       { _.isEmpty(differing) ? (
         <p className='muted'>The atlas is the same as this version.</p>
       ) : (

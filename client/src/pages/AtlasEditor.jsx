@@ -29,7 +29,7 @@ import ImageField from '../components/ImageField';
 import { CROP_SHAPES, ImageCropContext } from '../components/ImageCropper';
 import PagesEditor from '../components/PagesEditor';
 import SectionsEditor from '../components/SectionsEditor';
-import { Button, Field, Message, MultiSelect, Select, Tag } from '../components/ui';
+import { Button, Field, Message, MultiSelect, onTabListKeyDown, Select, Tag } from '../components/ui';
 import { paths } from '../router';
 
 const TABS = [
@@ -359,11 +359,11 @@ const AtlasEditor = ({ id, navigate }) => {
 
   const renderGeneral = () => (
     <>
-      <h3>Visibility</h3>
+      <h2 className='h-section'>Visibility</h2>
       <PublishPanel onChange={(changes) => setSite((prev) => ({ ...prev, ...changes }))} site={site} />
-      <h3>Address</h3>
+      <h2 className='h-section'>Address</h2>
       <DomainPanel onChange={(changes) => setSite((prev) => ({ ...prev, ...changes }))} site={site} />
-      <h3>Languages</h3>
+      <h2 className='h-section'>Languages</h2>
       <LanguagesPanel i18n={siteConfig.i18n} onChange={updateI18n} />
       <Field label='Name' required>
         <input className='input' onChange={(e) => update({ name: e.target.value })} value={site.name || ''} />
@@ -371,7 +371,7 @@ const AtlasEditor = ({ id, navigate }) => {
       <Field hint={site.permissions?.manage === false ? 'The atlas’s platform address is built from it. Only the atlas’s owners can change it.' : 'Lowercase letters, numbers, and hyphens. The atlas’s platform address is built from it; changing it changes that address, and a connected domain has to be checked again.'} label='Slug' required>
         <input className='input' onChange={(e) => update({ slug: e.target.value })} readOnly={site.permissions?.manage === false} value={site.slug || ''} />
       </Field>
-      <h3>Search index</h3>
+      <h2 className='h-section'>Search index</h2>
       { _.isEmpty(collections) && <p className='muted'>No search collections.</p> }
       { _.map(collections, (collection) => (
         <div className='card row' key={collection.id}>
@@ -385,12 +385,12 @@ const AtlasEditor = ({ id, navigate }) => {
           <Button onClick={() => onReindex(collection)}>Reindex</Button>
         </div>
       ))}
-      <h3>Map tiles</h3>
+      <h2 className='h-section'>Map tiles</h2>
       <p className='muted'>Generates PMTiles from the project's place geometries — the full-dataset map layer for large collections. Runs as a job.</p>
       <Button onClick={onBuildTiles}>Build map tiles</Button>
       { site.permissions?.delete && (
         <>
-          <h3>Delete</h3>
+          <h2 className='h-section'>Delete</h2>
           <DeleteAtlasPanel onDeleted={() => navigate(paths.atlases())} site={site} />
         </>
       )}
@@ -439,7 +439,7 @@ const AtlasEditor = ({ id, navigate }) => {
         <input checked={branding.header?.hide_title === true} onChange={(e) => updateBrandingSection('header', { hide_title: e.target.checked })} type='checkbox' />
         Hide the title text in the header (logo only)
       </label>
-      <h3>Fonts</h3>
+      <h2 className='h-section'>Fonts</h2>
       <div className='grid-2'>
         <Field label='Header font'>
           <Select onChange={(v) => updateBranding({ font_header: v })} options={_.map(FONTS, (f) => ({ value: f, text: f }))} placeholder='Inter (default)' value={branding.font_header || ''} />
@@ -448,7 +448,7 @@ const AtlasEditor = ({ id, navigate }) => {
           <Select onChange={(v) => updateBranding({ font_body: v })} options={_.map(FONTS, (f) => ({ value: f, text: f }))} placeholder='Inter (default)' value={branding.font_body || ''} />
         </Field>
       </div>
-      <h3>Colors</h3>
+      <h2 className='h-section'>Colors</h2>
       <div className='grid-3'>
         { _.map(COLORS, ([key, label]) => (
           <Field key={key} label={label}>
@@ -459,7 +459,7 @@ const AtlasEditor = ({ id, navigate }) => {
           </Field>
         ))}
       </div>
-      <h3>Footer</h3>
+      <h2 className='h-section'>Footer</h2>
       <Field label='Credit line' hint='A line under the title, e.g. "A project of the Center for Digital Scholarship".'>
         <input className='input' onChange={(e) => updateBrandingSection('footer', { credit: e.target.value })} value={branding.footer?.credit || ''} />
       </Field>
@@ -481,7 +481,7 @@ const AtlasEditor = ({ id, navigate }) => {
       >
         <input className='input' maxLength={300} onChange={(e) => updateBrandingSection('footer', { copyright: e.target.value })} value={branding.footer?.copyright || ''} />
       </Field>
-      <h4>Partner logos</h4>
+      <h3 className='h-sub'>Partner logos</h3>
       { _.map(footerLogos, (logo, index) => (
         <div className='card' key={index}>
           <ImageField
@@ -548,7 +548,7 @@ const AtlasEditor = ({ id, navigate }) => {
             <Field hint='Shown by search engines and link previews.' label={`Description (${name})`}>
               <input className='input' onChange={(e) => updateTranslation(editingLocale, { home: { ...translatedHome, description: e.target.value } })} value={translatedHome.description || ''} />
             </Field>
-            <h4>Sections</h4>
+            <h2 className='h-sub'>Sections</h2>
             <SectionsEditor
               assets={assets}
               fallbackTitle={branding.title || site.name}
@@ -573,7 +573,7 @@ const AtlasEditor = ({ id, navigate }) => {
       <Field hint='Shown by search engines and link previews.' label='Description'>
         <input className='input' onChange={(e) => updateHome({ description: e.target.value })} value={home.description || ''} />
       </Field>
-      <h4>Sections</h4>
+      <h2 className='h-sub'>Sections</h2>
       <SectionsEditor
         assets={assets}
         fallbackTitle={branding.title || site.name}
@@ -620,7 +620,7 @@ const AtlasEditor = ({ id, navigate }) => {
   const renderLayers = () => (
     <>
       <HistoricMapPanel onAdd={(layer) => updateConfig({ layers: [...(siteConfig.layers || []), layer] })} />
-      <h3>Layers</h3>
+      <h2 className='h-section'>Layers</h2>
       <p className='muted'>The base maps visitors choose from, and overlays they can switch on. Changes apply when you save.</p>
       { _.map(siteConfig.layers || [], (layer, index) => (
         <div className='card' key={index}>
@@ -840,35 +840,37 @@ const AtlasEditor = ({ id, navigate }) => {
                 How each group of related records is headed on a record’s page and in the map’s panel. Leave a name empty
                 to use the FairData name.
               </p>
-              <table className='table'>
-                <thead>
-                  <tr>
-                    <th>In FairData</th>
-                    { _.map(atlasLocales, (loc) => <th key={loc}>{ atlasLocales.length > 1 ? `On the atlas (${loc})` : 'On the atlas' }</th>) }
-                  </tr>
-                </thead>
-                <tbody>
-                  { _.map(entry.relationships, (relationship) => (
-                    <tr key={relationship.key}>
-                      <td>
-                        { relationship.name }
-                        { relationship.related && <span className='muted'> · { relationship.inverse ? 'from' : 'to' } { relationship.related }</span> }
-                      </td>
-                      { _.map(atlasLocales, (loc) => (
-                        <td key={loc}>
-                          <input
-                            aria-label={`${relationship.name} (${loc})`}
-                            className='input'
-                            onChange={(e) => updateSectionName(relationship.key, loc, e.target.value)}
-                            placeholder={relationship.name}
-                            value={siteConfig.i18n?.strings?.[loc]?.[relationship.key] || ''}
-                          />
-                        </td>
-                      ))}
+              <div className='table-scroll'>
+                <table className='table'>
+                  <thead>
+                    <tr>
+                      <th>In FairData</th>
+                      { _.map(atlasLocales, (loc) => <th key={loc}>{ atlasLocales.length > 1 ? `On the atlas (${loc})` : 'On the atlas' }</th>) }
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    { _.map(entry.relationships, (relationship) => (
+                      <tr key={relationship.key}>
+                        <td>
+                          { relationship.name }
+                          { relationship.related && <span className='muted'> · { relationship.inverse ? 'from' : 'to' } { relationship.related }</span> }
+                        </td>
+                        { _.map(atlasLocales, (loc) => (
+                          <td key={loc}>
+                            <input
+                              aria-label={`${relationship.name} (${loc})`}
+                              className='input'
+                              onChange={(e) => updateSectionName(relationship.key, loc, e.target.value)}
+                              placeholder={relationship.name}
+                              value={siteConfig.i18n?.strings?.[loc]?.[relationship.key] || ''}
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
@@ -880,8 +882,8 @@ const AtlasEditor = ({ id, navigate }) => {
     <>
       <p className='muted'>Free-form JSON for config sections without a dedicated editor (the rest of detail_pages, result_filtering, i18n, wordpress, core_data.url). Merged into the site config when you click away.</p>
       { advancedError && <Message tone='negative'>Invalid JSON — fix the syntax to apply changes.</Message> }
-      <textarea className='input code' onBlur={onAdvancedBlur} onChange={(e) => setAdvancedText(e.target.value)} rows={24} spellCheck={false} value={advancedText} />
-      <h3>Config preview</h3>
+      <textarea aria-label='Settings as JSON' className='input code' onBlur={onAdvancedBlur} onChange={(e) => setAdvancedText(e.target.value)} rows={24} spellCheck={false} value={advancedText} />
+      <h2 className='h-section'>Config preview</h2>
       <p className='muted'>The emitted config.json — what the renderer receives for this atlas. Reflects the last saved state.</p>
       <Button onClick={onLoadPreview}>Load preview</Button>
       { preview && <pre className='code-block'>{ preview }</pre> }
@@ -912,9 +914,9 @@ const AtlasEditor = ({ id, navigate }) => {
       { notice && <Message tone='positive'>{ notice }</Message> }
       { site && (
         <section className='panel'>
-          <div className='tabs' role='tablist'>
+          <div aria-label='Settings' className='tabs' onKeyDown={onTabListKeyDown} role='tablist'>
             { _.map(TABS, (t) => (
-              <button aria-selected={tab === t.key} className='tab' key={t.key} onClick={() => setTab(t.key)} role='tab' type='button'>{ t.label }</button>
+              <button aria-selected={tab === t.key} className='tab' key={t.key} onClick={() => setTab(t.key)} role='tab' tabIndex={tab === t.key ? 0 : -1} type='button'>{ t.label }</button>
             ))}
           </div>
           { renderers[tab]() }

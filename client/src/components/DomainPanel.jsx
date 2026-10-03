@@ -98,27 +98,29 @@ const DomainPanel = ({ onChange, site }) => {
           { !connected && dns && !dns.local && (
             <div className='dns-records'>
               <p>Ask whoever manages <strong>{ site.domain }</strong>’s DNS to add one of these records, then check again.</p>
-              <table className='table'>
-                <thead>
-                  <tr><th>For</th><th>Type</th><th>Name</th><th>Value</th></tr>
-                </thead>
-                <tbody>
-                  { dns.cname && (
+              <div className='table-scroll'>
+                <table className='table'>
+                  <thead>
+                    <tr><th>For</th><th>Type</th><th>Name</th><th>Value</th></tr>
+                  </thead>
+                  <tbody>
+                    { dns.cname && (
+                      <tr>
+                        <td>A subdomain (atlas.example.org)</td>
+                        <td>CNAME</td>
+                        <td><code>{ site.domain }</code></td>
+                        <td><code>{ dns.cname }</code></td>
+                      </tr>
+                    )}
                     <tr>
-                      <td>A subdomain (atlas.example.org)</td>
-                      <td>CNAME</td>
-                      <td><code>{ site.domain }</code></td>
-                      <td><code>{ dns.cname }</code></td>
+                      <td>A root domain (example.org)</td>
+                      <td>TXT</td>
+                      <td><code>{ dns.txt_name }</code></td>
+                      <td><code>{ dns.txt_value }</code></td>
                     </tr>
-                  )}
-                  <tr>
-                    <td>A root domain (example.org)</td>
-                    <td>TXT</td>
-                    <td><code>{ dns.txt_name }</code></td>
-                    <td><code>{ dns.txt_value }</code></td>
-                  </tr>
-                </tbody>
-              </table>
+                  </tbody>
+                </table>
+              </div>
               <p className='muted'>
                 A root domain can’t have a CNAME: it also needs A or ALIAS records pointing at the platform
                 { dns.cname && <> (the same place as <code>{ dns.cname }</code>)</> }.

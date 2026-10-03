@@ -81,6 +81,22 @@ export const AssetPicker = ({ assets, onCancel, onPick, onUpload }) => {
 };
 
 /**
+ * Text that reads on a hex background (the logo previewed on the header's
+ * color): white on dark, the console's text color on light.
+ */
+const textOn = (background) => {
+  const hex = /^#([0-9a-f]{6}|[0-9a-f]{3})$/i.exec(background || '')?.[1];
+  if (!hex) return undefined;
+
+  const full = hex.length === 3 ? hex.split('').map((c) => c + c).join('') : hex;
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16) / 255)
+    .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+  return luminance < 0.18 ? '#ffffff' : '#1f2937';
+};
+
+/**
  * Width / height as a short ratio for people: 1.333 → "4:3".
  */
 const ratioLabel = (width, height) => {
@@ -122,7 +138,7 @@ const ImageField = ({ alt, assets, background, crop = {}, hint, label, onAltChan
       <span className='field-label'>{ label }</span>
       <div className='image-field'>
         <div className='image-preview' style={background ? { background } : undefined}>
-          { value ? <img alt='' src={preview} /> : <span className='muted'>No image</span> }
+          { value ? <img alt='' src={preview} /> : <span className='muted' style={background ? { color: textOn(background) } : undefined}>No image</span> }
         </div>
         <div className='image-actions'>
           <Button onClick={() => setPicking(!picking)}>{ value ? 'Change…' : 'Add image…' }</Button>

@@ -18,13 +18,13 @@ const AtlasHeader = ({ active, navigate, site }) => {
   // Feedback sent from this atlas's pages is about this atlas.
   useEffect(() => { if (site) setSite?.(site); }, [setSite, site]);
 
+  // The atlas's pages: links (a nav), the current one marked as the page.
   const tab = (to, label, key) => (
     <a
-      aria-selected={active === key}
+      aria-current={active === key ? 'page' : undefined}
       className='tab'
       href={to}
       onClick={(e) => { e.preventDefault(); navigate(to); }}
-      role='tab'
     >
       { label }
     </a>
@@ -49,7 +49,7 @@ const AtlasHeader = ({ active, navigate, site }) => {
         { link && <a className='button' href={link} rel='noreferrer' target='_blank'>{ site.published ? 'View atlas ↗' : 'Preview ↗' }</a> }
       </div>
       { site && (
-        <div className='tabs' role='tablist'>
+        <nav aria-label='Atlas pages' className='tabs'>
           { tab(paths.atlas(site.id), 'Settings', 'settings') }
           { tab(paths.places(site.id), 'Places', 'places') }
           { tab(paths.imports(site.id), 'Imports', 'imports') }
@@ -64,7 +64,7 @@ const AtlasHeader = ({ active, navigate, site }) => {
             People →
           </a>
           )}
-        </div>
+        </nav>
       )}
     </div>
   );

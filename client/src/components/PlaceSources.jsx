@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import DatasetImportPanel from './DatasetImportPanel';
 import PlaceImportPanel from './PlaceImportPanel';
+import { onTabListKeyDown } from './ui';
 
 const TABS = [
   { key: 'upload', label: 'Upload your data' },
@@ -17,7 +18,7 @@ const PlaceSources = ({ area, onImported, projectId }) => {
 
   return (
     <>
-      <div className='tabs' role='tablist'>
+      <div aria-label='Where the places come from' className='tabs' onKeyDown={onTabListKeyDown} role='tablist'>
         { TABS.map(({ key, label }) => (
           <button
             aria-selected={tab === key}
@@ -25,6 +26,7 @@ const PlaceSources = ({ area, onImported, projectId }) => {
             key={key}
             onClick={() => setTab(key)}
             role='tab'
+            tabIndex={tab === key ? 0 : -1}
             type='button'
           >
             { label }

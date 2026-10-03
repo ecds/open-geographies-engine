@@ -8,7 +8,7 @@ import {
 } from '../api';
 import { paths } from '../router';
 import { isAdmin } from '../session';
-import { Button, Message } from '../components/ui';
+import { Button, Message, onTabListKeyDown } from '../components/ui';
 
 const FILTERS = [
   { value: 'new', label: 'New' },
@@ -140,7 +140,7 @@ const FeedbackList = ({ navigate }) => {
   return (
     <main className='wizard'>
       <h1>Feedback</h1>
-      <div className='tabs' role='tablist'>
+      <div aria-label='Show' className='tabs' onKeyDown={onTabListKeyDown} role='tablist'>
         { _.map(FILTERS, (filter) => (
           <button
             aria-selected={status === filter.value}
@@ -148,6 +148,7 @@ const FeedbackList = ({ navigate }) => {
             key={filter.label}
             onClick={() => { setStatus(filter.value); setPage(1); }}
             role='tab'
+            tabIndex={status === filter.value ? 0 : -1}
             type='button'
           >
             { filter.label }
@@ -185,11 +186,11 @@ const FeedbackList = ({ navigate }) => {
               { report.status === 'new' ? 'Mark resolved' : 'Reopen' }
             </Button>
           </header>
-          <h4>What happened</h4>
+          <h2 className='h-sub'>What happened</h2>
           <p className='feedback-text'>{ report.what_happened }</p>
           { report.expected && (
             <>
-              <h4>What they expected</h4>
+              <h2 className='h-sub'>What they expected</h2>
               <p className='feedback-text'>{ report.expected }</p>
             </>
           )}

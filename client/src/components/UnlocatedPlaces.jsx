@@ -219,31 +219,33 @@ const UnlocatedPlaces = ({ site }) => {
               </p>
               { found.length > 0 && (
                 <>
-                  <table className='table'>
-                    <thead>
-                      <tr><th>Save</th><th>Place</th><th>Address</th><th>Matched</th></tr>
-                    </thead>
-                    <tbody>
-                      { _.map(found, (result) => (
-                        <tr key={result.id}>
-                          <td>
-                            <input
-                              aria-label='Save this location'
-                              checked={!!accepted[result.id]}
-                              onChange={(e) => setAccepted({ ...accepted, [result.id]: e.target.checked })}
-                              type='checkbox'
-                            />
-                          </td>
-                          <td>{ result.name || `#${result.id}` }</td>
-                          <td>{ result.address }</td>
-                          <td>
-                            { result.matched }
-                            { result.status === 'approximate' && <span className='muted'> (near)</span> }
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <div className='table-scroll'>
+                    <table className='table'>
+                      <thead>
+                        <tr><th>Save</th><th>Place</th><th>Address</th><th>Matched</th></tr>
+                      </thead>
+                      <tbody>
+                        { _.map(found, (result) => (
+                          <tr key={result.id}>
+                            <td>
+                              <input
+                                aria-label='Save this location'
+                                checked={!!accepted[result.id]}
+                                onChange={(e) => setAccepted({ ...accepted, [result.id]: e.target.checked })}
+                                type='checkbox'
+                              />
+                            </td>
+                            <td>{ result.name || `#${result.id}` }</td>
+                            <td>{ result.address }</td>
+                            <td>
+                              { result.matched }
+                              { result.status === 'approximate' && <span className='muted'> (near)</span> }
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                   <Button disabled={acceptedCount === 0 || saving} loading={saving} onClick={onSaveLookup} primary>
                     Save { acceptedCount } { acceptedCount === 1 ? 'location' : 'locations' }
                   </Button>
@@ -254,7 +256,7 @@ const UnlocatedPlaces = ({ site }) => {
         </details>
       )}
 
-      <h3>Place them on the map</h3>
+      <h2 className='h-section'>Place them on the map</h2>
       <div className='unlocated-layout'>
         <div className='unlocated-list'>
           <ul>
@@ -283,7 +285,7 @@ const UnlocatedPlaces = ({ site }) => {
         <div className='unlocated-detail'>
           { selected && (
             <>
-              <h4>{ selected.name }</h4>
+              <h3 className='h-sub'>{ selected.name }</h3>
               { selected.fields.length > 0 && (
                 <dl className='place-fields'>
                   { _.map(selected.fields.slice(0, 6), (field) => (

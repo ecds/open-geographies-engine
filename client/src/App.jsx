@@ -220,7 +220,7 @@ const Wizard = ({ navigate }) => {
               ))}
             </fieldset>
           )}
-          <h3>Geographic area <span className='muted'>(optional)</span></h3>
+          <h2 className='h-section'>Geographic area <span className='muted'>(optional)</span></h2>
           <p className='muted'>
             Used to find places in gazetteers such as GeoNames. Skip it if you’re bringing your own
             data; you can choose one later when importing.

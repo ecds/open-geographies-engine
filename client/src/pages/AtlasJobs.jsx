@@ -84,24 +84,26 @@ const AtlasJobs = ({ id, navigate }) => {
       { !_.isEmpty(errors) && <Message list={errors} tone='negative' /> }
       { jobs && _.isEmpty(jobs) && <Message>No jobs yet.</Message> }
       { !_.isEmpty(jobs) && (
-        <table className='table'>
-          <thead>
-            <tr><th>Job</th><th>Status</th><th>Details</th><th>Started</th></tr>
-          </thead>
-          <tbody>
-            { _.map(jobs, (job) => (
-              <tr key={job.id}>
-                <td>{ JOB_LABELS[job.job_type] || job.job_type }</td>
-                <td><JobStatus status={job.status} /></td>
-                <td className='muted'>
-                  { summary(job) }
-                  { job.status === JobStatuses.failed && <> <FeedbackLink error={summary(job)} jobId={job.id} /></> }
-                </td>
-                <td>{ new Date(job.created_at).toLocaleString() }</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className='table-scroll'>
+          <table className='table'>
+            <thead>
+              <tr><th>Job</th><th>Status</th><th>Details</th><th>Started</th></tr>
+            </thead>
+            <tbody>
+              { _.map(jobs, (job) => (
+                <tr key={job.id}>
+                  <td>{ JOB_LABELS[job.job_type] || job.job_type }</td>
+                  <td><JobStatus status={job.status} /></td>
+                  <td className='muted'>
+                    { summary(job) }
+                    { job.status === JobStatuses.failed && <> <FeedbackLink error={summary(job)} jobId={job.id} /></> }
+                  </td>
+                  <td>{ new Date(job.created_at).toLocaleString() }</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </main>
   );
