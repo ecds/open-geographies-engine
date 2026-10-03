@@ -164,22 +164,28 @@ module CoreDataConnector
     def update_site_config(site)
       url = layer_url(site)
 
-      layers = (site.config['layers'] || []).deep_dup
-      layer = layers.find { |entry| entry['generated'] == 'tiles' }
+      # Reloaded under the row's lock: the build took minutes, and the config
+      # (search, detail pages) may have been saved meanwhile; merging into the
+      # copy loaded at the start would put the older one back.
+      site.with_lock do
+        config = site.config || {}
+        layers = (config['layers'] || []).deep_dup
+        layer = layers.find { |entry| entry['generated'] == 'tiles' }
 
-      if layer
-        layer['url'] = url
-      else
-        layers << {
-          'name' => LAYER_NAME,
-          'layer_type' => 'pmtiles',
-          'url' => url,
-          'overlay' => true,
-          'generated' => 'tiles'
-        }
+        if layer
+          layer['url'] = url
+        else
+          layers << {
+            'name' => LAYER_NAME,
+            'layer_type' => 'pmtiles',
+            'url' => url,
+            'overlay' => true,
+            'generated' => 'tiles'
+          }
+        end
+
+        site.update!(config: config.merge('layers' => layers))
       end
-
-      site.update!(config: site.config.merge('layers' => layers))
 
       url
     end

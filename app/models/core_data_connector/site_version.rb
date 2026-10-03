@@ -45,15 +45,21 @@ module CoreDataConnector
 
     validates :source, inclusion: { in: SOURCES }
 
-    # The site's versioned columns as they are now (or were, with
-    # `previous: true`, before the save being recorded), as JSON reads them
-    # back (string keys), so a snapshot compares equal to its stored self.
-    def self.snapshot_of(site, previous: false)
-      snapshot = COLUMNS.to_h do |column|
-        [column, previous ? site.attribute_before_last_save(column) : site.public_send(column)]
-      end
+    # The site's versioned columns as this record holds them, as JSON reads
+    # them back (string keys), so a snapshot compares equal to its stored
+    # self. For a site just loaded (comparing with "now").
+    def self.snapshot_of(site)
+      JSON.parse(COLUMNS.to_h { |column| [column, site.public_send(column)] }.to_json)
+    end
 
-      JSON.parse(snapshot.to_json)
+    # The site's versioned columns as saved: read back from its row inside
+    # the save's transaction. Not from the record, which may have been loaded
+    # long before (a tile build holds it for minutes) and so holds stale
+    # values for the columns its save didn't write.
+    def self.saved_snapshot(site)
+      values = uncached { site.class.where(id: site.id).pick(*COLUMNS) }
+
+      JSON.parse(COLUMNS.zip(values).to_h.to_json)
     end
 
     # A part's value in a snapshot.
@@ -93,10 +99,12 @@ module CoreDataConnector
       columns_changed = created || COLUMNS.any? { |column| site.saved_change_to_attribute?(column) }
       return if !columns_changed && events.empty?
 
-      after = snapshot_of(site)
+      after = saved_snapshot(site)
 
       unless created || exists?(site_id: site.id)
-        before = snapshot_of(site, previous: true)
+        # The row as it was: as it is now, with this save's own changes undone.
+        undone = site.saved_changes.slice(*COLUMNS).transform_values(&:first)
+        before = after.merge(JSON.parse(undone.to_json))
         create!(site:, project_id: site.project_id, source: 'baseline', snapshot: before, created_at: site.updated_at_before_last_save || Time.current)
       end
 
@@ -118,12 +126,17 @@ module CoreDataConnector
       prune!(site.id)
     end
 
-    # Keeps the newest KEEP versions and the first.
+    # Keeps the newest KEEP versions and the first. The oldest of the newest
+    # then follows the first with versions missing between them; it's marked
+    # (`events.pruned_before`) so what it changed isn't read as one save's.
     def self.prune!(site_id)
       ids = where(site_id:).order(id: :desc).pluck(:id)
       return if ids.size <= KEEP + 1
 
       where(id: ids[KEEP...-1]).delete_all
+
+      oldest = find(ids[KEEP - 1])
+      oldest.update_columns(events: oldest.events.merge('pruned_before' => true)) unless oldest.events['pruned_before']
     end
 
     def self.part(key)
@@ -139,7 +152,8 @@ module CoreDataConnector
         if !part[:path] && !part[:rest]
           site.public_send("#{part[:column]}=", value)
         else
-          current = (site.public_send(part[:column]) || {}).deep_dup
+          current = site.public_send(part[:column])
+          current = current.is_a?(Hash) ? current.deep_dup : {}
           named = PARTS.select { |p| p[:column] == part[:column] && p[:path] }.map { |p| p[:path] }
           updated = if part[:rest]
                       current.slice(*named).merge(value || {})
