@@ -134,10 +134,16 @@ The wizard's "Add places" step and each atlas's Imports page offer two sources.
 **Upload your data** (`DatasetImportsController`, `ImportDatasetJob`,
 `app/services/core_data_connector/dataset_imports/`). A CSV (comma, semicolon or tab; any
 common encoding), an Excel (.xlsx) or OpenDocument (.ods) workbook (first sheet), a GeoJSON
-file, or a zipped shapefile (.shp + .dbf, with .prj/.cpg when present; longitude/latitude
+file, KML or KMZ, or a zipped shapefile (.shp + .dbf, with .prj/.cpg when present; longitude/latitude
 only — projected files are refused with re-export steps), up to 50 MB / 50,000 rows.
-Workbooks use roo and shapefiles rubyzip, both already in core-data-cloud's bundle; the
-shapefile reader needs no GIS library. The preview proposes a role per
+Workbooks use roo, shapefiles and KMZ rubyzip, KML Nokogiri's pull reader — all already in
+core-data-cloud's bundle; neither reader needs a GIS library. KML (`KmlReader`): a row per
+Placemark — name, description (HTML to text), address, ExtendedData `Data`/`SimpleData` as
+columns, TimeStamp/TimeSpan as a fuzzy-date "Dates" column, the innermost folder as "Folder"
+(proposed as the category when it repeats); Point, LineString, Polygon with holes,
+MultiGeometry and gx:Track; read one placemark at a time, DOCTYPEs refused, no network. In a
+KMZ, network links to .kml files inside the zip are followed (GDAL's per-layer KMZ), others
+and image overlays are reported, and reading stops past 250 MB unpacked. The preview proposes a role per
 column (place name, field, category, latitude, longitude, geometry, identifier, skip) and a
 field type, shows the rows on a map, and lists rows whose location can't be used (e.g. a
 projected CRS). The place-name suggestion is scored (a name-like header, filled, nearly unique,
@@ -191,7 +197,7 @@ Each search's "Also search in" (Settings → Search; `search_fields`, from
 a promoted field under its key (`address`), any other as `<label>.value` — and is emitted to
 the renderer as `elasticsearch.search_attributes` after the name and descriptions.
 
-Older .xls, a bare .shp and KML are refused with instructions. Fixtures for each reader,
+Older .xls and a bare .shp are refused with instructions. Fixtures for each reader,
 written with independent tools (openpyxl, odfpy, GDAL), are in `test/fixtures/datasets/`.
 
 **From a gazetteer**: GeoNames and Wikidata imports for the atlas's area (`PlaceImportsController`,

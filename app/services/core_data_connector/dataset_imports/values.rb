@@ -39,6 +39,11 @@ module CoreDataConnector
       QUARTER = /\A(\d{2})q([1-4])\z/i
       # "ca. 1825- ca. 1830": a range with circa on either end, kept as written.
       CIRCA_RANGE = /\A(?:c\.?|ca\.?|circa|about)\s*(\d{4})\s*(?:-|–|—|to)\s*(?:(?:c\.?|ca\.?|circa|about)\s*)?(\d{4})\z/i
+      # Two dates as a span: "1819-03-01 – 1886-05", "1819-03/1886" (ISO 8601's
+      # interval), "March 1819 to 1886" is not read. Each end a year, a month
+      # or a day; a dash between them needs spaces around it, an en/em dash
+      # or slash doesn't.
+      DATE_SPAN = %r{\A(\d{4}[-/\d]*?)\s*(?:–|—|/(?=\d{4})|\s-\s|\sto\s)\s*(\d{4}[-/\d]*)\z}
 
       ACCURACY = { year: 0, month: 1, date: 2 }.freeze
 
@@ -151,6 +156,16 @@ module CoreDataConnector
           return fuzzy(Date.new(from, 1, 1), Date.new(from + 24, 12, 31), :year, range: true)
         end
 
+        if (match = DATE_SPAN.match(value))
+          from = date_end(match[1])
+          to = date_end(match[2])
+          return :invalid unless from && to && to[1] >= from[0]
+
+          # The coarser end says how exact the span is.
+          accuracy = [from[2], to[2]].min_by { |a| ACCURACY.fetch(a) }
+          return fuzzy(from[0], to[1], accuracy, range: true)
+        end
+
         :invalid
       rescue Date::Error
         :invalid
@@ -213,6 +228,23 @@ module CoreDataConnector
       end
 
       # Core Data's fuzzy date document.
+      # One end of a span: [first day, last day, accuracy] for a year, a
+      # month or a day, else nil.
+      def date_end(text)
+        if (match = FULL_DATE.match(text))
+          day = Date.new(match[1].to_i, match[2].to_i, match[3].to_i)
+          [day, day, :date]
+        elsif (match = MONTH.match(text))
+          start = Date.new(match[1].to_i, match[2].to_i, 1)
+          [start, start.end_of_month, :month]
+        elsif (match = YEAR.match(text))
+          year = match[1].to_i
+          [Date.new(year, 1, 1), Date.new(year, 12, 31), :year]
+        end
+      rescue Date::Error
+        nil
+      end
+
       def fuzzy(start, finish, accuracy, range: false, description: nil)
         {
           'start_date' => start.iso8601,

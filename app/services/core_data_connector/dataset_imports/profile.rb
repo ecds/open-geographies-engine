@@ -309,10 +309,16 @@ module CoreDataConnector
 
         @category_column = columns.each_with_index.filter_map do |column, index|
           stat = stats[column]
-          next unless category_header?(column) && stat[:categorical] && stat[:terms] >= 2 && !skip_reason(column, stat)
+          next unless (category_header?(column) || kml_folder?(column)) && stat[:categorical] && stat[:terms] >= 2 && !skip_reason(column, stat)
 
           [stat[:terms], -index, column]
         end.max&.last
+      end
+
+      # A KML file's folders ("Day 1", "Churches") usually sort its places
+      # into kinds; proposed like a category header when they repeat.
+      def kml_folder?(column)
+        reader.format == 'kml' && column == KmlReader::FOLDER
       end
 
       # "Building types", "ResType", "site_type": a category word among the
@@ -386,7 +392,7 @@ module CoreDataConnector
       end
 
       def row_label(row)
-        prefix = %w[geojson shapefile].include?(reader.format) ? 'Feature' : 'Row'
+        prefix = Reader.row_name(reader.format)
         "#{prefix} #{row[:line] || (row[:index] + 2)}"
       end
 

@@ -62,7 +62,7 @@ module CoreDataConnector
       @model = model
       @columns = columns
       @mapping = DatasetImports::Geometry.mapping_for(format, columns)
-      @row_label = %w[geojson shapefile].include?(format) ? 'Feature' : 'Row'
+      @row_label = DatasetImports::Reader.row_name(format)
       @name_column = role_column('name')
       @identifier_column = role_column('identifier')
       @photo_column = role_column('photo')

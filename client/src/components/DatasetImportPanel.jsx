@@ -27,7 +27,7 @@ import {
 // package bundles another), which the rest of the console never needs.
 const PreviewMap = lazy(() => import('./PreviewMap'));
 
-const ACCEPT = '.csv,.tsv,.txt,.xlsx,.ods,.geojson,.json,.zip';
+const ACCEPT = '.csv,.tsv,.txt,.xlsx,.ods,.geojson,.json,.kml,.kmz,.zip';
 
 const ROLES = [
   { value: 'name', text: 'Place name' },
@@ -454,8 +454,9 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
     <div className='import-panel'>
       <p className='muted'>
         A spreadsheet (Excel .xlsx, OpenDocument .ods, or CSV or tab-separated text: .csv, .tsv, .txt), a
-        GeoJSON file (.geojson or .json), or a shapefile zipped with its .dbf and .prj; up to 50 MB and
-        50,000 rows. Nothing is imported until you review it and press Import.
+        GeoJSON file (.geojson or .json), a Google Earth or My Maps file (.kml or .kmz), or a shapefile
+        zipped with its .dbf and .prj; up to 50 MB and 50,000 rows. Nothing is imported until you review
+        it and press Import.
       </p>
 
       { !_.isEmpty(errors) && <Message list={errors} tone='negative' /> }

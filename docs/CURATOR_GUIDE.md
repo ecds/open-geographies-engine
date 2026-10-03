@@ -36,11 +36,11 @@ shows.
 - **A FairData account.** Someone who runs your FairData site creates it, or an atlas owner invites you
   (see [People](#16-people-owners-and-editors)).
 - **Your data**, if you have it: one row per place in a spreadsheet (Excel, OpenDocument or CSV), or a
-  GeoJSON file or zipped shapefile. It helps to have:
+  GeoJSON file, a Google Earth or My Maps file (KML/KMZ) or a zipped shapefile. It helps to have:
   - a **name** column;
   - where each place is: **latitude and longitude** in decimal degrees (33.749, -84.388), a street
-    **address** (U.S. addresses can be looked up for you), or a shape (GeoJSON, a shapefile, or WKT
-    text in a column);
+    **address** (U.S. addresses can be looked up for you), or a shape (GeoJSON, KML, a shapefile, or
+    WKT text in a column);
   - a **category** column (building, district, church…) that becomes the atlas's main filter;
   - a column with a **unique id** for each row from your source (a record number or link), so you
     can import the same file again later without duplicates;
@@ -88,11 +88,21 @@ Under **Imports** (or step 3 of the wizard), choose **Upload your data**.
 Choose your file and **Preview**. Nothing is imported until you review it and press **Import**.
 
 - **Files read:** Excel `.xlsx`, OpenDocument `.ods`, CSV or tab-separated text (`.csv`, `.tsv`,
-  `.txt`), GeoJSON (`.geojson` or `.json`), and a shapefile zipped with its `.dbf`, `.shx` and `.prj`.
-  Up to 50 MB and 50,000 rows.
+  `.txt`), GeoJSON (`.geojson` or `.json`), KML or KMZ (`.kml`, `.kmz`: Google Earth, Google My Maps,
+  QGIS), and a shapefile zipped with its `.dbf`, `.shx` and `.prj`. Up to 50 MB and 50,000 rows.
+- **KML and KMZ:** each placemark is a place: its name, its description (Google Earth's formatted
+  descriptions become plain text, links kept as "text (address)"), its address, its points, lines
+  or shapes (holes and multi-part shapes included; GPS tracks as lines), and every value under
+  *Data* in Google Earth's "Get Info" (ExtendedData) as a column of its own. A placemark's time
+  (TimeStamp or TimeSpan) becomes a **Dates** column ("1819–1886"). The folder each placemark is in
+  becomes a **Folder** column, proposed as the category when folders sort the places into kinds
+  ("Churches", "Squares"); choose **Don't import** if they don't. Image overlays (a scanned map laid
+  over Google Earth) are not imported — add a scanned map under
+  [Historic maps](#12-map-layers-and-historic-maps) instead — and network links to files on the web
+  are not followed; the preview says when a file has either. A KMZ that links to its own layers
+  inside the zip (as GDAL and QGIS write them) is read whole.
 - **Converting other files:**
   - **Older `.xls`:** save it as `.xlsx` or CSV in Excel first.
-  - **KML:** convert it to GeoJSON (with QGIS or geojson.io).
   - **Shapefiles:** they must be in latitude/longitude (WGS 84). The console explains how to
     convert a projected one in QGIS.
 
@@ -427,7 +437,7 @@ Someone invited by email can work on the atlases they've been added to, but can'
 
 | | |
 |---|---|
-| Data files | .xlsx, .ods, .csv, GeoJSON, zipped shapefile (WGS 84); up to 50 MB and 50,000 rows |
+| Data files | .xlsx, .ods, .csv, GeoJSON, KML/KMZ, zipped shapefile (WGS 84); up to 50 MB and 50,000 rows |
 | Address lookup | U.S. street addresses |
 | Images | PNG, JPEG, GIF, WebP, AVIF, SVG, ICO up to 10 MB; TIFF up to 100 MB |
 | Languages | English, Spanish, French, German, Italian, Portuguese |

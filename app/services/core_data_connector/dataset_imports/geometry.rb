@@ -24,7 +24,7 @@ module CoreDataConnector
       TYPES = %w[Point MultiPoint LineString MultiLineString Polygon MultiPolygon GeometryCollection].freeze
 
       # Formats whose rows carry their own geometry.
-      FEATURE_FORMATS = %w[geojson shapefile].freeze
+      FEATURE_FORMATS = %w[geojson shapefile kml].freeze
 
       class Error < StandardError; end
 
@@ -117,7 +117,10 @@ module CoreDataConnector
         coordinates = positions(geometry)
         raise Error, 'has an empty geometry' if coordinates.empty?
 
-        outside = coordinates.find { |lon, lat| !lon.is_a?(Numeric) || !lat.is_a?(Numeric) || lon.abs > 180 || lat.abs > 90 }
+        unreadable = coordinates.find { |lon, lat| !lon.is_a?(Numeric) || !lat.is_a?(Numeric) }
+        raise Error, "has coordinates that are not numbers (#{unreadable.first(2).join(', ').truncate(40)})" if unreadable
+
+        outside = coordinates.find { |lon, lat| lon.abs > 180 || lat.abs > 90 }
         return unless outside
 
         raise Error, "has coordinates outside longitude/latitude range (#{outside.first(2).join(', ')}); " \

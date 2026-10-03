@@ -16,9 +16,9 @@ module CoreDataConnector
     #
     # Supported: CSV (comma, semicolon or tab separated; any common encoding),
     # Excel (.xlsx) and OpenDocument (.ods) workbooks, GeoJSON (a
-    # FeatureCollection, a single Feature, or a bare geometry) and zipped
-    # Shapefiles. Everything else is refused with a message that says what to
-    # do instead.
+    # FeatureCollection, a single Feature, or a bare geometry), zipped
+    # Shapefiles, and KML/KMZ. Everything else is refused with a message that
+    # says what to do instead.
     #
     # Rows also carry `line`: where the curator will find the row in their own
     # file (the spreadsheet row number, or the feature's position).
@@ -33,13 +33,20 @@ module CoreDataConnector
       GEOJSON_EXTENSIONS = %w[.geojson .json].freeze
       SPREADSHEET_EXTENSIONS = { '.xlsx' => :xlsx, '.ods' => :ods }.freeze
       SHAPEFILE_EXTENSIONS = %w[.zip].freeze
+      KML_EXTENSIONS = { '.kml' => false, '.kmz' => true }.freeze
 
       HINTS = {
         '.xls' => 'Older Excel files (.xls) are not read: in Excel, use File → Save As → Excel Workbook (.xlsx) or CSV, then upload that.',
-        '.shp' => 'A shapefile is several files: zip the layer’s .shp, .dbf, .shx and .prj together and upload the .zip.',
-        '.kml' => 'KML is not read directly yet: convert it to GeoJSON (for example with QGIS or geojson.io), then upload that.',
-        '.kmz' => 'KMZ is not read directly yet: convert it to GeoJSON (for example with QGIS or geojson.io), then upload that.'
+        '.shp' => 'A shapefile is several files: zip the layer’s .shp, .dbf, .shx and .prj together and upload the .zip.'
       }.freeze
+
+      # What a row is called in each format's own terms, for messages
+      # ("Placemark 12", "Feature 3", "Row 7").
+      ROW_NAMES = { 'geojson' => 'Feature', 'shapefile' => 'Feature', 'kml' => 'Placemark' }.freeze
+
+      def self.row_name(format)
+        ROW_NAMES.fetch(format, 'Row')
+      end
 
       def self.open(path, filename:)
         extension = File.extname(filename.to_s).downcase
@@ -54,9 +61,11 @@ module CoreDataConnector
           SpreadsheetReader.new(path, extension: SPREADSHEET_EXTENSIONS[extension])
         elsif SHAPEFILE_EXTENSIONS.include?(extension)
           ShapefileReader.new(path)
+        elsif KML_EXTENSIONS.key?(extension)
+          KmlReader.new(path, kmz: KML_EXTENSIONS[extension])
         else
           raise UnsupportedFormat, HINTS.fetch(extension) {
-            "Upload a .csv, .xlsx, .ods, .geojson or zipped shapefile (.zip) (got #{extension.presence || 'no extension'})."
+            "Upload a .csv, .xlsx, .ods, .geojson, .kml, .kmz or zipped shapefile (.zip) (got #{extension.presence || 'no extension'})."
           }
         end
       end

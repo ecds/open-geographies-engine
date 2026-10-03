@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">
+<Document>
+	<name>Savannah walking tour.kmz</name>
+	<Style id="s_ylw-pushpin">
+		<IconStyle><scale>1.1</scale><Icon><href>http://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png</href></Icon></IconStyle>
+	</Style>
+	<StyleMap id="m_ylw-pushpin">
+		<Pair><key>normal</key><styleUrl>#s_ylw-pushpin</styleUrl></Pair>
+	</StyleMap>
+	<Folder>
+		<name>Walking tour</name>
+		<open>1</open>
+		<Folder>
+			<name>Day 1</name>
+			<Placemark>
+				<name>Telfair Academy</name>
+				<description><![CDATA[<div><b>Telfair Academy</b> (1819)</div><p>Designed by William Jay.<br>Open Tue&ndash;Sun.</p><p><a href="https://www.telfair.org/">Museum website</a></p><img src="https://example.org/telfair.jpg" width="200">]]></description>
+				<TimeSpan><begin>1819</begin><end>1886</end></TimeSpan>
+				<styleUrl>#m_ylw-pushpin</styleUrl>
+				<ExtendedData>
+					<Data name="Architect"><displayName>Architect</displayName><value>William Jay</value></Data>
+					<Data name="Stop"><value>1</value></Data>
+				</ExtendedData>
+				<Point><gx:drawOrder>1</gx:drawOrder><coordinates>-81.0951,32.0784,0</coordinates></Point>
+			</Placemark>
+			<Placemark>
+				<name>Owens–Thomas House</name>
+				<description>A plain-text description,
+on two lines.</description>
+				<address>124 Abercorn St, Savannah, GA</address>
+				<ExtendedData>
+					<Data name="Architect"><value>William Jay</value></Data>
+					<Data name="Stop"><value>2</value></Data>
+				</ExtendedData>
+				<Point><coordinates>-81.0896, 32.0775, 0</coordinates></Point>
+			</Placemark>
+		</Folder>
+		<Folder>
+			<name>Day 2</name>
+			<Placemark>
+				<name>Morning walk (GPS track)</name>
+				<ExtendedData><Data name="Stop"><value>3</value></Data></ExtendedData>
+				<gx:Track>
+					<when>2026-03-01T09:00:00Z</when>
+					<when>2026-03-01T09:05:00Z</when>
+					<when>2026-03-01T09:10:00Z</when>
+					<gx:coord>-81.0915 32.0805 5</gx:coord>
+					<gx:coord>-81.0930 32.0790 5</gx:coord>
+					<gx:coord>-81.0951 32.0784 6</gx:coord>
+				</gx:Track>
+			</Placemark>
+			<Placemark>
+				<name>Colonial Park Cemetery</name>
+				<TimeStamp><when>1750</when></TimeStamp>
+				<ExtendedData><Data name="Stop"><value>4</value></Data></ExtendedData>
+				<Polygon>
+					<tessellate>1</tessellate>
+					<outerBoundaryIs><LinearRing><coordinates>
+						-81.0905,32.0745,0 -81.0880,32.0745,0 -81.0880,32.0765,0 -81.0905,32.0765,0
+					</coordinates></LinearRing></outerBoundaryIs>
+				</Polygon>
+			</Placemark>
+			<Placemark>
+				<name>Bad coordinates (test)</name>
+				<ExtendedData><Data name="Stop"><value>5</value></Data></ExtendedData>
+				<Point><coordinates>-81.09,north</coordinates></Point>
+			</Placemark>
+		</Folder>
+	</Folder>
+	<Placemark>
+		<name>Visitor center (outside any folder)</name>
+		<ExtendedData><Data name="Stop"><value>0</value></Data></ExtendedData>
+		<Point><coordinates>-81.0993,32.0779</coordinates></Point>
+	</Placemark>
+	<NetworkLink>
+		<name>Live bus positions</name>
+		<Link><href>https://example.org/buses.kml</href><refreshMode>onInterval</refreshMode></Link>
+	</NetworkLink>
+	<GroundOverlay>
+		<name>1818 plan of Savannah</name>
+		<Icon><href>files/plan-1818.jpg</href></Icon>
+		<LatLonBox><north>32.085</north><south>32.070</south><east>-81.085</east><west>-81.100</west></LatLonBox>
+	</GroundOverlay>
+</Document>
+</kml>

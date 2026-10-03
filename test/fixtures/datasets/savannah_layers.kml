@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+<Document id="root_doc">
+<Schema name="Churches" id="Churches">
+	<SimpleField name="Denomination" type="string"></SimpleField>
+	<SimpleField name="Founded" type="int"></SimpleField>
+	<SimpleField name="Address" type="string"></SimpleField>
+	<SimpleField name="Notes" type="string"></SimpleField>
+</Schema>
+<Folder><name>Churches</name>
+  <Placemark id="Churches.1">
+	<name>First African Baptist Church</name>
+	<description>&lt;b&gt;Founded&lt;/b&gt; 1773&lt;br&gt;One of the oldest Black congregations in North America.</description>
+	<ExtendedData><SchemaData schemaUrl="#Churches">
+		<SimpleData name="Denomination">Baptist</SimpleData>
+		<SimpleData name="Founded">1773</SimpleData>
+		<SimpleData name="Address">23 Montgomery St</SimpleData>
+		<SimpleData name="Notes">Pews &amp; ceiling &lt; 1859 &gt; restored</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-81.0946,32.0812</coordinates></Point>
+  </Placemark>
+  <Placemark id="Churches.2">
+	<name>Christ Church Episcopal</name>
+	<description>Mother church of Georgia.</description>
+	<ExtendedData><SchemaData schemaUrl="#Churches">
+		<SimpleData name="Denomination">Episcopal</SimpleData>
+		<SimpleData name="Founded">1733</SimpleData>
+		<SimpleData name="Address">28 Bull St</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-81.0911,32.0806</coordinates></Point>
+  </Placemark>
+  <Placemark id="Churches.3">
+	<name>Cathédrale Saint-Jean-Baptiste (test name)</name>
+	<ExtendedData><SchemaData schemaUrl="#Churches">
+		<SimpleData name="Denomination">Catholic</SimpleData>
+		<SimpleData name="Founded">1799</SimpleData>
+		<SimpleData name="Address">222 E Harris St</SimpleData>
+		<SimpleData name="Notes">Accented name</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-81.0921,32.0738</coordinates></Point>
+  </Placemark>
+</Folder>
+<Folder><name>Squares</name>
+  <Placemark id="Squares.1">
+	<name>Johnson Square</name>
+	<description>The first square, 1733.</description>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#Squares">
+		<SimpleData name="Ward">Derby</SimpleData>
+		<SimpleData name="Laid out">1733</SimpleData>
+	</SchemaData></ExtendedData>
+      <Polygon><outerBoundaryIs><LinearRing><coordinates>-81.0915,32.08 -81.0905,32.08 -81.0905,32.0809 -81.0915,32.0809 -81.0915,32.08</coordinates></LinearRing></outerBoundaryIs></Polygon>
+  </Placemark>
+  <Placemark id="Squares.2">
+	<name>Forsyth Park</name>
+	<description>With a hole where the fountain plaza is (test geometry).</description>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#Squares">
+		<SimpleData name="Laid out">1840</SimpleData>
+	</SchemaData></ExtendedData>
+      <Polygon><outerBoundaryIs><LinearRing><coordinates>-81.099,32.064 -81.096,32.064 -81.096,32.07 -81.099,32.07 -81.099,32.064</coordinates></LinearRing></outerBoundaryIs><innerBoundaryIs><LinearRing><coordinates>-81.098,32.068 -81.098,32.0688 -81.097,32.0688 -81.097,32.068 -81.098,32.068</coordinates></LinearRing></innerBoundaryIs></Polygon>
+  </Placemark>
+  <Placemark id="Squares.3">
+	<name>Emmet Park</name>
+	<description>Two parts along Bay Street.</description>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#Squares">
+		<SimpleData name="Ward">Warren</SimpleData>
+		<SimpleData name="Laid out">1902</SimpleData>
+	</SchemaData></ExtendedData>
+      <MultiGeometry><Polygon><outerBoundaryIs><LinearRing><coordinates>-81.088,32.0795 -81.087,32.0795 -81.087,32.08 -81.088,32.08 -81.088,32.0795</coordinates></LinearRing></outerBoundaryIs></Polygon><Polygon><outerBoundaryIs><LinearRing><coordinates>-81.0865,32.0793 -81.0855,32.0793 -81.0855,32.0798 -81.0865,32.0798 -81.0865,32.0793</coordinates></LinearRing></outerBoundaryIs></Polygon></MultiGeometry>
+  </Placemark>
+</Folder>
+<Folder><name>Streets</name>
+  <Placemark id="Streets.1">
+	<name>Bull Street</name>
+	<description>Oglethorpe's north–south axis.</description>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#Streets">
+		<SimpleData name="Laid out">1733</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-81.0912,32.0812 -81.0915,32.076 -81.096,32.064</coordinates></LineString>
+  </Placemark>
+  <Placemark id="Streets.2">
+	<name>River Street rail spur</name>
+	<description>Two surviving segments.</description>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#Streets">
+		<SimpleData name="Laid out">1870</SimpleData>
+	</SchemaData></ExtendedData>
+      <MultiGeometry><LineString><coordinates>-81.095,32.0815 -81.092,32.0818</coordinates></LineString><LineString><coordinates>-81.09,32.082 -81.087,32.0822</coordinates></LineString></MultiGeometry>
+  </Placemark>
+</Folder>
+<Folder><name>Forts</name>
+  <Placemark id="Forts.1">
+	<name>Fort Pulaski</name>
+	<description>The fort and its visitor center.</description>
+	<ExtendedData><SchemaData schemaUrl="#Forts">
+		<SimpleData name="Laid out">1829</SimpleData>
+	</SchemaData></ExtendedData>
+      <MultiGeometry><Point><coordinates>-80.8903,32.0272</coordinates></Point><Polygon><outerBoundaryIs><LinearRing><coordinates>-80.8915,32.0262 -80.889,32.0262 -80.889,32.0282 -80.8915,32.0282 -80.8915,32.0262</coordinates></LinearRing></outerBoundaryIs></Polygon></MultiGeometry>
+  </Placemark>
+  <Placemark id="Forts.2">
+	<name>Savannah Theatre (no location in the file)</name>
+	<description>A place without geometry.</description>
+	<ExtendedData><SchemaData schemaUrl="#Forts">
+		<SimpleData name="Laid out">1818</SimpleData>
+	</SchemaData></ExtendedData>
+  </Placemark>
+</Folder>
+<Schema name="Squares" id="Squares">
+	<SimpleField name="Ward" type="string"></SimpleField>
+	<SimpleField name="Laid out" type="int"></SimpleField>
+</Schema>
+<Schema name="Streets" id="Streets">
+	<SimpleField name="Laid out" type="int"></SimpleField>
+</Schema>
+<Schema name="Forts" id="Forts">
+	<SimpleField name="Laid out" type="int"></SimpleField>
+</Schema>
+</Document></kml>
