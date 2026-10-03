@@ -4,8 +4,10 @@ module CoreDataConnector
   #   GET  /core_data/sites/:id/versions?page=1
   #        { versions: [{ id, created_at, source, user, changed_parts, events, restored_from_id }], total, page, per_page, parts }
   #   GET  /core_data/sites/:id/versions/:version_id
-  #        { version: {...}, changes: { part => [lines] }, differences: { part => [lines] } }
-  #        `changes`: what that save changed (from the version before it);
+  #        { version: {...}, changes: { part => [lines] }, changes_since: {...}, differences: { part => [lines] } }
+  #        `changes`: what that save changed (from the version before it;
+  #        `changes_since` = { at:, gap: true } when older versions were
+  #        removed between them, so it covers more than one save);
   #        `differences`: what restoring it would change now.
   #   POST /core_data/sites/:id/versions/:version_id/restore   { parts: ["home", "branding", ...] }
   #        → { site: {...}, version: {...} }
@@ -42,6 +44,7 @@ module CoreDataConnector
       render json: {
         version: version_json(version),
         changes: previous ? SiteVersionSummary.compare(previous.snapshot, version.snapshot) : {},
+        changes_since: previous && version.events['pruned_before'] ? { at: previous.created_at, gap: true } : nil,
         differences: SiteVersionSummary.compare(SiteVersion.snapshot_of(site), version.snapshot)
       }, status: :ok
     end
@@ -49,14 +52,22 @@ module CoreDataConnector
     def restore
       site = authorized_site(:update?)
       version = site.versions.find(params[:version_id])
+      requested = Array(params[:parts]).map(&:to_s) & SiteVersion::PART_KEYS
+      parts = []
+      saved = false
 
-      parts = Array(params[:parts]).map(&:to_s) & SiteVersion::PART_KEYS
-      parts &= version.differing_parts(site)
+      # Under the row's lock, from the row as it is: a restore writes whole
+      # columns, so a save that landed after this request loaded the site
+      # would otherwise be overwritten with this copy's older values.
+      site.with_lock do
+        parts = requested & version.differing_parts(site)
+        next if parts.empty?
+
+        version.apply_to(site, parts)
+        saved = SiteVersion::Context.set(user: current_user, source: 'restore', restored_from_id: version.id) { site.save }
+      end
+
       render json: { errors: [{ base: 'Choose a part that differs from the atlas as it is now.' }] }, status: :unprocessable_entity and return if parts.empty?
-
-      version.apply_to(site, parts)
-
-      saved = SiteVersion::Context.set(user: current_user, source: 'restore', restored_from_id: version.id) { site.save }
       render json: { errors: [site.errors.to_hash] }, status: :unprocessable_entity and return unless saved
 
       render json: { site: { id: site.id, name: site.name }, version: site.versions.first && version_json(site.versions.first) }, status: :ok
