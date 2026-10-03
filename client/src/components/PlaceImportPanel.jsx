@@ -7,6 +7,7 @@ import useJobPolling from '../hooks/useJobPolling';
 import AreaMap from './AreaMap';
 import AtlasAreaForm from './AtlasAreaForm';
 import JobStatus from './JobStatus';
+import FeedbackLink from './FeedbackLink';
 import ReindexStatus from './ReindexStatus';
 import {
   Button,
@@ -274,7 +275,7 @@ const PlaceImportPanel = ({ area: initialArea, onImported, projectId }) => {
             { counts.failed > 0 && <Stat label='Failed' tone='negative' value={counts.failed} /> }
           </div>
         )}
-        { error && <Message tone='negative'>{ error }</Message> }
+        { error && <Message action={<FeedbackLink error={error} jobId={resultJob.id} />} tone='negative'>{ error }</Message> }
         { counts?.imported > 0 && resultJob.extra?.reindex_job_id && <ReindexStatus jobId={resultJob.extra.reindex_job_id} /> }
         { !_.isEmpty(warnings) && <Message header='Warnings' list={warnings} tone='warning' /> }
         { !_.isEmpty(duplicates) && (

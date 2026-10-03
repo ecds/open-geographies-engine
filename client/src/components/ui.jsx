@@ -5,7 +5,7 @@ import _ from 'underscore';
  * names map to styles.css.
  */
 
-export const Message = ({ children, header, list, tone = 'info' }) => (
+export const Message = ({ action, children, header, list, tone = 'info' }) => (
   <div className={`message message-${tone}`} role={tone === 'negative' ? 'alert' : 'status'}>
     { header && <strong className='message-header'>{ header }</strong> }
     { children }
@@ -14,6 +14,7 @@ export const Message = ({ children, header, list, tone = 'info' }) => (
         { _.map(list, (item, index) => <li key={index}>{ item }</li>) }
       </ul>
     )}
+    { action && <div className='message-action'>{ action }</div> }
   </div>
 );
 

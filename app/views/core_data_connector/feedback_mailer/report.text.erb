@@ -1,0 +1,29 @@
+<%= @report.user ? "#{@report.user.name} <#{@report.user.email}>" : 'Someone' %> sent feedback<%= @report.site ? " about the atlas “#{@report.site.name}”" : '' %>.
+
+What happened
+<%= @report.what_happened %>
+<% if @report.expected.present? %>
+
+What they expected
+<%= @report.expected %>
+<% end %>
+
+Where
+  Page:     <%= @report.page_url.present? ? "#{@console_url}#{@report.page_url.start_with?('/') ? @report.page_url : "/#{@report.page_url}"}" : '—' %>
+<% if @report.site %>
+  Atlas:    <%= @report.site.name %> (<%= @report.site.slug %>), FairData project <%= @report.project&.name || @report.site.project_id %>
+<% end %>
+<% if @report.context['error'].present? %>
+  Error:    <%= @report.context['error'] %>
+<% end %>
+<% if @report.context['job_id'].present? %>
+  Job:      <%= @report.context['job_id'] %>
+<% end %>
+  Browser:  <%= @report.context['user_agent'] || '—' %>
+  Window:   <%= @report.context['viewport'] || '—' %><%= @report.context['screen'].present? ? " (screen #{@report.context['screen']})" : '' %>
+<% if @report.screenshot.attached? %>
+
+Screenshot attached.
+<% end %>
+
+Report #<%= @report.id %>, <%= @report.created_at.utc.strftime('%Y-%m-%d %H:%M UTC') %>. All reports: <%= @console_url %>/atlases/feedback

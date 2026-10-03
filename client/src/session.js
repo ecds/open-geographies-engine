@@ -39,6 +39,12 @@ export const isSignedIn = () => {
 export const canCreateAtlases = () => getSession().user?.role !== 'guest';
 
 /**
+ * FairData's administrators run the platform: they read the feedback
+ * curators send.
+ */
+export const isAdmin = () => getSession().user?.role === 'admin';
+
+/**
  * Stores a session as the console would (the /auth/login response: token,
  * exp, user), so the two clients share one sign-in.
  */

@@ -3,8 +3,10 @@ import _ from 'underscore';
 import { errorMessages, fetchJobs, fetchSite } from '../api';
 import JobStatus from '../components/JobStatus';
 import { Message } from '../components/ui';
-import { isTerminal } from '../jobs';
+import { isTerminal, JobStatuses } from '../jobs';
 import AtlasHeader from '../components/AtlasHeader';
+import FeedbackLink from '../components/FeedbackLink';
+import { explain } from '../components/ReindexStatus';
 
 const JOB_LABELS = {
   provision_atlas: 'Provision atlas',
@@ -53,6 +55,12 @@ const AtlasJobs = ({ id, navigate }) => {
   const summary = (job) => {
     const extra = job.extra || {};
 
+    // A failed job says why, not how far it got; a reindex in the curator's
+    // terms, as the import panels do.
+    if (job.status === JobStatuses.failed && extra.error) {
+      return job.job_type === 'reindex' ? explain(extra.error) : extra.error;
+    }
+
     if (extra.counts) {
       return `${extra.counts.imported} imported, ${extra.counts.skipped} skipped`;
     }
@@ -83,7 +91,10 @@ const AtlasJobs = ({ id, navigate }) => {
               <tr key={job.id}>
                 <td>{ JOB_LABELS[job.job_type] || job.job_type }</td>
                 <td><JobStatus status={job.status} /></td>
-                <td className='muted'>{ summary(job) }</td>
+                <td className='muted'>
+                  { summary(job) }
+                  { job.status === JobStatuses.failed && <> <FeedbackLink error={summary(job)} jobId={job.id} /></> }
+                </td>
                 <td>{ new Date(job.created_at).toLocaleString() }</td>
               </tr>
             ))}

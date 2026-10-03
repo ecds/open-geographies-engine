@@ -77,7 +77,9 @@ const ERROR_PREFIXES = {
   content: '',
   branding: 'Branding: ',
   navigation: 'Menu: ',
-  config: ''
+  config: '',
+  screenshot: '',
+  what_happened: 'What happened: '
 };
 
 export const errorMessages = (error, prefixes = {}) => {
@@ -214,3 +216,50 @@ export const locateUnlocatedPlaces = (siteId, locations) => request('POST', `/co
 export const fetchCategories = (siteId) => request('GET', `/core_data/sites/${siteId}/categories`);
 
 export const renameCategoryValue = (siteId, termId, name) => request('PATCH', `/core_data/sites/${siteId}/categories/${termId}`, { body: { name } });
+
+// --- Feedback (FeedbackReportsController) ---------------------------------
+
+/**
+ * Sends a feedback report: { what_happened, expected, page_url, site_id,
+ * context: {...}, screenshot: File }.
+ */
+export const sendFeedback = ({ context, screenshot, ...fields }) => {
+  const form = new FormData();
+
+  Object.entries(fields).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      form.append(key, value);
+    }
+  });
+  Object.entries(context || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      form.append(`context[${key}]`, String(value));
+    }
+  });
+  if (screenshot) {
+    form.append('screenshot', screenshot);
+  }
+
+  return request('POST', '/core_data/feedback_reports', { form });
+};
+
+export const fetchFeedbackReports = (params) => request('GET', '/core_data/feedback_reports', { params });
+
+export const updateFeedbackReport = (id, status) => request('PATCH', `/core_data/feedback_reports/${id}`, { body: { status } });
+
+/**
+ * A report's screenshot as an object URL (the image is served only with the
+ * session's Authorization header, which an <img src> can't send). The caller
+ * revokes it.
+ */
+export const fetchFeedbackScreenshot = async (id) => {
+  const response = await fetch(`${config.apiBaseUrl}/core_data/feedback_reports/${id}/screenshot`, {
+    headers: { Authorization: getToken() || '' }
+  });
+
+  if (!response.ok) {
+    throw new ApiError(`${response.status} ${response.statusText}`, response.status);
+  }
+
+  return URL.createObjectURL(await response.blob());
+};

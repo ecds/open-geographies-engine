@@ -53,6 +53,14 @@ where they meet these. Today's reference deployment is the demo stack in [`demo/
   addresses.
 - [ ] **Cron**: `bin/rails open_geographies:check_domains` hourly. It re-checks custom-domain
   DNS, connecting late arrivals and disconnecting domains whose DNS moved away.
+- [ ] **Curator feedback** ("Send feedback" in the console) is always kept in the host's
+  database and listed for FairData administrators at `/atlases/feedback`. To have each report
+  emailed as well, set `OG_FEEDBACK_EMAIL` (comma-separated addresses). Mail goes through the
+  host's own delivery (Postmark: `POSTMARK_API_TOKEN`), from `OG_FEEDBACK_FROM` or else
+  `POSTMARK_FROM`, which must be a Postmark sender signature; replies go to the curator. A
+  delivery that fails is retried twice, then shown on the report as "Email failed" (the report
+  itself is never lost). Screenshots (PNG/JPEG/WebP, 10 MB) are stored with the host's other
+  uploads and served only to their sender and admins.
 
 ## 3. Proxy, CDN and caching
 
@@ -132,6 +140,8 @@ where they meet these. Today's reference deployment is the demo stack in [`demo/
   config; others (and every atlas after a renderer restart) render empty until it's back.
 - [ ] **Sidekiq failed and dead jobs**, especially reindex jobs (see 8). Curators also see
   each atlas's jobs in the console.
+- [ ] Someone reads **curator feedback** (`/atlases/feedback`, or the `OG_FEEDBACK_EMAIL`
+  inbox) and marks it resolved.
 - [ ] **Elasticsearch disk**: past the flood-stage watermark (95%), ES makes the index
   read-only and every reindex fails (this happened on the demo machine). Alert at 85%.
 - [ ] Field count of `open_geographies_v1` against its limit (see 8).

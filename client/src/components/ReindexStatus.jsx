@@ -1,12 +1,13 @@
 import useJobPolling from '../hooks/useJobPolling';
 import { JobStatuses } from '../jobs';
+import FeedbackLink from './FeedbackLink';
 import { Message, Progress } from './ui';
 
 /**
  * What a reindex means for the curator, in their terms. The search index is
  * shared by every atlas, so two failures come from outside this atlas.
  */
-const explain = (error) => {
+export const explain = (error) => {
   if (!error) {
     return 'The search index refused the update.';
   }
@@ -50,7 +51,11 @@ const ReindexStatus = ({ jobId }) => {
 
   if (job.status === JobStatuses.failed) {
     return (
-      <Message header='The atlas couldn’t be updated' tone='negative'>
+      <Message
+        action={<FeedbackLink error={explain(job.extra?.error)} jobId={jobId} />}
+        header='The atlas couldn’t be updated'
+        tone='negative'
+      >
         { explain(job.extra?.error) }
       </Message>
     );

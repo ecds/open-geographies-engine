@@ -14,6 +14,7 @@ import { isTerminal, JobStatuses } from '../jobs';
 import AddressLookup from './AddressLookup';
 import JobStatus from './JobStatus';
 import CopyPhotosStatus from './CopyPhotosStatus';
+import FeedbackLink from './FeedbackLink';
 import ReindexStatus from './ReindexStatus';
 import {
   Button,
@@ -422,7 +423,7 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
     return (
       <div className='card'>
         <h4>{ result.extra?.filename } <JobStatus status={result.status} /></h4>
-        { error && <Message tone='negative'>{ error }</Message> }
+        { error && <Message action={<FeedbackLink error={error} jobId={result.id} />} tone='negative'>{ error }</Message> }
         { result.status === JobStatuses.completed && (
           <div className='stats'>
             <Stat label='Imported' tone='positive' value={counts.imported || 0} />
@@ -459,7 +460,7 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
         it and press Import.
       </p>
 
-      { !_.isEmpty(errors) && <Message list={errors} tone='negative' /> }
+      { !_.isEmpty(errors) && <Message action={<FeedbackLink error={errors} />} list={errors} tone='negative' /> }
 
       <div className='card'>
         <input accept={ACCEPT} aria-label='Dataset file' onChange={onChooseFile} type='file' />

@@ -433,6 +433,17 @@ Someone invited by email can work on the atlases they've been added to, but can'
   - Placed places and category renames: within a minute or so.
   - Copied photos: about one a second.
 
+### Send feedback
+
+**Send feedback** at the top of every console page opens a short form: what happened, what you
+expected, and a screenshot if it helps (choose a file, or copy a screenshot and paste it into the
+form with ⌘V / Ctrl+V). Where something failed — an import, a reindex, copying photos, a job, creating
+an atlas — **Tell us what went wrong** beside the message opens the same form with the message and the
+job already attached. The form lists what's sent along with your words: the page, the atlas, the
+message and job when there is one, your browser and window size, and your name and email so the
+platform's team can reply. Only the platform's administrators read feedback; nobody working on
+another atlas sees it.
+
 ## 18. Quick reference
 
 | | |
@@ -445,3 +456,4 @@ Someone invited by email can work on the atlases they've been added to, but can'
 | Dates | Settings → Search → Time: a date filter, oldest/newest sorts, an optional timeline |
 | Draft → public | Settings → General → Visibility → **Publish atlas** (owners) |
 | Changes live | Within 30 seconds of **Save** |
+| Stuck? | **Send feedback** (top of the console), or **Tell us what went wrong** beside a failure |

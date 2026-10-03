@@ -1,5 +1,7 @@
+import { useEffect } from 'react';
 import { liveUrl, previewUrl } from '../atlasLinks';
 import config from '../config';
+import { useFeedback } from '../feedback';
 import { paths } from '../router';
 
 /**
@@ -11,6 +13,10 @@ import { paths } from '../router';
  */
 const AtlasHeader = ({ active, navigate, site }) => {
   const link = site?.published ? liveUrl(site) : previewUrl(site);
+  const { setSite } = useFeedback();
+
+  // Feedback sent from this atlas's pages is about this atlas.
+  useEffect(() => { if (site) setSite?.(site); }, [setSite, site]);
 
   const tab = (to, label, key) => (
     <a

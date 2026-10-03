@@ -47,6 +47,11 @@ module OpenGeographiesPlatform
           post :reindex, on: :member
         end
 
+        # "Send feedback" from the console (FeedbackReportsController).
+        resources :feedback_reports, only: [:index, :show, :create, :update] do
+          get :screenshot, on: :member
+        end
+
         resources :sites do
           get :config, action: :site_config, on: :member
           get :facets, on: :member

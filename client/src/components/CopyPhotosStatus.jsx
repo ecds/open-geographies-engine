@@ -2,6 +2,7 @@ import _ from 'underscore';
 import useJobPolling from '../hooks/useJobPolling';
 import { JobStatuses } from '../jobs';
 import ReindexStatus from './ReindexStatus';
+import FeedbackLink from './FeedbackLink';
 import { Message, Progress } from './ui';
 
 /**
@@ -34,7 +35,7 @@ const CopyPhotosStatus = ({ jobId }) => {
 
   if (job.status === JobStatuses.failed) {
     return (
-      <Message header='The photos couldn’t be copied' tone='negative'>
+      <Message action={<FeedbackLink error={job.extra?.error} jobId={jobId} />} header='The photos couldn’t be copied' tone='negative'>
         { job.extra?.error }
         { counts.copied > 0 && ` ${counts.copied} were copied before it stopped; importing the file again copies the rest.` }
       </Message>

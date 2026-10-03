@@ -21,6 +21,7 @@ module OpenGeographiesPlatform
       attr_reader :a, :b, :editor
 
       EDITOR_EMAIL = 'og-tenancy-probe-e@example.test'
+      ADMIN_EMAIL = 'og-tenancy-probe-admin@example.test'
 
       def self.build!(password:)
         new.tap { |fixtures| fixtures.build!(password:) }
@@ -35,6 +36,8 @@ module OpenGeographiesPlatform
 
       def teardown!
         remove_editor
+        remove_admin
+        remove_feedback([a&.user&.id, b&.user&.id])
         [a, b].compact.each do |tenant|
           tenant.job&.destroy
           tenant.site&.destroy
@@ -59,8 +62,35 @@ module OpenGeographiesPlatform
         user
       end
 
+      # An administrator of the platform, made only for the feedback checks
+      # (admins read every report) and removed with the fixtures.
+      def build_admin(password:)
+        remove_admin
+        ::CoreDataConnector::User.create!(
+          name: 'Tenancy Probe Admin', email: ADMIN_EMAIL, password:, password_confirmation: password,
+          role: ::CoreDataConnector::User::ROLE_ADMIN, require_password_change: false,
+          skip_invitation: true, last_sign_in_at: Time.now.utc
+        )
+      end
+
+      def remove_admin
+        ::CoreDataConnector::User.where(email: ADMIN_EMAIL).find_each do |user|
+          remove_feedback([user.id])
+          user.destroy
+        end
+      end
+
+      # Reports the probe's users sent, with their screenshots.
+      def remove_feedback(user_ids)
+        ::CoreDataConnector::FeedbackReport.where(user_id: user_ids.compact).find_each do |report|
+          report.screenshot.purge if report.screenshot.attached?
+          report.destroy
+        end
+      end
+
       def remove_editor
         ::CoreDataConnector::User.where(email: EDITOR_EMAIL).find_each do |user|
+          remove_feedback([user.id])
           ::CoreDataConnector::Job.where(user_id: user.id).delete_all
           ::CoreDataConnector::UserProject.where(user_id: user.id).delete_all
           user.destroy
@@ -69,6 +99,7 @@ module OpenGeographiesPlatform
 
       def build_tenant(key, password:, discoverable:)
         email = "og-tenancy-probe-#{key}@example.test"
+        remove_feedback(::CoreDataConnector::User.where(email:).pluck(:id))
 
         # Leftovers from a KEEP=1 or crashed run.
         ::CoreDataConnector::Site.where(slug: ["og-tenancy-probe-#{key}", 'og-tenancy-probe-bare', 'og-tenancy-probe-foreign', 'og-tenancy-probe-borrowed', 'og-tenancy-probe-doomed']).destroy_all
@@ -378,6 +409,10 @@ module OpenGeographiesPlatform
         remote_files_refusals
       end
 
+      group 'feedback reports: anyone signed in sends them; only admins read others\'' do
+        feedback(a, b)
+      end
+
       group 'uploaded photos get web-sized copies' do
         if ::CoreDataConnector::SiteImages.available?
           image_copies(a)
@@ -388,6 +423,64 @@ module OpenGeographiesPlatform
     end
 
     private
+
+    # "Send feedback": who may send a report, about which atlas, and who may
+    # read it, its screenshot and its status.
+    def feedback(a, b)
+      path = '/core_data/feedback_reports'
+      report = { what_happened: 'Probe: the import failed.', expected: 'Places on the map.', page_url: '/atlases', context: { source: 'probe' } }
+      ids = ->(res) { Array(body(res)['feedback_reports']).map { |r| r['id'] } }
+
+      refused 'anonymous can\'t send one', post(path, report)
+      refused 'nor list them', get(path)
+
+      res = post(path, report.merge(site_id: a.site.id), a.token)
+      status 'an owner sends one about their atlas', res, '201'
+      mine = body(res)['feedback_report'] || {}
+      check '... tied to the atlas and its project', mine.dig('site', 'id') == a.site.id && mine.dig('project', 'id') == a.project.id, mine.inspect[0, 160]
+
+      before = ::CoreDataConnector::FeedbackReport.count
+      status 'another tenant can\'t send one about it', post(path, report.merge(site_id: a.site.id), b.token), '404'
+      check '... and nothing is saved', ::CoreDataConnector::FeedbackReport.count == before
+
+      editor_token = login(Fixtures::EDITOR_EMAIL)
+      status 'an editor (a FairData guest) sends one', post(path, report.merge(site_id: a.site.id), editor_token), '201'
+
+      res = post(path, report, b.token)
+      status 'B sends one without an atlas', res, '201'
+      theirs = body(res)['feedback_report']&.dig('id')
+
+      res = get(path, b.token)
+      check 'B lists only its own', ids.(res) == [theirs], ids.(res).inspect
+      status 'B can\'t read A\'s', get("#{path}/#{mine['id']}", b.token), %w[401 404]
+      status 'nor mark it resolved', patch("#{path}/#{mine['id']}", { status: 'resolved' }, b.token), %w[401 404]
+      status 'an owner can\'t mark even their own resolved', patch("#{path}/#{mine['id']}", { status: 'resolved' }, a.token), %w[401 403]
+      check '... and it stays new', ::CoreDataConnector::FeedbackReport.find(mine['id']).status == 'new'
+      status 'a blank report is refused', post(path, report.merge(what_happened: '  '), a.token), '422'
+
+      res = multipart(path, { what_happened: 'Probe: with a screenshot', site_id: a.site.id.to_s }, { screenshot: ['shot.png', PNG, 'image/png'] }, a.token)
+      status 'a screenshot is attached', res, '201'
+      shot = body(res)['feedback_report']&.dig('id')
+      res = get("#{path}/#{shot}/screenshot", a.token, accept: '*/*')
+      check 'the sender sees it, sandboxed', res.code == '200' && res['Content-Type'].to_s.start_with?('image/png') &&
+                                            res['X-Content-Type-Options'] == 'nosniff' && res['Content-Security-Policy'].to_s.include?('sandbox') &&
+                                            res['Cache-Control'].to_s.include?('no-store'), "#{res.code} #{res['Content-Type']}"
+      status 'another tenant can\'t', get("#{path}/#{shot}/screenshot", b.token, accept: '*/*'), %w[401 404]
+      status 'nor anonymous', get("#{path}/#{shot}/screenshot", nil, accept: '*/*'), '401'
+      status 'an HTML file named .png is refused', multipart(path, { what_happened: 'x' }, { screenshot: ['shot.png', '<html><script>alert(1)</script></html>', 'image/png'] }, a.token), '422'
+
+      admin = @fixtures.send(:build_admin, password: @password)
+      admin_token = login(admin.email)
+      res = get(path, admin_token)
+      check 'an admin lists everyone\'s', (ids.(res) & [mine['id'], theirs, shot]).size == 3, ids.(res).inspect[0, 120]
+      status 'an admin marks one resolved', patch("#{path}/#{mine['id']}", { status: 'resolved' }, admin_token), '200'
+      check '... recorded, with who', ::CoreDataConnector::FeedbackReport.find(mine['id']).then { |r| r.status == 'resolved' && r.resolved_by_id == admin.id }
+      status 'an admin sees the screenshot', get("#{path}/#{shot}/screenshot", admin_token, accept: '*/*'), '200'
+
+      # Twenty an hour per person.
+      codes = Array.new(::CoreDataConnector::FeedbackReport::HOURLY_LIMIT) { post(path, report, b.token).code }
+      check 'too many in an hour are refused', codes.last == '429' && codes.count('201') == ::CoreDataConnector::FeedbackReport::HOURLY_LIMIT - 1, codes.tally.inspect
+    end
 
     # A 2400 x 1600 photo through upload, the public bundle, the public route
     # and delete (SiteImages).
@@ -708,7 +801,20 @@ module OpenGeographiesPlatform
       {}
     end
 
-    def get(path, token = nil, preview: nil) = request(Net::HTTP::Get, path, nil, token, preview:)
+    def get(path, token = nil, preview: nil, accept: 'application/json') = request(Net::HTTP::Get, path, nil, token, preview:, accept:)
+
+    # A multipart form: fields plus files ({ name => [filename, bytes, type] }).
+    def multipart(path, fields, files, token = nil)
+      uri = URI.join(@host, path)
+      req = Net::HTTP::Post.new(uri)
+      req['Accept'] = 'application/json'
+      req['Authorization'] = token if token
+      parts = fields.map { |name, value| [name.to_s, value.to_s] } +
+              files.map { |name, (filename, bytes, type)| [name.to_s, StringIO.new(bytes), { filename:, content_type: type }] }
+      req.set_form(parts, 'multipart/form-data')
+
+      Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https') { |http| http.request(req) }
+    end
 
     # A multipart file upload (the console's image upload).
     def upload(path, filename, bytes, token = nil)

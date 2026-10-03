@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import _ from 'underscore';
 import { createAtlas, errorMessages, signIn } from './api';
 import { liveUrl, previewUrl } from './atlasLinks';
@@ -9,6 +9,8 @@ import useJobPolling from './hooks/useJobPolling';
 import { canCreateAtlases, isSignedIn, setSession } from './session';
 import { paths, useRoute } from './router';
 import AtlasAreaForm from './components/AtlasAreaForm';
+import FeedbackDialog from './components/FeedbackDialog';
+import FeedbackLink from './components/FeedbackLink';
 import PlaceSources from './components/PlaceSources';
 import Shell from './components/Shell';
 import { Button, Field, Message } from './components/ui';
@@ -17,6 +19,8 @@ import AtlasImports from './pages/AtlasImports';
 import AtlasJobs from './pages/AtlasJobs';
 import AtlasPlaces from './pages/AtlasPlaces';
 import AtlasList from './pages/AtlasList';
+import FeedbackList from './pages/FeedbackList';
+import FeedbackContext from './feedback';
 
 const Steps = {
   basics: 'basics',
@@ -223,7 +227,9 @@ const Wizard = ({ navigate }) => {
           <AtlasAreaForm onChange={(area) => update({ area })} value={atlas.area} />
           { /* Beside the button, not at the top of the form: the curator is
                looking here when the create fails. */ }
-          { !_.isEmpty(errors) && <Message header='Unable to create the atlas' list={errors} tone='negative' /> }
+          { !_.isEmpty(errors) && (
+            <Message action={<FeedbackLink error={errors} />} header='Unable to create the atlas' list={errors} tone='negative' />
+          )}
           <div className='actions'>
             <Button disabled={!atlas.name.trim() || saving} loading={saving} onClick={onCreate} primary>
               Create atlas
@@ -345,6 +351,37 @@ const SignIn = ({ onSignedIn }) => {
 };
 
 /**
+ * "Send feedback" for the whole console: the form, and the atlas it's about
+ * (the atlas pages report theirs through `setSite`, from AtlasHeader).
+ */
+const FeedbackProvider = ({ children, siteId }) => {
+  const [prefill, setPrefill] = useState(null);
+  const [site, setSite] = useState(null);
+
+  useEffect(() => {
+    if (!siteId) setSite(null);
+  }, [siteId]);
+
+  const value = useMemo(() => ({
+    open: (details = {}) => setPrefill(details),
+    setSite
+  }), []);
+
+  return (
+    <FeedbackContext.Provider value={value}>
+      { children }
+      { prefill && (
+        <FeedbackDialog
+          onClose={() => setPrefill(null)}
+          prefill={prefill}
+          site={site && site.id === siteId ? site : null}
+        />
+      )}
+    </FeedbackContext.Provider>
+  );
+};
+
+/**
  * The engine's console: the wizard plus the atlas pages, chosen by path.
  */
 const App = () => {
@@ -374,13 +411,18 @@ const App = () => {
     atlas: () => <AtlasEditor id={route.id} key={route.id} navigate={navigate} />,
     imports: () => <AtlasImports id={route.id} key={route.id} navigate={navigate} />,
     jobs: () => <AtlasJobs id={route.id} key={route.id} navigate={navigate} />,
-    places: () => <AtlasPlaces id={route.id} key={route.id} navigate={navigate} />
+    places: () => <AtlasPlaces id={route.id} key={route.id} navigate={navigate} />,
+    feedback: () => <FeedbackList navigate={navigate} />
   }[route.name];
 
+  const active = { wizard: 'wizard', feedback: 'feedback' }[route.name] || 'atlases';
+
   return (
-    <Shell active={route.name === 'wizard' ? 'wizard' : 'atlases'} navigate={navigate}>
-      { page() }
-    </Shell>
+    <FeedbackProvider siteId={route.name === 'wizard' || route.name === 'feedback' ? null : route.id}>
+      <Shell active={active} navigate={navigate}>
+        { page() }
+      </Shell>
+    </FeedbackProvider>
   );
 };
 

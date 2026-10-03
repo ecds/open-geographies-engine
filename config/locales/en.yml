@@ -12,3 +12,7 @@ en:
       destroy?: 'You do not have permission to delete this search collection.'
     core_data_connector/job_policy:
       show?: 'You do not have permission to view this job.'
+    core_data_connector/feedback_report_policy:
+      create?: 'Sign in to send feedback.'
+      show?: 'You do not have permission to view this feedback.'
+      update?: 'Only administrators can mark feedback resolved.'

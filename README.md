@@ -18,7 +18,10 @@ are written `::OpenGeographies::V1::…` / `::OpenGeographies::ProjectModelRole`
 Running it in production (with the renderer): [`PRODUCTION.md`](PRODUCTION.md), the
 readiness checklist. Trying it locally in one command: [`demo/`](demo/). For curators:
 [`docs/CURATOR_GUIDE.md`](docs/CURATOR_GUIDE.md), linked from the console's header as **Guide ↗**
-(`OG_GUIDE_URL` points it elsewhere).
+(`OG_GUIDE_URL` points it elsewhere). Beside it, **Send feedback**: curators' reports
+(`FeedbackReport`, `/core_data/feedback_reports`), kept for FairData admins at
+`/atlases/feedback` and emailed to `OG_FEEDBACK_EMAIL` when set (`FeedbackEmailJob`);
+failures in the console offer "Tell us what went wrong" with the message and job attached.
 
 ## Why an engine
 

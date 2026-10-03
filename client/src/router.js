@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from 'react';
 const ROUTES = [
   { name: 'wizard', pattern: /^\/wizard\/?$/ },
   { name: 'atlases', pattern: /^\/atlases\/?$/ },
+  { name: 'feedback', pattern: /^\/atlases\/feedback\/?$/ },
   { name: 'atlas', pattern: /^\/atlases\/(\d+)\/?$/ },
   { name: 'imports', pattern: /^\/atlases\/(\d+)\/imports\/?$/ },
   { name: 'jobs', pattern: /^\/atlases\/(\d+)\/jobs\/?$/ },
@@ -32,7 +33,8 @@ const TITLES = {
   atlas: 'Atlas settings',
   imports: 'Imports',
   jobs: 'Jobs',
-  places: 'Places'
+  places: 'Places',
+  feedback: 'Feedback'
 };
 
 export const useRoute = () => {
@@ -63,5 +65,6 @@ export const paths = {
   atlas: (id) => `/atlases/${id}`,
   imports: (id) => `/atlases/${id}/imports`,
   jobs: (id) => `/atlases/${id}/jobs`,
-  places: (id) => `/atlases/${id}/places`
+  places: (id) => `/atlases/${id}/places`,
+  feedback: () => '/atlases/feedback'
 };
