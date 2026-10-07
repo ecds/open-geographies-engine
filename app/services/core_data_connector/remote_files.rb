@@ -14,8 +14,11 @@ module CoreDataConnector
   # - http(s) on the standard ports only, no user:password@ in the address;
   # - the host must resolve only to public addresses (no loopback, private,
   #   link-local — 169.254.169.254 — carrier-grade NAT, multicast or
-  #   reserved ranges, in IPv4 or IPv6), and the connection is made to the
-  #   address that was checked, so a second DNS answer can't swap it;
+  #   reserved ranges, in IPv4 or IPv6), and the connection is made to an
+  #   address that was checked, so a second DNS answer can't swap it. IPv4
+  #   addresses are tried before IPv6 ones, and the next is tried only when
+  #   connecting fails: many servers and containers have no IPv6 route, and
+  #   most photo sources (the Library of Congress among them) answer on both;
   # - every redirect is checked again, at most MAX_REDIRECTS of them;
   # - timeouts, and at most MAX_BYTES read.
   #
@@ -60,15 +63,8 @@ module CoreDataConnector
 
     def fetch(url, redirects: MAX_REDIRECTS)
       uri = check_uri!(url)
-      address = resolve!(uri.host)
 
-      http = Net::HTTP.new(uri.host, uri.port)
-      http.ipaddr = address
-      http.use_ssl = uri.scheme == 'https'
-      http.open_timeout = OPEN_TIMEOUT
-      http.read_timeout = READ_TIMEOUT
-
-      http.start do
+      connect(uri, resolve!(uri.host)) do |http|
         request = Net::HTTP::Get.new(uri.request_uri, 'User-Agent' => USER_AGENT, 'Accept' => 'image/*')
 
         http.request(request) do |response|
@@ -109,8 +105,36 @@ module CoreDataConnector
       raise Refused, 'Not a web address.'
     end
 
-    # The address to connect to: every address the name resolves to must be
-    # public (a name with one private answer is refused outright).
+    # Opens a connection to the first of the checked addresses that answers
+    # and yields it. Only a failure to connect moves on to the next address;
+    # once connected, errors are the source's.
+    def connect(uri, addresses)
+      addresses.each_with_index do |address, index|
+        http = Net::HTTP.new(uri.host, uri.port)
+        http.ipaddr = address
+        http.use_ssl = uri.scheme == 'https'
+        http.open_timeout = OPEN_TIMEOUT
+        http.read_timeout = READ_TIMEOUT
+
+        begin
+          http.start
+        rescue Net::OpenTimeout, SystemCallError
+          raise if index == addresses.size - 1
+
+          next
+        end
+
+        begin
+          return yield(http)
+        ensure
+          http.finish if http.started?
+        end
+      end
+    end
+
+    # The addresses to connect to, IPv4 first: every address the name
+    # resolves to must be public (a name with one private answer is refused
+    # outright).
     def resolve!(host)
       name = host.delete_prefix('[').delete_suffix(']')
       addresses = literal?(name) ? [name] : Resolv.getaddresses(name)
@@ -118,7 +142,12 @@ module CoreDataConnector
       raise Failed, "#{host} couldn't be found." if addresses.empty?
       raise Refused, "#{host} is not a public address." if addresses.any? { |address| blocked?(address) }
 
-      addresses.first
+      ipv4_first(addresses.uniq)
+    end
+
+    # IPv4 addresses before IPv6 ones, each in the resolver's order.
+    def ipv4_first(addresses)
+      addresses.each_with_index.sort_by { |address, index| [IPAddr.new(address).ipv4? ? 0 : 1, index] }.map(&:first)
     end
 
     def blocked?(address)

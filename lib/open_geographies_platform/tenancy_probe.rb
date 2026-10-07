@@ -407,6 +407,7 @@ module OpenGeographiesPlatform
 
       group 'photo links can\'t reach the server\'s own network' do
         remote_files_refusals
+        remote_files_connect
       end
 
       group 'an atlas\'s history: its project reads it; editors restore content, never what owners decide' do
@@ -862,6 +863,33 @@ module OpenGeographiesPlatform
           check "refuses #{label}", false, "#{e.class}: #{e.message}"
         end
       end
+    end
+
+    # Dual-stack sources: IPv4 is tried first, and a failed connection moves
+    # on to the next checked address, so a server without an IPv6 route
+    # still reaches them. Uses a local listener; no outside network.
+    def remote_files_connect
+      fetcher = ::CoreDataConnector::RemoteFiles
+      check 'photo sources: IPv4 addresses are tried before IPv6',
+            fetcher.ipv4_first(%w[2001:db8::1 192.0.2.1 2001:db8::2 192.0.2.2]) == %w[192.0.2.1 192.0.2.2 2001:db8::1 2001:db8::2]
+
+      label = 'photo sources: a refused connection moves on to the next address'
+      server = TCPServer.new('127.0.0.1', 0)
+      listener = Thread.new do
+        client = server.accept
+        client.gets
+        client.write("HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok")
+        client.close
+      rescue StandardError
+        nil
+      end
+      code = fetcher.connect(URI("http://og-probe.test:#{server.addr[1]}/"), ['::1', '127.0.0.1']) { |http| http.get('/').code }
+      check label, code == '200', code
+    rescue StandardError => e
+      check label, false, "#{e.class}: #{e.message}"
+    ensure
+      listener&.kill
+      server&.close
     end
 
     # A 16-bit TIFF scan (what archives hand out) is stored as a JPEG.
