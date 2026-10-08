@@ -33,7 +33,8 @@ ENV VITE_MAP_TILER_KEY=$VITE_MAP_TILER_KEY \
     DISABLE_ESLINT_PLUGIN=true \
     GENERATE_SOURCEMAP=false \
     NODE_OPTIONS="--max-old-space-size=4096"
-RUN yarn config set network-timeout 600000 -g && yarn build && yarn deploy && rm -rf client/node_modules
+RUN yarn config set network-timeout 600000 -g && yarn build && yarn deploy \
+  && rm -rf client/node_modules && yarn cache clean
 
 ARG ENGINE_REF=
 RUN if [ -n "$ENGINE_REF" ]; then \
