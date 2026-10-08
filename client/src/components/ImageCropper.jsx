@@ -174,6 +174,11 @@ const ImageCropper = ({ asset, crop = {}, initial, label, onCancel, onCropped })
   const H = asset.height;
   const { aspect } = crop;
 
+  // The crop frame, focused when it first appears: it's drawn once the image
+  // has loaded and been measured, after the dialog opened and gave focus to
+  // its first button, where the arrow keys did nothing (or scrolled the page).
+  const frame = useRef(null);
+  const frameFocused = useRef(false);
   const [rect, setRect] = useState(() => startingRect(initial, W, H, aspect));
   const [scale, setScale] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -256,6 +261,13 @@ const ImageCropper = ({ asset, crop = {}, initial, label, onCancel, onCropped })
     height: rect.h * scale
   } : null;
 
+  useEffect(() => {
+    if (box && !frameFocused.current) {
+      frameFocused.current = true;
+      frame.current?.focus({ preventScroll: true });
+    }
+  }, [Boolean(box)]);
+
   return (
     <dialog
       aria-labelledby='crop-title'
@@ -284,6 +296,7 @@ const ImageCropper = ({ asset, crop = {}, initial, label, onCancel, onCropped })
               className='crop-box'
               onKeyDown={onKeyDown}
               onPointerDown={(e) => onPointerDown(e, 'move')}
+              ref={frame}
               role='group'
               style={box}
               tabIndex={0}
