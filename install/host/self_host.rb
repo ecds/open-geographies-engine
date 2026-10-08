@@ -34,3 +34,48 @@ end
 Rails.application.config.after_initialize do
   ActionMailer::MailDeliveryJob.log_arguments = false
 end
+
+# Sign-in (POST /auth/login) has no limit of its own: at most 10 attempts from
+# one address in 3 minutes. Caddy passes the client's address on, and Rails
+# trusts it from the stack's private network.
+Rails.application.config.to_prepare do
+  JwtAuth::AuthenticationController.rate_limit to: 10, within: 3.minutes, only: :login, store: Rails.cache
+end
+
+module OpenGeographiesInstall
+  # Two kinds of the host's paths never answer from the internet (Caddy
+  # refuses them first; this holds behind any other proxy too):
+  # - Active Storage's own endpoints. Its direct-upload URLs take files from
+  #   anyone, and neither console uses them (their GETs only ever reached the
+  #   console's catch-all route anyway).
+  # - The job dashboard, /sidekiq: Basic auth with no attempt limit, and it
+  #   shows job arguments. It answers only to a localhost address, i.e.
+  #   through an SSH tunnel (README: "The job dashboard").
+  class Guard
+    LOCAL = %w[localhost 127.0.0.1 ::1].freeze
+
+    def initialize(app)
+      @app = app
+    end
+
+    def call(env)
+      path = Rack::Utils.unescape_path(env['PATH_INFO'].to_s).squeeze('/').downcase
+
+      if path.start_with?('/rails/active_storage/') || (path.start_with?('/sidekiq') && !local?(env))
+        return [404, { 'content-type' => 'text/plain' }, ['Not Found']]
+      end
+
+      @app.call(env)
+    end
+
+    private
+
+    # The Host header itself: Rack's #host would take X-Forwarded-Host, which
+    # a client can set.
+    def local?(env)
+      LOCAL.include?(env['HTTP_HOST'].to_s.downcase.sub(/:\d+\z/, '').delete_prefix('[').delete_suffix(']'))
+    end
+  end
+end
+
+Rails.application.config.middleware.insert_before 0, OpenGeographiesInstall::Guard

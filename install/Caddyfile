@@ -13,6 +13,13 @@
 # The FairData console, the atlas wizard and settings, and the API.
 {$CONSOLE_DOMAIN} {
 	encode zstd gzip
+	header Strict-Transport-Security "max-age=31536000"
+	# Never from the internet: the job dashboard (Basic auth, and it shows job
+	# arguments; README: "The job dashboard") and Active Storage's own
+	# endpoints (their upload URLs take files from anyone; neither console
+	# uses them). host/self_host.rb refuses them too.
+	@internal path /sidekiq* /rails/active_storage/*
+	respond @internal 404
 	# Archival TIFF scans and dataset uploads.
 	request_body {
 		max_size 100MB
@@ -26,5 +33,9 @@ https:// {
 		on_demand
 	}
 	encode zstd gzip
+	# Atlases take small JSON only (searches, saved searches).
+	request_body {
+		max_size 1MB
+	}
 	reverse_proxy renderer:8080
 }

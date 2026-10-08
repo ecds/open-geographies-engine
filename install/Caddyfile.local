@@ -6,6 +6,9 @@
 }
 
 http://{$CONSOLE_DOMAIN} {
+	# As in Caddyfile: the job dashboard and Active Storage's endpoints stay off.
+	@internal path /sidekiq* /rails/active_storage/*
+	respond @internal 404
 	request_body {
 		max_size 100MB
 	}
@@ -13,5 +16,8 @@ http://{$CONSOLE_DOMAIN} {
 }
 
 http:// {
+	request_body {
+		max_size 1MB
+	}
 	reverse_proxy renderer:8080
 }

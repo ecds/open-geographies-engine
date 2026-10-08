@@ -25,6 +25,7 @@ in as its first administrator and make atlases.
 git clone https://github.com/ecds/open-geographies-engine.git
 cd open-geographies-engine/install
 cp .env.example .env
+chmod 600 .env
 ```
 
 Fill in `.env`: the two domains, your email and a password for the first administrator, and
@@ -64,6 +65,20 @@ To keep uploaded files in S3 (or another S3-compatible store) instead, set `S3_B
 `S3_ENDPOINT` and usually `S3_FORCE_PATH_STYLE=true`, then `docker compose up -d`. Files
 uploaded before the switch stay in the `storage` volume and are still read from there.
 
+## The job dashboard
+
+Imports, reindexes and photo copies run as background jobs. Their dashboard (`/sidekiq`) isn't
+served to the internet. To look at it, tunnel to the console's container over SSH:
+
+```sh
+# on the server: the console container's address, e.g. 172.18.0.5
+docker compose exec host hostname -i
+# on your computer
+ssh -L 3000:172.18.0.5:3000 you@your-server
+```
+
+Then open `http://localhost:3000/sidekiq` and sign in with an administrator's email and password.
+
 ## Updating
 
 ```sh
@@ -87,6 +102,9 @@ To look around without a server or DNS, use the "Trying it on one computer" line
 
 - **Search stays private.** Only Caddy is reachable from outside; the database, search index
   and job queue are on the stack's internal network.
+- **What's refused at the edge:** the job dashboard and Active Storage's own endpoints (its
+  upload URLs would take files from anyone). Sign-in allows 10 attempts from one address in
+  3 minutes. Atlases accept request bodies up to 1 MB, the console up to 100 MB.
 - **Address lookups** use the U.S. Census Bureau for U.S. addresses and OpenStreetMap's public
   service elsewhere (one address a second, at most 500 an import). For more, run your own
   Nominatim and set `OG_NOMINATIM_URL`. See `PRODUCTION.md` in the repository root.
