@@ -14,3 +14,5 @@ Gemfile.lock
 !demo/data/.gitkeep
 demo/.env
 install/.env
+install/.env.*
+!install/.env.example

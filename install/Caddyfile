@@ -20,9 +20,10 @@
 	# uses them). host/self_host.rb refuses them too.
 	@internal path /sidekiq* /rails/active_storage/*
 	respond @internal 404
-	# Archival TIFF scans and dataset uploads.
+	# Just above the console's own limits (100 MB for an archival TIFF, 50 MB
+	# for a dataset), so a curator gets its message rather than a bare 413.
 	request_body {
-		max_size 100MB
+		max_size 110MB
 	}
 	reverse_proxy host:3000
 }

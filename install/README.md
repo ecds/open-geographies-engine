@@ -104,7 +104,8 @@ To look around without a server or DNS, use the "Trying it on one computer" line
   and job queue are on the stack's internal network.
 - **What's refused at the edge:** the job dashboard and Active Storage's own endpoints (its
   upload URLs would take files from anyone). Sign-in allows 10 attempts from one address in
-  3 minutes. Atlases accept request bodies up to 1 MB, the console up to 100 MB.
+  3 minutes. Atlases accept request bodies up to 1 MB, the console up to 110 MB (just above its
+  own limits: 100 MB for an archival TIFF, 50 MB for a dataset).
 - **Address lookups** use the U.S. Census Bureau for U.S. addresses and OpenStreetMap's public
   service elsewhere (one address a second, at most 500 an import). For more, run your own
   Nominatim and set `OG_NOMINATIM_URL`. See `PRODUCTION.md` in the repository root.

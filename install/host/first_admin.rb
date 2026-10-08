@@ -1,10 +1,12 @@
 # frozen_string_literal: true
 
-# The first administrator, from ADMIN_EMAIL / ADMIN_PASSWORD. The host's
-# db/seeds.rb creates admin@example.com with a published password on a new
-# database; that account is taken over (or, if it's gone, a new one made), so
-# no install runs with a known password. Run on every start: once the
-# administrator exists with a password of its own, nothing changes.
+# The first administrator, from ADMIN_EMAIL / ADMIN_PASSWORD. On a new
+# database the host's db/seeds.rb creates admin@example.com with a published
+# password, and FairData's invitation hook at once replaces it with a random
+# one and queues an email with it. That account is taken over (or, if it's
+# gone, a new one made), so no install keeps the published password or one
+# nobody knows. Runs on every start; once the administrator has signed in,
+# nothing changes.
 email = ENV['ADMIN_EMAIL'].to_s.strip.downcase
 password = ENV['ADMIN_PASSWORD'].to_s
 PUBLISHED = 'Changeme1!!'
@@ -14,20 +16,22 @@ abort '[install] ADMIN_PASSWORD is the published default; choose another.' if pa
 
 User = CoreDataConnector::User
 user = User.find_by(email:)
+# The seed's account, until someone signs in with it (ADMIN_EMAIL may be its
+# own address).
+seeded = User.find_by(email: 'admin@example.com', last_sign_in_at: nil)
 
-if user.nil?
-  seeded = User.find_by(email: 'admin@example.com')
+if user.nil? || user == seeded
   user = seeded || User.new(name: 'Administrator')
   user.skip_invitation = true
   user.assign_attributes(email:, password:, password_confirmation: password, role: User::ROLE_ADMIN)
   user.require_password_change = false if user.respond_to?(:require_password_change=)
   user.save!
-  puts "[install] administrator #{email}: #{seeded ? 'took over the seeded admin@example.com' : 'created'}"
+  puts "[install] administrator #{email}: #{seeded ? 'took over the seeded account' : 'created'}"
 
   if seeded
-    # FairData invited the seeded account as it was made, with a new password
-    # in the email. The worker hasn't started yet; drop that email, which
-    # would now go to ADMIN_EMAIL with a password that no longer works.
+    # The invitation queued for the seeded account: the worker hasn't started
+    # yet. Drop it; it would now go to ADMIN_EMAIL with a password that no
+    # longer works.
     require 'sidekiq/api'
     gid = "\"#{seeded.to_global_id}\""
     Sidekiq::Queue.all.each do |queue|
@@ -36,17 +40,11 @@ if user.nil?
       end
     end
   end
-elsif user.authenticate(PUBLISHED)
+# authenticate_password, not authenticate: FairData's #authenticate also
+# records a sign-in.
+elsif user.authenticate_password(PUBLISHED)
   user.update!(password:, password_confirmation: password, role: User::ROLE_ADMIN)
   puts "[install] administrator #{email}: password set from ADMIN_PASSWORD"
 else
   puts "[install] administrator #{email} exists"
-end
-
-# No other account may keep the published seed password.
-User.where.not(id: user.id).find_each do |other|
-  next unless other.authenticate(PUBLISHED)
-
-  other.update!(password: "#{SecureRandom.base58(32)}Aa1!")
-  puts "[install] #{other.email} no longer has the published password"
 end

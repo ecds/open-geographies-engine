@@ -9,8 +9,10 @@ http://{$CONSOLE_DOMAIN} {
 	# As in Caddyfile: the job dashboard and Active Storage's endpoints stay off.
 	@internal path /sidekiq* /rails/active_storage/*
 	respond @internal 404
+	# Just above the console's own limits (100 MB for an archival TIFF, 50 MB
+	# for a dataset), so a curator gets its message rather than a bare 413.
 	request_body {
-		max_size 100MB
+		max_size 110MB
 	}
 	reverse_proxy host:3000
 }

@@ -5,12 +5,21 @@
 set -e
 cd /app
 
+# Waits for a command to succeed, saying what it's waiting for every 30 s.
 wait_for() {
-  until "$@" > /dev/null 2>&1; do sleep 2; done
+  local what=$1 tries=0
+  shift
+  until "$@" > /dev/null 2>&1; do
+    tries=$((tries + 1))
+    if [ $((tries % 15)) -eq 0 ]; then
+      echo "[install] still waiting for ${what}"
+    fi
+    sleep 2
+  done
 }
 
-wait_for pg_isready -d "$DATABASE_URL"
-wait_for curl -fs "$ELASTICSEARCH_HOST/_cluster/health"
+wait_for "the database (check POSTGRES_PASSWORD: letters and digits only)" pg_isready -d "$DATABASE_URL"
+wait_for "Elasticsearch" curl -fs "$ELASTICSEARCH_HOST/_cluster/health"
 
 case "${1:-web}" in
   web)
@@ -20,10 +29,9 @@ case "${1:-web}" in
     exec bundle exec puma -C config/puma.rb -b tcp://0.0.0.0:3000
     ;;
   worker)
-    # The web container migrates; wait until it has.
-    until bundle exec bin/rails runner 'exit(ActiveRecord::Base.connection.pool.migration_context.needs_migration? ? 1 : 0)' > /dev/null 2>&1; do
-      sleep 5
-    done
+    # The console answers only once the database is migrated (the host's
+    # migrations and the engines'), so the jobs never run on an old schema.
+    wait_for "the console to finish migrating" curl -fs http://host:3000/health
     exec bundle exec sidekiq -C config/sidekiq.yml
     ;;
   *)

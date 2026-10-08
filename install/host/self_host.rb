@@ -43,16 +43,30 @@ Rails.application.config.to_prepare do
 end
 
 module OpenGeographiesInstall
-  # Two kinds of the host's paths never answer from the internet (Caddy
-  # refuses them first; this holds behind any other proxy too):
+  # Two kinds of the host's paths never answer from the internet. Caddy
+  # refuses them first; this refuses them in Rails as well:
   # - Active Storage's own endpoints. Its direct-upload URLs take files from
   #   anyone, and neither console uses them (their GETs only ever reached the
   #   console's catch-all route anyway).
   # - The job dashboard, /sidekiq: Basic auth with no attempt limit, and it
-  #   shows job arguments. It answers only to a localhost address, i.e.
-  #   through an SSH tunnel (README: "The job dashboard").
+  #   shows job arguments. It answers only to a request from the server
+  #   itself, addressed to localhost: an SSH tunnel's (README: "The job
+  #   dashboard"), which arrives from the stack network's gateway, or one
+  #   made inside this container. Caddy's requests never come from either,
+  #   and neither address can be set by a header.
   class Guard
-    LOCAL = %w[localhost 127.0.0.1 ::1].freeze
+    LOCAL_HOSTS = %w[localhost 127.0.0.1 ::1].freeze
+
+    # The stack network's gateway: the default route in /proc/net/route,
+    # whose addresses are little-endian hex.
+    def self.gateway
+      route = File.readlines('/proc/net/route').map(&:split).find { |fields| fields[1] == '00000000' }
+      route && [route[2]].pack('H8').bytes.reverse.join('.')
+    rescue SystemCallError
+      nil
+    end
+
+    LOCAL_PEERS = ['127.0.0.1', '::1', gateway].compact.freeze
 
     def initialize(app)
       @app = app
@@ -70,10 +84,13 @@ module OpenGeographiesInstall
 
     private
 
-    # The Host header itself: Rack's #host would take X-Forwarded-Host, which
-    # a client can set.
+    # REMOTE_ADDR is the connection's own address (this runs before Rails'
+    # proxy handling), and the Host header is read directly: Rack's #host
+    # would take X-Forwarded-Host.
     def local?(env)
-      LOCAL.include?(env['HTTP_HOST'].to_s.downcase.sub(/:\d+\z/, '').delete_prefix('[').delete_suffix(']'))
+      host = env['HTTP_HOST'].to_s.downcase.sub(/:\d+\z/, '').delete_prefix('[').delete_suffix(']')
+
+      LOCAL_PEERS.include?(env['REMOTE_ADDR']) && LOCAL_HOSTS.include?(host)
     end
   end
 end
