@@ -590,7 +590,7 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
 
           <div className='actions'>
             <Button disabled={!_.isEmpty(problems) || importing} loading={importing} onClick={onImport} primary>
-              Import { preview.row_count } rows
+              Import { preview.row_count } { preview.row_count === 1 ? 'row' : 'rows' }
             </Button>
           </div>
         </div>
