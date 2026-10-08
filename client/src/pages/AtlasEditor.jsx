@@ -70,7 +70,7 @@ const LAYER_TYPES = ['vector', 'raster', 'pmtiles', 'geojson', 'georeference'];
 const LAYER_TYPE_LABELS = {
   vector: 'Vector tiles (a style)',
   raster: 'Raster tiles',
-  pmtiles: 'PMTiles archive',
+  pmtiles: 'Vector tile overlay (PMTiles or TileJSON)',
   geojson: 'GeoJSON',
   georeference: 'Historic map (Allmaps)',
   image: 'Image on the map (from a KML file)'
@@ -83,7 +83,7 @@ const defaultOpacity = (layer) => (layer.layer_type === 'georeference' ? 0.5 : 1
 const LAYER_URL_LABELS = {
   vector: 'Style address',
   raster: 'Tile address ({z}/{x}/{y})',
-  pmtiles: 'Archive address (.pmtiles)',
+  pmtiles: 'Address (.pmtiles archive or TileJSON .json)',
   geojson: 'GeoJSON address',
   georeference: 'Allmaps annotation address',
   image: 'Image address'
