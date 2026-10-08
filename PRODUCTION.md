@@ -13,9 +13,8 @@ where they meet these. Today's reference deployment is the demo stack in [`demo/
   (`scripts/serve.mjs`, Node 24). It serves the build's Brotli/gzip copies of `/_astro/*`
   (10 MB → 2.3 MB). Astro's own entry point (`dist/server/entry.mjs`) sends everything
   uncompressed. The demo's `demo/renderer/Dockerfile` does this.
-- [ ] **Install with `npm install`, not `npm ci`.** The renderer's `package-lock.json` is
-  missing some peer dependencies, so `npm ci` refuses it. Regenerate the lockfile (and
-  test the build) before switching a pipeline to `npm ci`.
+- [ ] **Node 24** (the renderer's `engines`). Install with `npm ci`: its lockfile is in sync
+  for npm 11. An older npm (Node 20's npm 10) reports it out of sync and refuses.
 - [ ] **Environment**
 
   | Variable | Value |
