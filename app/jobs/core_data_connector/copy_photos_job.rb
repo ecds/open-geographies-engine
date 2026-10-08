@@ -188,10 +188,13 @@ module CoreDataConnector
     def download(url)
       # One of the atlas's own images (a photo packed in a KMZ, stored at
       # import): read from storage, not fetched.
+      # Rewound like RemoteFiles' downloads: the upload reads the file from
+      # where it is, and from its end it sent IIIF Cloud an empty file.
       if (blob = own_asset(url))
         file = Tempfile.new(['og-photo', File.extname(blob.filename.to_s)], binmode: true)
         blob.download { |chunk| file.write(chunk) }
         file.flush
+        file.rewind
         return RemoteFiles::Download.new(file:, content_type: blob.content_type, url:)
       end
 

@@ -793,11 +793,28 @@ module OpenGeographiesPlatform
              upload("/core_data/sites/#{a.site.id}/assets", 'huge.png', Vips::Image.black(11_000, 10_000).pngsave_buffer(compression: 9), a.token), '422'
 
       image_crops(a, b, asset)
+      packed_photo_copy(asset)
 
       status 'deleting the photo', delete("/core_data/sites/#{a.site.id}/assets/#{asset['key']}", a.token), '204'
       status 'deletes its copies', get(largest['path'].to_s), '404'
 
       tiff_copies(a, photo)
+    end
+
+    # A photo packed in a KMZ is stored as one of the atlas's images at
+    # import, and CopyPhotosJob hands that stored copy to the image server.
+    # It has to be read from its first byte: left at its end, it reached
+    # IIIF Cloud as an empty file (no sizes, broken pictures).
+    def packed_photo_copy(asset)
+      label = 'a packed photo reaches the image server whole'
+      blob = ::ActiveStorage::Blob.find_by(key: asset['key'])
+      download = ::CoreDataConnector::CopyPhotosJob.new.send(:download, "/core_data/public/v1/assets/#{asset['key']}/photo.jpg")
+      read = download.file.read.to_s.bytesize
+      check label, blob && read.positive? && read == blob.byte_size, "#{read} of #{blob&.byte_size} bytes"
+    rescue StandardError => e
+      check label, false, "#{e.class}: #{e.message}"
+    ensure
+      download&.close!
     end
 
     # Cropping an uploaded photo (the console's image picker): a new image of
