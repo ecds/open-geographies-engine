@@ -13,6 +13,9 @@ where they meet these. Today's reference deployment is the demo stack in [`demo/
   (`scripts/serve.mjs`, Node 24). It serves the build's Brotli/gzip copies of `/_astro/*`
   (10 MB → 2.3 MB). Astro's own entry point (`dist/server/entry.mjs`) sends everything
   uncompressed. The demo's `demo/renderer/Dockerfile` does this.
+- [ ] **Install with `npm install`, not `npm ci`.** The renderer's `package-lock.json` is
+  missing some peer dependencies, so `npm ci` refuses it. Regenerate the lockfile (and
+  test the build) before switching a pipeline to `npm ci`.
 - [ ] **Environment**
 
   | Variable | Value |
@@ -22,6 +25,7 @@ where they meet these. Today's reference deployment is the demo stack in [`demo/
   | `OG_CORE_DATA_INTERNAL_URL` | Only if the browser-facing Core Data URL doesn't resolve from the renderer (e.g. a container network). |
   | `OG_BASE_DOMAIN` | **Required.** The domain atlases live under (`atlas.example.edu` → `<slug>.atlas.example.edu`). Without it, every atlas address 404s. |
   | `OG_ELASTICSEARCH_URL`, `OG_ELASTICSEARCH_API_KEY` | The search index. The renderer only searches, so give it a **read-only** API key limited to `open_geographies_v1` (and `open_geographies_v1_project_*` once each atlas has its own index, §8). |
+  | `OG_TILE_SERVER` | A tile server whose vector tiles atlases load through their own address (`/map-tiles/<name>.json`, a layer of type "Vector tile overlay"). ECDS's is `https://pmtiles.ecds.io`; its CORS list doesn't include atlases' domains, so browsers can't load it directly. Only tile sets an atlas's layers name are passed through. Unset, `/map-tiles` answers 404. |
   | `OG_SITE_SLUG` | **Unset** (it pins one atlas). |
   | `OG_TRUST_ATLAS_SLUG_HEADER` | **Unset**, unless a proxy sets `X-Atlas-Slug` itself and strips the client's. |
   | Optional | `OG_ATLAS_CACHE_TTL_MS` (30 s), `OG_ATLAS_ERROR_TTL_MS` (5 s), `OG_ATLAS_FETCH_TIMEOUT_MS` (5 s), `OG_ATLAS_CACHE_MAX_ENTRIES` (1,000), `OG_WORDPRESS_TIMEOUT_MS`. |
@@ -36,7 +40,10 @@ where they meet these. Today's reference deployment is the demo stack in [`demo/
 - [ ] `CORE_DATA_PUBLIC_URL` (the browser-facing console URL), `VITE_MAP_TILER_KEY` (console
   maps), `GEONAMES_USERNAME` (see 7), `ELASTICSEARCH_HOST` + `ELASTICSEARCH_API_KEY` (write
   access to the index), `IIIF_CLOUD_URL` + `IIIF_CLOUD_API_KEY` + `IIIF_CLOUD_PROJECT_ID`
-  (photo copies). `OG_GEOCODER=none` turns off US Census address lookups (on by default).
+  (photo copies). On FairData these are the host's existing IIIF settings: one IIIF Cloud
+  project per instance, with each atlas's photos kept apart by its project's storage key
+  (`projects.use_storage_key`, on by default). `OG_GEOCODER=none` turns off US Census
+  address lookups (on by default).
 - [ ] **Migrations**: the host doesn't copy engine migrations on its own. Run
   `bin/rails railties:install:migrations FROM=open_geographies_platform` (and the
   indexing engine's, `FROM=open_geographies`), then `db:migrate`.
@@ -86,6 +93,7 @@ where they meet these. Today's reference deployment is the demo stack in [`demo/
   - `robots.txt`: 1 hour. `sitemap.xml`: 5 minutes to 1 hour.
   - Platform address → custom domain redirect: `301`, 1 hour.
   - `/config.json`, `/api/search.json`, previews, 404s: `no-store`.
+  - `/map-tiles/<name>/<z>/<x>/<y>.mvt`: 1 day; `/map-tiles/<name>.json`: 5 minutes.
   - After **unpublishing** an atlas, purge its host from the CDN, or cached pages outlive it.
 - [ ] **Atlas images**: the console serves uploaded images at
   `/core_data/public/v1/assets/<key>/<file>` (immutable, ETag) by reading them from S3 on
