@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { liveUrl, previewUrl } from '../atlasLinks';
 import config from '../config';
 import { useFeedback } from '../feedback';
@@ -17,6 +17,19 @@ const AtlasHeader = ({ active, navigate, site }) => {
 
   // Feedback sent from this atlas's pages is about this atlas.
   useEffect(() => { if (site) setSite?.(site); }, [setSite, site]);
+
+  // On a phone the tabs scroll sideways; bring the current one into view
+  // (the row only: scrollIntoView would move the page too).
+  const nav = useRef(null);
+  useEffect(() => {
+    const row = nav.current;
+    const current = row?.querySelector('[aria-current="page"]');
+    if (!current) return;
+
+    const r = row.getBoundingClientRect();
+    const c = current.getBoundingClientRect();
+    if (c.left < r.left || c.right > r.right) row.scrollLeft += (c.left + c.width / 2) - (r.left + r.width / 2);
+  }, [active, site?.id]);
 
   // The atlas's pages: links (a nav), the current one marked as the page.
   const tab = (to, label, key) => (
@@ -49,7 +62,7 @@ const AtlasHeader = ({ active, navigate, site }) => {
         { link && <a className='button' href={link} rel='noreferrer' target='_blank'>{ site.published ? 'View atlas ↗' : 'Preview ↗' }</a> }
       </div>
       { site && (
-        <nav aria-label='Atlas pages' className='tabs'>
+        <nav aria-label='Atlas pages' className='tabs' ref={nav}>
           { tab(paths.atlas(site.id), 'Settings', 'settings') }
           { tab(paths.places(site.id), 'Places', 'places') }
           { tab(paths.imports(site.id), 'Imports', 'imports') }

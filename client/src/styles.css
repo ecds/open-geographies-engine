@@ -242,7 +242,10 @@ textarea.input { resize: vertical; }
 @media (max-width: 720px) {
   .grid-2, .grid-3 { grid-template-columns: minmax(0, 1fr); }
   .image-field { flex-direction: column; align-items: flex-start; }
+  /* Tabs keep their one-line labels and the row scrolls sideways, rather
+     than squeezing "Pages & menu" onto three lines. */
   .tabs { overflow-x: auto; }
+  .tabs .tab { flex: 0 0 auto; white-space: nowrap; }
   /* The header's links wrap onto a second row instead of widening the page. */
   .shell { flex-wrap: wrap; height: auto; min-height: 52px; padding: 8px 12px; gap: 4px 8px; }
   .shell-nav { flex: 1 1 auto; }
