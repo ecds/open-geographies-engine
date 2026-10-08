@@ -19,6 +19,7 @@ import ReindexStatus from './ReindexStatus';
 import {
   Button,
   Message,
+  OsmAttribution,
   Progress,
   Select,
   Stat
@@ -440,6 +441,7 @@ const DatasetImportPanel = ({ onImported, projectId }) => {
             { counts.failed > 0 && <Stat label='Failed' tone='negative' value={counts.failed} /> }
           </div>
         )}
+        { counts.located_from_openstreetmap > 0 && <OsmAttribution /> }
         { geocodeError && <Message tone='warning'>{ geocodeError }</Message> }
         { !_.isEmpty(created) && <p className='muted'>New fields: { created.join(', ') }</p> }
         { !_.isEmpty(filters) && <p className='muted'>Added as filters on the atlas: { filters.join(', ') }</p> }

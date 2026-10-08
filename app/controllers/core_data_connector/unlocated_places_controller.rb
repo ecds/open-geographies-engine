@@ -21,6 +21,8 @@ module CoreDataConnector
   class UnlocatedPlacesController < ApplicationController
     PER_PAGE = 50
     LOOKUP_LIMIT = 1000
+    # A click waits for these: one request a second, two for a miss.
+    OPENSTREETMAP_LIMIT = 8
     LOCATE_LIMIT = 1000
     FIELD_TYPES = %w[String Text].freeze
     FIELD_MAX = 300
@@ -42,7 +44,7 @@ module CoreDataConnector
         bbox: located_bbox(models),
         address_fields: labels.values.select { |field| FIELD_TYPES.include?(field.data_type) }.map(&:column_name).uniq,
         address: address_defaults(site, models),
-        geocoder: DatasetImports::Geocoder.available? ? DatasetImports::Geocoder::PROVIDER : nil
+        geocoder: DatasetImports::Geocoder.available? ? DatasetImports::Geocoder.provider_label : nil
       }, status: :ok
     end
 
@@ -55,13 +57,13 @@ module CoreDataConnector
             else
               unlocated(models).order(:id).limit(LOOKUP_LIMIT).pluck(:id)
             end
-      address = params.fetch(:address, {}).permit(:street_field, :city_field, :city_value, :state_field, :state_value, :zip_field, :zip_value).to_h
+      address = params.fetch(:address, {}).permit(*DatasetImports::Geocoder::PARTS.flat_map { |part| [:"#{part}_field", :"#{part}_value"] }).to_h
       uuids = field_labels(models).values.group_by(&:column_name).transform_values { |fields| fields.map(&:uuid) }
 
       names = {}
       addresses = unlocated(models).where(id: ids).includes(:place_names).each_with_object({}) do |place, wanted|
         names[place.id] = place.name
-        parts = %w[street city state zip].map do |part|
+        parts = DatasetImports::Geocoder::PARTS.map do |part|
           field = address["#{part}_field"].presence
           value = field ? Array(uuids[field]).filter_map { |uuid| place.user_defined&.dig(uuid).presence }.first : address["#{part}_value"]
           value.to_s.squish
@@ -70,7 +72,9 @@ module CoreDataConnector
         wanted[place.id] = parts if parts.first.present?
       end
 
-      found = DatasetImports::Geocoder.locate(addresses)
+      # One click looks up a handful from OpenStreetMap (one a second); the
+      # rest come back "later", for the next click.
+      found = DatasetImports::Geocoder.locate(addresses, openstreetmap_limit: OPENSTREETMAP_LIMIT, beyond: 'later')
 
       render json: {
         results: addresses.to_h do |id, parts|
@@ -81,6 +85,7 @@ module CoreDataConnector
             latitude: result&.latitude,
             longitude: result&.longitude,
             matched: result&.matched,
+            source: result&.source,
             address: parts.compact_blank.join(', ')
           }.compact]
         end
@@ -184,7 +189,7 @@ module CoreDataConnector
       constants = job.extra['geocode_constants'] || {}
       labels = Array(job.extra['columns']).select { |c| %w[field identifier].include?(c['role']) }.to_h { |c| [c['name'], c['label'].presence || c['name']] }
 
-      %w[street city state zip].each_with_object({}) do |part, address|
+      DatasetImports::Geocoder::PARTS.each_with_object({}) do |part, address|
         column = geocode[part].presence
 
         if column && labels[column]

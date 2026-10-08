@@ -457,7 +457,7 @@ module CoreDataConnector
     def record_geocode_constants(rows, config)
       kept = @columns.select { |c| %w[field identifier].include?(c['role']) }.map { |c| c['name'] }
 
-      constants = %w[city state zip].each_with_object({}) do |part, found|
+      constants = %w[city state zip country].each_with_object({}) do |part, found|
         column = config[part].presence
         next if column.nil? || kept.include?(column)
 
@@ -476,6 +476,7 @@ module CoreDataConnector
       if result&.found?(exact_only: @geocode_config['exact_only'] == true)
         @counts['located_from_address'] += 1
         @counts['approximate_address'] += 1 if result.status == 'approximate'
+        @counts['located_from_openstreetmap'] += 1 if result.source == 'openstreetmap'
         return { 'type' => 'Point', 'coordinates' => [result.longitude, result.latitude] }
       end
 
@@ -491,6 +492,7 @@ module CoreDataConnector
                when 'tie' then 'the address matches more than one place'
                when 'other_town' then "the address was found only in another town (#{result.matched})"
                when 'approximate' then "only an approximate match (#{result.matched}), and exact matches were chosen"
+               when 'over_limit' then "not looked up: an import sends OpenStreetMap at most #{DatasetImports::Geocoder::Nominatim.limit} addresses (find the rest from the atlas's Places page)"
                else 'the address wasn\'t found'
                end
       problem(line, "(#{name}): #{reason}: #{parts.compact_blank.join(', ')}")

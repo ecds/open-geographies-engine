@@ -39,7 +39,7 @@ shows.
   GeoJSON file, a Google Earth or My Maps file (KML/KMZ) or a zipped shapefile. It helps to have:
   - a **name** column;
   - where each place is: **latitude and longitude** in decimal degrees (33.749, -84.388), a street
-    **address** (U.S. addresses can be looked up for you), or a shape (GeoJSON, KML, a shapefile, or
+    **address** (addresses can be looked up for you, in any country), or a shape (GeoJSON, KML, a shapefile, or
     WKT text in a column);
   - a **category** column (building, district, church…) that becomes the atlas's main filter;
   - a column with a **unique id** for each row from your source (a record number or link), so you
@@ -157,15 +157,23 @@ suggests another type.
 
 ### Places with only an address
 
-If rows have no coordinates but have a U.S. street address, **Find locations from addresses**
-looks them up:
+If rows have no coordinates but have a street address, **Find locations from addresses**
+looks them up: U.S. addresses with the U.S. Census Bureau, addresses anywhere else with
+OpenStreetMap.
 
-1. Choose the **Street address** column, and the **City**, **State** and **ZIP code** columns. You can
-   type one value for every row instead, for example the state.
+1. Choose the **Street address** column, and the **City**, **State or region**, **ZIP or postal
+   code** and **Country** columns. You can type one value for every row instead, for example the
+   state or the country. Without a country, an address is tried as a U.S. address first, then
+   with OpenStreetMap.
 2. **Find locations**. The console shows what was **Found** exactly, what was found only **near the
    address**, and what was **Not placed**.
 3. Matches near an address are left out unless you include them. Check those: an old street name can
    match a similar street.
+
+OpenStreetMap answers one address a second, so the preview looks up only the first few of its
+rows (the import looks up the rest), and one import sends it at most 500 addresses; place any
+others from the atlas's **Places** page afterwards. Locations from OpenStreetMap are credited to
+"© OpenStreetMap contributors".
 
 Places that aren't found are still imported: they're listed and searchable, just not on the map.
 You can place them afterwards (section 5).

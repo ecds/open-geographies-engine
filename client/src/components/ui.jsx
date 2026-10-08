@@ -145,6 +145,15 @@ export const Stat = ({ label, tone, value }) => (
   </span>
 );
 
+// Locations found by OpenStreetMap's address lookup are OpenStreetMap data
+// (ODbL), which asks for this credit wherever they're shown.
+export const OsmAttribution = () => (
+  <p className='muted'>
+    Some locations are from OpenStreetMap: ©{ ' ' }
+    <a href='https://www.openstreetmap.org/copyright' rel='noreferrer' target='_blank'>OpenStreetMap contributors</a>.
+  </p>
+);
+
 export const Toggle = ({ checked, disabled, label, onChange }) => (
   <label className='toggle'>
     <input checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} type='checkbox' />

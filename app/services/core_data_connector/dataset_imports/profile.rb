@@ -120,7 +120,7 @@ module CoreDataConnector
           # Rows without a location can be looked up from an address; the
           # columns that seem to make one.
           'geocoding' => summary['counts']['missing'].positive? && Geocoder.available? ? {
-            'provider' => Geocoder::PROVIDER,
+            'provider' => Geocoder.provider_label,
             'suggested' => Geocoder.suggest(columns)
           } : nil,
           # A KML's image overlays, which the import adds as map layers.

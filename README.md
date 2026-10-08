@@ -174,9 +174,10 @@ until the curator presses Import. Then:
 - missing fields are created on the Places model; a column matching an existing field
   (e.g. "Short Description") fills it, so canonical promotions still apply;
 - rows without coordinates can be placed from their address: the preview's "Find locations
-  from addresses" uses the chosen columns (or a city/state typed once) with the U.S. Census
-  Bureau's batch geocoder (`DatasetImports::Geocoder`; free, no key, U.S. only;
-  `OG_GEOCODER=none` turns it off), shows what was found on the preview map (orange), lists the
+  from addresses" uses the chosen columns (or a city/state/country typed once) with the U.S.
+  Census Bureau's batch geocoder for U.S. addresses and OpenStreetMap's Nominatim for other
+  countries and U.S.-first misses (`DatasetImports::Geocoder`; see PRODUCTION.md for its
+  limits; `OG_GEOCODER=none` turns lookups off), shows what was found on the preview map (orange), lists the
   approximate matches to check and the rows not placed (descriptions, intersections, a match in
   another town), and the import looks every row up the same way (`located_from_address`,
   `address_not_found` in the job counts). A name that is an address ("621 Ruben Street
@@ -225,8 +226,9 @@ but not on its map. The atlas's **Places** page (`/atlases/:id/places`) puts the
 - **One by one:** pick a place from the list, then click the map where it is (or search for
   it by name with MapTiler, limited to the atlas's area first) and drag the marker to
   adjust. The map is framed to the places already located.
-- **All at once:** look their addresses up with the Census geocoder (street from one of
-  their fields, city/state/ZIP from a field or typed), prefilled from the last upload's
+- **All at once:** look their addresses up (the Census for U.S. addresses, OpenStreetMap
+  elsewhere, a few at a time; street from one of their fields, city/state/ZIP/country from a
+  field or typed), prefilled from the last upload's
   address lookup. Exact matches are ticked; matches near the address are listed for
   review; nothing is saved until "Save N locations".
 - `GET /core_data/sites/:id/unlocated_places`, `POST …/unlocated_places/lookup`,

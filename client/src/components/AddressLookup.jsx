@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import _ from 'underscore';
 import { errorMessages, geocodeDatasetImport } from '../api';
-import { Button, Message, Select, Stat } from './ui';
+import { Button, Message, OsmAttribution, Select, Stat } from './ui';
 
-// The parts of an address; each comes from a column, or (city, state, ZIP)
-// from a value typed once for every row.
+// The parts of an address; each comes from a column, or (city, state, ZIP,
+// country) from a value typed once for every row.
 const PARTS = [
   { key: 'street', label: 'Street address', typed: false },
   { key: 'city', label: 'City', typed: true },
-  { key: 'state', label: 'State', typed: true, placeholder: 'e.g. GA' },
-  { key: 'zip', label: 'ZIP code', typed: true }
+  { key: 'state', label: 'State or region', typed: true, placeholder: 'e.g. GA' },
+  { key: 'zip', label: 'ZIP or postal code', typed: true },
+  { key: 'country', label: 'Country', typed: true, placeholder: 'e.g. Kenya' }
 ];
 
 const REASONS = {
@@ -65,8 +66,9 @@ const AddressLookup = ({ blobId, columns, config, missing, onConfigChange, onRes
       <h3 className='h-sub'>Find locations from addresses</h3>
       <p className='muted'>
         { missing } { missing === 1 ? 'row has' : 'rows have' } no coordinates. Rows with a street address can be
-        placed by looking the address up with { provider } (U.S. addresses only). Anything not found is imported
-        without a location: listed and searchable, but not on the map.
+        placed by looking the address up with { provider }. Give the country (a column, or typed for every row);
+        without one, an address is tried as a U.S. address first. Anything not found is imported without a
+        location: listed and searchable, but not on the map.
       </p>
       <div className='address-parts'>
         { _.map(PARTS, (part) => (
@@ -123,6 +125,13 @@ const AddressLookup = ({ blobId, columns, config, missing, onConfigChange, onRes
               )}
             </>
           )}
+          { counts.later > 0 && (
+            <p className='muted'>
+              { counts.later } more { counts.later === 1 ? 'row' : 'rows' } will be looked up with OpenStreetMap when you
+              import: it answers one address a second, so the preview checks only the first few.
+            </p>
+          )}
+          { result.sources?.openstreetmap > 0 && <OsmAttribution /> }
           { result.looked_up < result.without_location && (
             <p className='muted'>
               Looked up the first { result.looked_up } of { result.without_location }; the import looks up all of them.

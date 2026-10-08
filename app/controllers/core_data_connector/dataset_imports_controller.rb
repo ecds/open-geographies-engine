@@ -65,9 +65,12 @@ module CoreDataConnector
     # Looks up the uploaded rows that have no location from their address
     # (DatasetImports::Geocoder), so the curator sees what will be found
     # before importing: counts, the found places for the preview map, and
-    # the rows that weren't found. Up to GEOCODE_PREVIEW_LIMIT rows; the
+    # the rows that weren't found. Up to GEOCODE_PREVIEW_LIMIT rows, of which
+    # at most OPENSTREETMAP_PREVIEW_LIMIT go to OpenStreetMap (one request a
+    # second, two for a miss: about 16 s at most; the rest are "later"); the
     # import itself looks up every row.
     GEOCODE_PREVIEW_LIMIT = 1000
+    OPENSTREETMAP_PREVIEW_LIMIT = 8
 
     def geocode
       project = Project.find(params[:project_id])
@@ -96,9 +99,11 @@ module CoreDataConnector
       addresses = sample.each_with_index.to_h do |row, index|
         [index, DatasetImports::Geocoder.parts_for(row[:properties], config, name_column && row[:properties][name_column])]
       end
-      results = DatasetImports::Geocoder.locate(addresses.reject { |_index, parts| parts.first.blank? })
+      results = DatasetImports::Geocoder.locate(addresses.reject { |_index, parts| parts.first.blank? },
+                                                openstreetmap_limit: OPENSTREETMAP_PREVIEW_LIMIT, beyond: 'later')
 
       counts = Hash.new(0)
+      sources = Hash.new(0)
       features = []
       missed = []
       approximate = []
@@ -109,6 +114,9 @@ module CoreDataConnector
         counts[status] += 1
 
         name = name_column && row[:properties][name_column]
+        sources[result.source] += 1 if result&.found?
+        next if status == 'later'
+
         if result&.found?
           features << { 'type' => 'Feature', 'geometry' => { 'type' => 'Point', 'coordinates' => [result.longitude, result.latitude] },
                         'properties' => { 'name' => name, 'matched' => result.matched, 'status' => status } }
@@ -122,8 +130,9 @@ module CoreDataConnector
 
       render json: {
         geocode: {
-          'provider' => DatasetImports::Geocoder::PROVIDER,
+          'provider' => DatasetImports::Geocoder.provider_label,
           'looked_up' => sample.size,
+          'sources' => sources,
           'without_location' => rows.size,
           'counts' => counts,
           'features' => { 'type' => 'FeatureCollection', 'features' => features },

@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import _ from 'underscore';
 import { errorMessages, fetchUnlocatedPlaces, locateUnlocatedPlaces, lookupUnlocatedPlaces } from '../api';
-import { Button, Field, Message, Select } from './ui';
+import { Button, Field, Message, OsmAttribution, Select } from './ui';
 
 const PlacePicker = lazy(() => import('./PlacePicker'));
 
@@ -13,9 +13,10 @@ const describe = (place) => (
 
 const PARTS = [
   { key: 'street', label: 'Street address', typed: false },
-  { key: 'city', label: 'City', typed: true },
-  { key: 'state', label: 'State', typed: true },
-  { key: 'zip', label: 'ZIP code', typed: true }
+  { key: 'city', label: 'City', typed: true, placeholder: 'e.g. Savannah' },
+  { key: 'state', label: 'State or region', typed: true, placeholder: 'e.g. GA' },
+  { key: 'zip', label: 'ZIP or postal code', typed: true },
+  { key: 'country', label: 'Country', typed: true, placeholder: 'e.g. Kenya' }
 ];
 
 /**
@@ -128,7 +129,8 @@ const UnlocatedPlaces = ({ site }) => {
     .sortBy((result) => (result.status === 'exact' ? 0 : 1))
     .value(), [lookup]);
 
-  const missed = useMemo(() => _.filter(lookup || {}, (result) => !['exact', 'approximate'].includes(result.status)).length, [lookup]);
+  const missed = useMemo(() => _.filter(lookup || {}, (result) => !['exact', 'approximate', 'later'].includes(result.status)).length, [lookup]);
+  const later = useMemo(() => _.filter(lookup || {}, { status: 'later' }).length, [lookup]);
 
   const acceptedCount = _.filter(found, (result) => accepted[result.id]).length;
 
@@ -182,7 +184,8 @@ const UnlocatedPlaces = ({ site }) => {
         <details className='details' open={!!lookup}>
           <summary>Look up their addresses all at once</summary>
           <p className='muted'>
-            Uses { data.geocoder } (U.S. street addresses). Nothing is saved until you review what was found.
+            Uses { data.geocoder }. Without a country, an address is tried as a U.S. address first. Nothing is
+            saved until you review what was found.
           </p>
           <div className='grid-2'>
             { _.map(PARTS, (part) => (
@@ -199,7 +202,7 @@ const UnlocatedPlaces = ({ site }) => {
                       aria-label={`${part.label} for every place`}
                       className='input'
                       onChange={(e) => setAddress({ ...address, [`${part.key}_value`]: e.target.value })}
-                      placeholder={part.key === 'city' ? 'e.g. Savannah' : part.key === 'state' ? 'e.g. GA' : ''}
+                      placeholder={part.placeholder || ''}
                       value={address?.[`${part.key}_value`] || ''}
                     />
                   )}
@@ -217,6 +220,13 @@ const UnlocatedPlaces = ({ site }) => {
                 Found { found.length }: { _.filter(found, { status: 'exact' }).length } exactly, { _.filter(found, { status: 'approximate' }).length } near
                 the address (check these: an old street name can match the wrong street). { missed } not found; place those on the map below.
               </p>
+              { later > 0 && (
+                <p className='muted'>
+                  { later } more not looked up yet: OpenStreetMap answers one address a second, so each lookup asks it about
+                  a few. Save these, then look up again for the next ones.
+                </p>
+              )}
+              { _.some(found, { source: 'openstreetmap' }) && <OsmAttribution /> }
               { found.length > 0 && (
                 <>
                   <div className='table-scroll'>

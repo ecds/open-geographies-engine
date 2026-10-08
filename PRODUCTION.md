@@ -41,8 +41,16 @@ where they meet these. Today's reference deployment is the demo stack in [`demo/
   access to the index), `IIIF_CLOUD_URL` + `IIIF_CLOUD_API_KEY` + `IIIF_CLOUD_PROJECT_ID`
   (photo copies). On FairData these are the host's existing IIIF settings: one IIIF Cloud
   project per instance, with each atlas's photos kept apart by its project's storage key
-  (`projects.use_storage_key`, on by default). `OG_GEOCODER=none` turns off US Census
-  address lookups (on by default).
+  (`projects.use_storage_key`, on by default).
+- [ ] **Address lookups**: U.S. addresses go to the Census Bureau's batch geocoder; other
+  countries' (and U.S.-first misses) to OpenStreetMap's Nominatim, one request a second per
+  process, answers cached 30 days in `Rails.cache` (so give the host a shared cache store).
+  The public server (the default) wants no bulk geocoding: an import sends it at most 500
+  addresses. For more, run a Nominatim of your own or use a compatible service:
+  `OG_NOMINATIM_URL` (and `OG_NOMINATIM_MAX_ROWS` to cap it), `OG_NOMINATIM_EMAIL` (a contact
+  sent with each request; the User-Agent names the platform and `CORE_DATA_PUBLIC_URL`).
+  `OG_NOMINATIM_URL=none` keeps lookups to U.S. addresses; `OG_GEOCODER=none` turns them
+  off. Locations from OpenStreetMap are ODbL data; the console credits them.
 - [ ] **Migrations**: the host doesn't copy engine migrations on its own. Run
   `bin/rails railties:install:migrations FROM=open_geographies_platform` (and the
   indexing engine's, `FROM=open_geographies`), then `db:migrate`.
@@ -54,7 +62,8 @@ where they meet these. Today's reference deployment is the demo stack in [`demo/
   `/core_data/sites/*/assets` (TIFF scans) and **50 MB** for dataset uploads. nginx's
   default is 1 MB.
 - [ ] **Outbound network from the host**: DNS (custom-domain checks use the system
-  resolver), `api.geonames.org`, `geocoding.geo.census.gov`, IIIF Cloud, and any public
+  resolver), `api.geonames.org`, `geocoding.geo.census.gov`, `nominatim.openstreetmap.org` (or
+  your `OG_NOMINATIM_URL`), IIIF Cloud, and any public
   web address a curator's photo links point at. Photo downloads refuse private and loopback
   addresses.
 - [ ] **Cron**: `bin/rails open_geographies:check_domains` hourly. It re-checks custom-domain

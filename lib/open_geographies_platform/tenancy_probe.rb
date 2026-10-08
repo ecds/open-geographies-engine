@@ -410,6 +410,10 @@ module OpenGeographiesPlatform
         remote_files_connect
       end
 
+      group 'addresses go to the Census (U.S.) or OpenStreetMap (elsewhere)' do
+        geocoder_routing
+      end
+
       group 'an atlas\'s history: its project reads it; editors restore content, never what owners decide' do
         history(a, b)
       end
@@ -907,6 +911,29 @@ module OpenGeographiesPlatform
     ensure
       listener&.kill
       server&.close
+    end
+
+    # Which provider an address goes to, and how a Nominatim answer is read.
+    # No network: with a cap of 0, nothing is sent to OpenStreetMap.
+    def geocoder_routing
+      geocoder = ::CoreDataConnector::DatasetImports::Geocoder
+      nominatim = geocoder::Nominatim
+      routes = { '' => :census_first, 'USA' => :census, 'United States' => :census, 'U.S.' => :census, 'Kenya' => :openstreetmap, 'mx' => :openstreetmap }
+      check 'a U.S. address goes to the Census; another country\'s to OpenStreetMap; none, the Census first',
+            routes.all? { |country, route| geocoder.route(['1 Main St', '', '', '', country]) == route },
+            routes.to_h { |country, _| [country, geocoder.route(['1 Main St', '', '', '', country])] }.inspect
+
+      held = geocoder.locate({ nairobi: ['Kenyatta Avenue', 'Nairobi', '', '', 'Kenya'] }, openstreetmap_limit: 0, beyond: 'later')
+      check 'past the cap an address is left for later, not sent', held[:nairobi]&.status == 'later', held.inspect
+
+      check 'the structured query keeps only the parts given',
+            nominatim.structured(['70 Avenida Juárez', 'Ciudad de México', '', '', 'México']) == { street: '70 Avenida Juárez', city: 'Ciudad de México', country: 'México' }
+
+      house = { 'lat' => '19.43', 'lon' => '-99.14', 'display_name' => '70, Avenida Juárez', 'address' => { 'house_number' => '70' } }
+      street = { 'lat' => '-1.28', 'lon' => '36.82', 'display_name' => 'Kenyatta Avenue', 'address' => {} }
+      check 'a house-number match is exact; a street, or the one-line search, approximate; nothing, not found',
+            nominatim.classify(house, :structured).status == 'exact' && nominatim.classify(street, :structured).status == 'approximate' &&
+            nominatim.classify(house, :line).status == 'approximate' && nominatim.classify(nil, :structured).status == 'not_found'
     end
 
     # A 16-bit TIFF scan (what archives hand out) is stored as a JPEG.
