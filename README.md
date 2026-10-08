@@ -16,7 +16,8 @@ domain classes still live in `CoreDataConnector::`; references into the lower en
 are written `::OpenGeographies::V1::…` / `::OpenGeographies::ProjectModelRole`.
 
 Running it in production (with the renderer): [`PRODUCTION.md`](PRODUCTION.md), the
-readiness checklist. Trying it locally in one command: [`demo/`](demo/). For curators:
+readiness checklist. The whole platform on your own server (Docker Compose, HTTPS by Caddy):
+[`install/`](install/). Trying it locally in one command: [`demo/`](demo/). For curators:
 [`docs/CURATOR_GUIDE.md`](docs/CURATOR_GUIDE.md), linked from the console's header as **Guide ↗**
 (`OG_GUIDE_URL` points it elsewhere). Beside it, **Send feedback**: curators' reports
 (`FeedbackReport`, `/core_data/feedback_reports`), kept for FairData admins at

@@ -1,0 +1,172 @@
+# Open Geographies on one server. See README.md in this directory.
+#
+#   caddy          TLS for the console and every atlas (certificates on first visit)
+#   host           FairData + the Open Geographies engines (console, wizard, API)
+#   worker         its background jobs (imports, reindexes, photo copies)
+#   renderer       the public atlases
+#   db             PostGIS
+#   elasticsearch  the search index
+#   redis          the job queue
+#
+# Uploaded files are kept in the `storage` volume, or in S3 if S3_BUCKET is set.
+#
+# Only Caddy's ports are published; everything else stays on the internal network.
+name: open-geographies
+
+x-host-env: &host-env
+  DATABASE_URL: postgres://og:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/open_geographies
+  REDIS_URL: redis://redis:6379/0
+  ELASTICSEARCH_HOST: http://elasticsearch:9200
+  ELASTICSEARCH_API_KEY: ""
+  SECRET_KEY_BASE: ${SECRET_KEY_BASE:?set SECRET_KEY_BASE in .env}
+  HOSTNAME: ${PUBLIC_SCHEME:-https}://${CONSOLE_DOMAIN:?set CONSOLE_DOMAIN in .env}${PUBLIC_PORT:-}
+  CORE_DATA_PUBLIC_URL: ${PUBLIC_SCHEME:-https}://${CONSOLE_DOMAIN}${PUBLIC_PORT:-}
+  OG_ATLAS_URL_TEMPLATE: ${PUBLIC_SCHEME:-https}://{slug}.${ATLAS_DOMAIN:?set ATLAS_DOMAIN in .env}${PUBLIC_PORT:-}
+  OG_ALLOWED_HOSTS: ${CONSOLE_DOMAIN},host
+  ADMIN_EMAIL: ${ADMIN_EMAIL:?set ADMIN_EMAIL in .env}
+  ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD in .env}
+  # Blank S3_BUCKET: files stay in the `storage` volume (host/self_host.rb).
+  S3_BUCKET: ${S3_BUCKET:-}
+  S3_ENDPOINT: ${S3_ENDPOINT:-}
+  S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-false}
+  AWS_BUCKET_NAME: ${S3_BUCKET:-}
+  AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:-}
+  AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:-}
+  AWS_REGION: ${S3_REGION:-us-east-1}
+  VITE_MAP_TILER_KEY: ${VITE_MAP_TILER_KEY:-}
+  GEONAMES_USERNAME: ${GEONAMES_USERNAME:-}
+  POSTMARK_API_TOKEN: ${POSTMARK_API_TOKEN:-}
+  POSTMARK_FROM: ${POSTMARK_FROM:-}
+  IIIF_CLOUD_URL: ${IIIF_CLOUD_URL:-}
+  IIIF_CLOUD_API_KEY: ${IIIF_CLOUD_API_KEY:-}
+  IIIF_CLOUD_PROJECT_ID: ${IIIF_CLOUD_PROJECT_ID:-}
+  OG_NOMINATIM_EMAIL: ${OG_NOMINATIM_EMAIL:-}
+  OG_NOMINATIM_URL: ${OG_NOMINATIM_URL:-https://nominatim.openstreetmap.org}
+  OG_NOMINATIM_MAX_ROWS: ${OG_NOMINATIM_MAX_ROWS:-}
+  OG_GEOCODER: ${OG_GEOCODER:-census}
+
+services:
+  caddy:
+    # The Caddyfile is built in rather than mounted, so the stack has no bind
+    # mounts and runs from any folder. After editing it: `docker compose up -d --build caddy`.
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM caddy:2
+        ARG CADDYFILE=Caddyfile
+        COPY $${CADDYFILE} /etc/caddy/Caddyfile
+      args:
+        CADDYFILE: ${CADDYFILE:-Caddyfile}
+    image: open-geographies-caddy
+    restart: unless-stopped
+    depends_on:
+      - host
+      - renderer
+    environment:
+      CONSOLE_DOMAIN: ${CONSOLE_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+
+  host:
+    build:
+      context: host
+      args:
+        HOST_REF: ${HOST_REF:-og/platform-engine}
+        ENGINE_REF: ${ENGINE_REF:-}
+        VITE_MAP_TILER_KEY: ${VITE_MAP_TILER_KEY:-}
+    image: open-geographies-host
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment: *host-env
+    volumes:
+      - storage:/app/storage
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:3000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 40
+      start_period: 60s
+
+  worker:
+    image: open-geographies-host
+    restart: unless-stopped
+    command: ["worker"]
+    depends_on:
+      # Healthy once the database (and the engines' migrations) are ready.
+      host:
+        condition: service_healthy
+    environment: *host-env
+    volumes:
+      - storage:/app/storage
+
+  renderer:
+    build:
+      context: https://github.com/ecds/core-data-places.git#${RENDERER_REF:-main}
+    image: open-geographies-renderer
+    restart: unless-stopped
+    depends_on:
+      - host
+      - elasticsearch
+    environment:
+      OG_BASE_DOMAIN: ${ATLAS_DOMAIN}
+      # Server-side calls stay on the internal network.
+      OG_CONSOLE_URL: http://host:3000
+      OG_CORE_DATA_INTERNAL_URL: http://host:3000
+      OG_ELASTICSEARCH_URL: http://elasticsearch:9200
+      OG_TILE_SERVER: ${OG_TILE_SERVER:-}
+
+  db:
+    image: postgis/postgis:16-3.4-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: og
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: open_geographies
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U og -d open_geographies"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      # Internal network only; nothing outside the stack can reach it.
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms${ES_HEAP:-1g} -Xmx${ES_HEAP:-1g}
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redisdata:/data
+
+volumes:
+  pgdata:
+  esdata:
+  redisdata:
+  storage:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,17 @@
+# Trying the install on one computer, without DNS or certificates:
+# CONSOLE_DOMAIN=console.localhost, ATLAS_DOMAIN=atlas.localhost,
+# PUBLIC_SCHEME=http, HTTP_PORT=8080, PUBLIC_PORT=:8080, CADDYFILE=Caddyfile.local.
+{
+	auto_https off
+}
+
+http://{$CONSOLE_DOMAIN} {
+	request_body {
+		max_size 100MB
+	}
+	reverse_proxy host:3000
+}
+
+http:// {
+	reverse_proxy renderer:8080
+}

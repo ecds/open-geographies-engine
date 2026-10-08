@@ -1,0 +1,30 @@
+# TLS for the console and every atlas. Certificates come from Let's Encrypt
+# on first visit; for an atlas's address only when the console vouches for
+# the name (an existing atlas's platform address, or a domain a curator has
+# connected), so nobody can make this server request certificates for
+# arbitrary names.
+{
+	email {$ACME_EMAIL}
+	on_demand_tls {
+		ask http://host:3000/core_data/public/v1/domains/allowed
+	}
+}
+
+# The FairData console, the atlas wizard and settings, and the API.
+{$CONSOLE_DOMAIN} {
+	encode zstd gzip
+	# Archival TIFF scans and dataset uploads.
+	request_body {
+		max_size 100MB
+	}
+	reverse_proxy host:3000
+}
+
+# Every other name is an atlas: <slug>.<ATLAS_DOMAIN>, or a curator's own domain.
+https:// {
+	tls {
+		on_demand
+	}
+	encode zstd gzip
+	reverse_proxy renderer:8080
+}

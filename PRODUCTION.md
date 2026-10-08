@@ -5,7 +5,9 @@ the two parts Open Geographies adds to FairData: the platform engine (`open_geog
 mounted in the FairData host) and the shared renderer (`ecds/core-data-places`, one Node
 server for every atlas). The indexing engine (`open_geographies_fairdata`) and FairData itself are referenced only
 where they meet these. Today's reference deployment is the demo stack in [`demo/`](demo/)
-(Docker Compose, development mode).
+(Docker Compose, development mode). For a production deployment on one server (production
+mode, the renderer's production build, on-demand TLS for atlas domains), see
+[`install/`](install/).
 
 ## 1. Renderer
 
