@@ -222,3 +222,15 @@ An open item with the indexing engine (the index-mapping proposal of 2026-09-30)
 - [ ] FairData's navigation links to `/atlases`.
 - [ ] Publish the atlas from the console (atlases start as drafts), open it at its address,
   and check `/robots.txt` and `/sitemap.xml` there.
+- [ ] **Certificates from the real certificate authority, end to end.** Once DNS and the proxy are in
+  place, check each of these:
+  - the console answers over HTTPS, and plain HTTP redirects to it;
+  - an atlas's platform address gets its certificate on first visit;
+  - a name nobody created (`https://no-such-atlas.<OG_BASE_DOMAIN>`, or any stray name pointed at
+    the server) gets no certificate: the TLS handshake fails, and the `allowed` endpoint answered 404;
+  - a connected custom domain, and its `www` pair, get certificates. The atlas's platform address
+    then redirects (301) to the custom domain.
+
+  The self-hosted install (`install/`) passed all four on 2026-10-08 with Caddy's own local
+  CA (`local_certs`) in place of Let's Encrypt, on one machine. Still untested: issuance from the
+  real CA, which needs public DNS and open ports 80/443. That's this check.
