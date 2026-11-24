@@ -86,9 +86,7 @@ namespace :open_geographies do
       definition = relationship.project_model_relationship
       next unless definition
 
-      primary_ok = relationship.primary_record.nil? || guards.record_in_model?(relationship.primary_record, definition.primary_model_id)
-      related_ok = relationship.related_record.nil? || guards.record_in_model?(relationship.related_record, definition.related_model_id)
-      refused << "relationship #{relationship.id} (definition #{definition.id} \"#{definition.name}\")" unless primary_ok && related_ok
+      refused << "relationship #{relationship.id} (definition #{definition.id} \"#{definition.name}\")" unless guards.relationship_allowed?(relationship)
     end
 
     definitions = CoreDataConnector::ProjectModelRelationship.includes(:primary_model, :related_model).to_a

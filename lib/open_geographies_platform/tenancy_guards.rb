@@ -22,8 +22,12 @@ module OpenGeographiesPlatform
   # Each guard is a validation, so the request is refused (422) and nothing
   # changes. Sharing is honoured: a model another project has granted access
   # to (ProjectModelAccess), and records shared into a model
-  # (ProjectModelShare), stay usable exactly as before. Existing rows are only
-  # checked when the keys that decide their project change.
+  # (ProjectModelShare), stay usable exactly as before. So is a project that
+  # has made itself public: a discoverable project's models can be linked to
+  # (HRCGA's "Contained In" points at project 7's counties), but only its
+  # published records, which its public API already serves, so a link reveals
+  # nothing new. Existing rows are only checked when the keys that decide
+  # their project change.
   #
   # Verify with: bin/rails open_geographies:host_tenancy_probe HOST=...
   module TenancyGuards
@@ -51,7 +55,38 @@ module OpenGeographiesPlatform
       return false unless model
 
       model.project_id == project_id ||
-        CoreDataConnector::ProjectModelAccess.where(project_model_id: model.id, project_id: project_id).exists?
+        granted?(model.id, project_id) ||
+        model.project&.discoverable == true
+    end
+
+    def self.granted?(model_id, project_id)
+      CoreDataConnector::ProjectModelAccess.where(project_model_id: model_id, project_id: project_id).exists?
+    end
+
+    # Whether a project may link to a record: its own, one in a model granted
+    # to it, or a published record of a discoverable project.
+    def self.record_linkable_by?(record, project_id)
+      model = record.try(:project_model)
+      return true unless model # not an owned record; the host decides
+      return true if model.project_id == project_id || granted?(model.id, project_id)
+
+      model.project&.discoverable == true && record.try(:published) != false
+    end
+
+    # Whether a relationship stays inside what its project may use: each
+    # record belongs to its definition's model (own or shared in), and each is
+    # one the definition's project may link to. The guard and the dry-run
+    # task both use this.
+    def self.relationship_allowed?(relationship)
+      definition = relationship.project_model_relationship
+      return true unless definition&.primary_model
+
+      project_id = definition.primary_model.project_id
+
+      [[relationship.primary_record, definition.primary_model_id],
+       [relationship.related_record, definition.related_model_id]].all? do |record, model_id|
+        record.nil? || (record_in_model?(record, model_id) && record_linkable_by?(record, project_id))
+      end
     end
 
     # Whether a record belongs in a model: it is the model's own, or it is
@@ -140,14 +175,19 @@ module OpenGeographiesPlatform
 
       def og_records_in_models
         definition = project_model_relationship
-        return unless definition # the host's own presence validation reports it
+        return unless definition&.primary_model # the host's own validations report it
 
-        unless primary_record.nil? || TenancyGuards.record_in_model?(primary_record, definition.primary_model_id)
-          errors.add(:primary_record, 'is not a record of this relationship’s model')
-        end
+        project_id = definition.primary_model.project_id
 
-        unless related_record.nil? || TenancyGuards.record_in_model?(related_record, definition.related_model_id)
-          errors.add(:related_record, 'is not a record of this relationship’s model')
+        { primary_record: [primary_record, definition.primary_model_id],
+          related_record: [related_record, definition.related_model_id] }.each do |key, (record, model_id)|
+          next if record.nil?
+
+          if !TenancyGuards.record_in_model?(record, model_id)
+            errors.add(key, 'is not a record of this relationship’s model')
+          elsif !TenancyGuards.record_linkable_by?(record, project_id)
+            errors.add(key, 'belongs to another project that hasn’t shared or published it')
+          end
         end
       end
     end
