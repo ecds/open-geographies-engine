@@ -1,3 +1,5 @@
+require 'open_geographies_platform/tenancy_guards'
+
 module OpenGeographiesPlatform
   # Applies Open Geographies' in-place extensions to upstream Core Data classes —
   # the OG-coupled subset of the changes the fork used to make directly to upstream
@@ -19,6 +21,7 @@ module OpenGeographiesPlatform
       wire_job_policy!
       wire_import_csv_job!
       wire_authority_bulk!
+      OpenGeographiesPlatform::TenancyGuards.apply!
     end
 
     # Job → the OG job types + their after_create_commit dispatch.
