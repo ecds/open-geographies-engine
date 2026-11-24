@@ -60,8 +60,9 @@ export const Field = ({ children, error, hint, label, required }) => (
   </label>
 );
 
-export const Select = ({ disabled, loading, onChange, options, placeholder, value }) => (
+export const Select = ({ ariaLabel, disabled, loading, onChange, options, placeholder, value }) => (
   <select
+    aria-label={ariaLabel}
     className='input'
     disabled={disabled || loading}
     onChange={(e) => onChange(e.target.value)}

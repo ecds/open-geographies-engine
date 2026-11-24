@@ -31,6 +31,7 @@ import { CROP_SHAPES, ImageCropContext } from '../components/ImageCropper';
 import PagesEditor from '../components/PagesEditor';
 import SectionsEditor from '../components/SectionsEditor';
 import TopicsEditor from '../components/TopicsEditor';
+import TypeIconsEditor from '../components/TypeIconsEditor';
 import { Button, Field, Message, MultiSelect, onTabListKeyDown, Select, Tag } from '../components/ui';
 import { paths } from '../router';
 
@@ -720,6 +721,13 @@ const AtlasEditor = ({ id, navigate }) => {
                 value={layer.end_year}
               />
             </div>
+          )}
+          { layer.layer_type === 'pmtiles' && (
+            <TypeIconsEditor
+              onChange={(typeIcons) => updateLayer(index, { type_icons: typeIcons })}
+              types={_.pluck(topicCategories?.terms || [], 'name')}
+              value={layer.type_icons}
+            />
           )}
           { layer.overlay === true && OPACITY_TYPES.includes(layer.layer_type) && (
             <Field

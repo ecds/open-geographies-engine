@@ -399,6 +399,11 @@ of map tiles, a historic map, a PMTiles archive or a KML image also has an **Opa
 when the map opens (a historic map starts at 50% unless you set it). Visitors can change it from
 the layers button.
 
+A **Vector tile overlay** of the atlas's own places can draw each type with an icon and colour
+instead of a dot. Under **Icons by type**, choose **+ Add an icon**, then a type, an icon and a
+colour. A place with several types takes the first one in the list, so put the most specific
+types first. Places of other types stay dots.
+
 ## 13. Languages
 
 An atlas can be in English, Spanish, French, German, Italian and Portuguese. Under **Settings →

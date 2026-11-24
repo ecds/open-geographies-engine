@@ -63,6 +63,13 @@ a { color: var(--og-info); }
 .field-error { display: block; color: var(--og-negative); font-size: 13px; margin-top: 4px; }
 .facet-label-row { display: grid; grid-template-columns: minmax(120px, 220px) 1fr; gap: 12px; align-items: center; margin-bottom: 6px; }
 .facet-label-row .muted { margin: 0; overflow-wrap: anywhere; }
+.type-icons { margin: 12px 0; }
+.type-icons-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 160px) 44px auto; gap: 8px; align-items: center; margin-bottom: 6px; }
+.type-icons-color { width: 44px; height: 36px; padding: 2px; border: 1px solid var(--og-border); border-radius: 6px; background: var(--og-surface); }
+@media (max-width: 720px) {
+  .type-icons-row { grid-template-columns: minmax(0, 1fr) 44px auto; }
+  .type-icons-row > select:first-child { grid-column: 1 / -1; }
+}
 .field.has-error .input { border-color: var(--og-negative); }
 .required { color: var(--og-negative); }
 .input { width: 100%; padding: 8px 10px; border: 1px solid var(--og-border); border-radius: 6px; font: inherit; background: #fff; color: inherit; }
