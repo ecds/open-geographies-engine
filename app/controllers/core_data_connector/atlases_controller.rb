@@ -154,13 +154,21 @@ module CoreDataConnector
       name
     end
 
-    # The stored config for a fresh atlas: an OSM base layer and one places
-    # search wired to the new collection. The platform-derived sections
+    # The stored config for a fresh atlas: two base maps, the renderer's
+    # simple map first (land, water and roads only, no shops or place
+    # labels, so the atlas's own data is what's named on the map) and
+    # OpenStreetMap for fuller context; and one places search wired to the
+    # new collection. The platform-derived sections
     # (core_data connection, elasticsearch index name) are
     # filled in by Site#to_site_config at publish time.
     def default_config(search_collection, locale)
       {
         'layers' => [
+          {
+            'name' => 'Simple map',
+            'layer_type' => 'vector',
+            'url' => '/styles/simple.json'
+          },
           {
             'name' => 'OpenStreetMap',
             'layer_type' => 'raster',

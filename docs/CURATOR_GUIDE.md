@@ -399,10 +399,16 @@ of map tiles, a historic map, a PMTiles archive or a KML image also has an **Opa
 when the map opens (a historic map starts at 50% unless you set it). Visitors can change it from
 the layers button.
 
-A **Vector tile overlay** of the atlas's own places can draw each type with an icon and colour
-instead of a dot. Under **Icons by type**, choose **+ Add an icon**, then a type, an icon and a
+A new atlas starts with two base maps: **Simple map**, which shows land, water, roads and
+boundaries but no shops or place labels, so the atlas's own places are what's named on the map;
+and **OpenStreetMap**, for fuller context. Visitors switch between them from the layers button;
+the first in the list is the one the map opens with.
+
+**Map icons**, at the top of the tab, draw the places in the atlas's search results with an icon
+and colour for their type instead of a dot. Choose **+ Add an icon**, then a type, an icon and a
 colour. A place with several types takes the first one in the list, so put the most specific
-types first. Places of other types stay dots.
+types first. Places of other types stay dots. A **Vector tile overlay** of the atlas's places uses
+the same icons, or its own under its **Icons by type**.
 
 ## 13. Languages
 

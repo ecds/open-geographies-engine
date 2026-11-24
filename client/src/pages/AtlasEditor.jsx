@@ -275,6 +275,18 @@ const AtlasEditor = ({ id, navigate }) => {
    * Hidden fields live under detail_pages.models.<model>.exclude. detail_pages
    * is otherwise advanced JSON, so the advanced text is refreshed to match.
    */
+  /**
+   * The atlas-wide icons by type (`map.type_icons`): its search results', and
+   * its tile overlays' unless one sets its own. Like the detail-page fields,
+   * this is otherwise advanced JSON, so the advanced text is refreshed.
+   */
+  const updateTypeIcons = (typeIcons) => {
+    const map = _.omit({ ...(siteConfig.map || {}), type_icons: typeIcons }, (value) => value === undefined);
+    const next = _.isEmpty(map) ? _.omit(siteConfig, 'map') : { ...siteConfig, map };
+    update({ config: next });
+    setAdvancedText(JSON.stringify(_.omit(next, MANAGED_KEYS), null, 2));
+  };
+
   const updateExclude = (model, exclude) => {
     const models = { ...(siteConfig.detail_pages?.models || {}) };
     models[model] = { ...(models[model] || {}), exclude };
@@ -670,6 +682,13 @@ const AtlasEditor = ({ id, navigate }) => {
   const renderLayers = () => (
     <>
       <HistoricMapPanel onAdd={(layer) => updateConfig({ layers: [...(siteConfig.layers || []), layer] })} />
+      <h2 className='h-section'>Map icons</h2>
+      <p className='muted'>For the places in the atlas's search results, and its vector tile overlays unless one sets its own below.</p>
+      <TypeIconsEditor
+        onChange={updateTypeIcons}
+        types={_.pluck(topicCategories?.terms || [], 'name')}
+        value={siteConfig.map?.type_icons}
+      />
       <h2 className='h-section'>Layers</h2>
       <p className='muted'>The base maps visitors choose from, and overlays they can switch on. Changes apply when you save.</p>
       { _.map(siteConfig.layers || [], (layer, index) => (
