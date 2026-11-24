@@ -3,10 +3,15 @@ import { Button, Select } from './ui';
 
 /**
  * The icons in the renderer's map sprite (core-data-places: icons/, built by
- * `npm run build:sprites`). Keep in step with icons/MANIFEST.json there; a
- * name the sprite doesn't have draws the renderer's default marker.
+ * `npm run build:sprites`). Keep in step with icons/MANIFEST.json there: a
+ * name the sprite doesn't have draws no icon on the map.
  */
-export const MAP_ICONS = ['church', 'lighthouse', 'marker', 'tree', 'water'];
+export const MAP_ICONS = [
+  'beach', 'bridge', 'building', 'cemetery', 'church', 'coral-reef', 'forest', 'fort', 'golf',
+  'government', 'harbor-11', 'hospital', 'house', 'island', 'library', 'lighthouse', 'marker',
+  'mountain', 'museum', 'park', 'plane', 'school', 'sinking-ship', 'tower', 'train', 'tree',
+  'water', 'water-flow'
+];
 
 const DEFAULT_COLOR = '#BC2635';
 
