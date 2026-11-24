@@ -66,6 +66,45 @@ namespace :open_geographies do
 
     puts "\nAll #{probe.checks} checks passed."
   end
+
+  # Read-only: which existing rows the tenancy guards would refuse if they
+  # were saved again with a changed project key. Run it on a copy of
+  # production (or production itself; it writes nothing) before relying on
+  # the guards. Each row it lists is a link or definition that already
+  # crosses projects without a share, and is worth a look.
+  #
+  #   bin/rails open_geographies:tenancy_guards_dry_run [LIMIT=20]
+  desc 'List existing relationships and definitions the tenancy guards would refuse (read-only)'
+  task tenancy_guards_dry_run: :environment do
+    guards = OpenGeographiesPlatform::TenancyGuards
+    limit = ENV.fetch('LIMIT', '20').to_i
+    refused = []
+    checked = 0
+
+    CoreDataConnector::Relationship.includes(:project_model_relationship).find_each do |relationship|
+      checked += 1
+      definition = relationship.project_model_relationship
+      next unless definition
+
+      primary_ok = relationship.primary_record.nil? || guards.record_in_model?(relationship.primary_record, definition.primary_model_id)
+      related_ok = relationship.related_record.nil? || guards.record_in_model?(relationship.related_record, definition.related_model_id)
+      refused << "relationship #{relationship.id} (definition #{definition.id} \"#{definition.name}\")" unless primary_ok && related_ok
+    end
+
+    definitions = CoreDataConnector::ProjectModelRelationship.includes(:primary_model, :related_model).to_a
+    bad_definitions = definitions.select do |definition|
+      definition.primary_model && definition.related_model &&
+        !guards.model_usable_by?(definition.related_model, definition.primary_model.project_id)
+    end
+
+    puts "Relationships checked: #{checked}; would be refused: #{refused.size}"
+    refused.first(limit).each { |line| puts "  #{line}" }
+    puts "Definitions checked: #{definitions.size}; would be refused: #{bad_definitions.size}"
+    bad_definitions.first(limit).each do |definition|
+      puts "  definition #{definition.id} \"#{definition.name}\": project #{definition.primary_model.project_id} -> " \
+           "model #{definition.related_model.id} of project #{definition.related_model.project_id}"
+    end
+  end
 end
 
 namespace :open_geographies do
