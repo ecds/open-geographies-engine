@@ -59,7 +59,6 @@ module OpenGeographiesPlatform
     extend ActiveSupport::Concern
 
     JOB_TYPE_REINDEX = 'reindex'
-    JOB_TYPE_BUILD_TILES = 'build_tiles'
     JOB_TYPE_PROVISION_ATLAS = 'provision_atlas'
     JOB_TYPE_IMPORT_PLACES = 'import_places'
     JOB_TYPE_IMPORT_DATASET = 'import_dataset'
@@ -67,7 +66,6 @@ module OpenGeographiesPlatform
 
     included do
       after_create_commit :queue_reindex_job, if: :reindex?
-      after_create_commit :queue_build_tiles_job, if: :build_tiles?
       after_create_commit :queue_provision_atlas_job, if: :provision_atlas?
       after_create_commit :queue_import_places_job, if: :import_places?
       after_create_commit :queue_import_dataset_job, if: :import_dataset?
@@ -76,10 +74,6 @@ module OpenGeographiesPlatform
 
     def reindex?
       job_type == JOB_TYPE_REINDEX
-    end
-
-    def build_tiles?
-      job_type == JOB_TYPE_BUILD_TILES
     end
 
     def provision_atlas?
@@ -102,10 +96,6 @@ module OpenGeographiesPlatform
 
     def queue_reindex_job
       CoreDataConnector::ReindexAtlasJob.perform_later(id)
-    end
-
-    def queue_build_tiles_job
-      CoreDataConnector::BuildTilesJob.perform_later(id)
     end
 
     def queue_provision_atlas_job

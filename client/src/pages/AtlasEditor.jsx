@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import _ from 'underscore';
 import {
-  buildTiles,
   errorMessages,
   fetchSearchCollections,
   fetchCategories,
@@ -395,10 +394,6 @@ const AtlasEditor = ({ id, navigate }) => {
     setReloads((n) => n + 1);
   };
 
-  const onBuildTiles = () => buildTiles(site.id)
-    .then(() => setNotice('Tile generation queued — watch the Jobs tab.'))
-    .catch((error) => setErrors(errorMessages(error)));
-
   const onReindex = (collection) => reindexSearchCollection(collection.id)
     .then(() => setNotice(`Reindex of "${collection.name}" queued — watch the Jobs tab.`))
     .catch((error) => setErrors(errorMessages(error)));
@@ -443,9 +438,6 @@ const AtlasEditor = ({ id, navigate }) => {
           <Button onClick={() => onReindex(collection)}>Reindex</Button>
         </div>
       ))}
-      <h2 className='h-section'>Map tiles</h2>
-      <p className='muted'>Generates PMTiles from the project's place geometries — the full-dataset map layer for large collections. Runs as a job.</p>
-      <Button onClick={onBuildTiles}>Build map tiles</Button>
       { site.permissions?.delete && (
         <>
           <h2 className='h-section'>Delete</h2>

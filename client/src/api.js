@@ -191,7 +191,6 @@ export const restoreSiteVersion = (id, versionId, parts) => request('POST', `/co
 
 export const deleteSiteAsset = (id, key) => request('DELETE', `/core_data/sites/${id}/assets/${encodeURIComponent(key)}`);
 
-export const buildTiles = (id) => request('POST', `/core_data/sites/${id}/build_tiles`, { body: {} });
 
 export const fetchSearchCollections = (projectId) => request('GET', '/core_data/search_collections', {
   params: { per_page: 0, project_id: projectId }

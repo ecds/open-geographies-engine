@@ -14,6 +14,8 @@ const JOB_LABELS = {
   import_dataset: 'Import a file',
   copy_photos: 'Copy photos',
   reindex: 'Reindex search',
+  // Retired: tiles are built by the indexing engine (og_pmtiles). Kept so
+  // earlier runs still show by name in the jobs list.
   build_tiles: 'Build map tiles'
 };
 

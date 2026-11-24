@@ -249,7 +249,6 @@ module OpenGeographiesPlatform
         refused 'update site', patch("/core_data/sites/#{a.site.id}", { site: { name: 'pwned' } }, b.token)
         refused 'delete site', delete("/core_data/sites/#{a.site.id}", b.token)
         refused 'reindex collection', post("/core_data/search_collections/#{a.collection.id}/reindex", {}, b.token)
-        refused 'build tiles', post("/core_data/sites/#{a.site.id}/build_tiles", {}, b.token)
         refused 'import preview', post("/core_data/projects/#{a.project.id}/place_imports/preview", { place_import: { source: 'geonames', area: {}, filters: {} } }, b.token)
         refused 'import', post("/core_data/projects/#{a.project.id}/place_imports", { place_import: { source: 'geonames', area: {}, filters: {} } }, b.token)
         refused 'admin_children scoped to project', get("/core_data/projects/#{a.project.id}/place_imports/admin_children?geoname_id=6295630", b.token)
